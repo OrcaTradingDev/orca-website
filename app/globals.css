@@ -1,26 +1,158 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+/* ================================
+   OrcaTrading Theme (Dark)
+   ================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg:            #0b1220;
+  --panel:         #0f1729;
+  --muted-text:    #a5b4cf;
+  --primary:       #22d3ee;
+  --primary-600:   #0891b2;
+  --accent:        #34d399;
+  --danger:        #ef4444;
+
+  --background:               var(--bg);
+  --foreground:               #e8eefc;
+
+  --card:                     var(--panel);
+  --card-foreground:          #e8eefc;
+
+  --popover:                  var(--panel);
+  --popover-foreground:       #e8eefc;
+
+  --primary-foreground:       #06202a;
+  --secondary:                #ecfeff;
+  --secondary-foreground:     #06202a;
+
+  --muted:                    rgba(255,255,255,0.06);
+  --muted-foreground:         var(--muted-text);
+
+  --accent-bg:                rgba(255,255,255,0.06);
+  --accent-foreground:        #e8eefc;
+
+  --destructive:              var(--danger);
+  --destructive-foreground:   #ffffff;
+
+  --border:                   rgba(255,255,255,0.08);
+  --input:                    rgba(255,255,255,0.1);
+  --ring:                     var(--primary);
+
+  --radius:                   0.75rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+/* Optional light mode */
+@media (prefers-color-scheme: light) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff;
+    --foreground: #0b1220;
+
+    --card: #ffffff;
+    --card-foreground: #0b1220;
+
+    --popover: #ffffff;
+    --popover-foreground: #0b1220;
+
+    --primary: #0891b2;
+    --primary-foreground: #ffffff;
+
+    --secondary: #0b1220;
+    --secondary-foreground: #ffffff;
+
+    --muted: #f1f5f9;
+    --muted-foreground: #475569;
+
+    --accent-bg: #f1f5f9;
+    --accent-foreground: #0b1220;
+
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #22d3ee;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ================================
+   Base styles
+   ================================ */
+@layer base {
+  * { border-color: var(--border); }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* reset links + strong headings for “preview” look */
+  a { text-decoration: none; color: inherit; }
+  h1,h2,h3 { font-weight: 800; }
 }
+
+/* Selection + focus */
+::selection {
+  background: color-mix(in oklab, var(--primary) 35%, transparent);
+  color: #ffffff;
+}
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--ring) 60%, transparent);
+}
+
+/* Glow + grid utilities */
+.orca-glow { position: relative; }
+.orca-glow::before {
+  content: "";
+  position: absolute;
+  inset: -200px;
+  pointer-events: none;
+  background: radial-gradient(
+    60% 60% at 50% 40%,
+    color-mix(in oklab, var(--primary) 18%, transparent) 0%,
+    transparent 60%
+  );
+  z-index: 0;
+}
+.orca-grid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  opacity: 0.4;
+  z-index: 0;
+}
+
+/* Panels / helpers */
+.orca-panel {
+  background: color-mix(in oklab, var(--panel) 95%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+.text-muted { color: var(--muted-text); }
+.orca-divider { border-top: 1px solid var(--border); }
+
+/* Scrollbar */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
