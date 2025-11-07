@@ -1,17 +1,12 @@
 // app/layout.tsx
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OrcaTrading",
-  description: "Automate, analyze, trade smarter.",
-};
-
-export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  viewportFit: "cover",
+  description:
+    "OrcaTrading unites automation and market analytics in one transparent ecosystem.",
+  metadataBase: new URL("https://tradewithorca.com"),
 };
 
 export default function RootLayout({
@@ -20,16 +15,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full bg-[#0A0F1A]">
-      {/* 
-        NOTE:
-        - overflow-x-hidden on <body> bans horizontal scroll.
-        - overflow-x-clip on main isolates any decorative off-screen elements.
-      */}
-      <body className="min-h-dvh overflow-x-hidden antialiased">
-        <main className="relative isolate overflow-x-clip">
-          {children}
-        </main>
+    <html lang="en">
+      {/* Keep the viewport strict to stop zoom/overflow quirks on iOS */}
+      <head>
+        <meta
+          name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover"
+        />
+      </head>
+      <body className="site">
+        <main className="site__main">{children}</main>
       </body>
     </html>
   );
