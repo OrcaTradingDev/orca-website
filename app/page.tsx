@@ -1,167 +1,154 @@
 // app/page.tsx
+
 export default function Page() {
   return (
     <>
-      {/* HERO */}
-      <section className="section">
+      {/* ---------- HERO ---------- */}
+      <header className="section no-x-scroll" style={{ paddingTop: "3.5rem" }}>
         <div className="container">
-          <span className="pill" aria-label="country of origin">
-            ● Engineered in Germany
-          </span>
-
-          <h1 style={{ marginTop: "16px" }}>
-            Automate, <br /> Analyze, Trade Smarter
-          </h1>
-
-          <p className="lede" style={{ maxWidth: 760 }}>
+          <p className="eyebrow">Engineered in Germany</p>
+          <h1>Automate, Analyze, Trade Smarter</h1>
+          <p style={{ maxWidth: 900, color: "#b7c6d8", marginTop: "0.75rem" }}>
             OrcaTrading unites automation and market analytics in one transparent
             ecosystem.
           </p>
 
-          <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 520 }}>
-            <a className="btn btn--brand" href="#pricing">
-              View Screener
-            </a>
-            <a className="btn" href="#values">
-              Explore platform
-            </a>
+          <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.15rem", flexWrap: "wrap" }}>
+            <a className="btn btn--primary" href="#pricing">View Screener</a>
+            <a className="btn btn--ghost" href="#products">Explore platform</a>
           </div>
         </div>
-      </section>
+      </header>
 
-      {/* CORE VALUES */}
-      <section id="values" className="section">
-        <div className="container">
-          <h2>Core values</h2>
-          <p className="lede">What defines how we build and ship.</p>
-
-          <div className="grid grid--cards">
-            <article className="card">
-              <h3 className="card__title">Automation with trust</h3>
-              <p>
-                Algorithms are rules-based, data-verified, and transparent across our
-                community.
-              </p>
-              <p className="muted" style={{ marginTop: 12 }}>
-                Avg. execution latency: <strong>35ms</strong> • 12-month live test
-                data
-              </p>
-            </article>
-
-            <article className="card">
-              <h3 className="card__title">Insights in seconds</h3>
-              <p>
-                Visual screener with multi-timeframe analysis, adaptable from scalpers
-                to long-term investors.
-              </p>
-            </article>
-
-            <article className="card">
-              <h3 className="card__title">Community collaboration</h3>
-              <p>
-                We identify trader pain points together → analyze → develop solutions.
-                Your feedback shapes the roadmap.
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      {/* PRODUCT PREVIEWS */}
+      {/* ---------- CORE VALUES ---------- */}
       <section className="section">
         <div className="container">
-          <h2>Product previews</h2>
+          <h2 style={{ marginBottom: "1rem" }}>Core values</h2>
 
-          <div className="grid grid--cards">
-            <article className="card">
-              <h3 className="card__title">OrcaScreener</h3>
+          <div className="grid grid--3">
+            <article className="tile">
+              <h3>Automation with trust</h3>
               <p>
-                Dashboard sample: trend strength, regime (bullish/bearish), watchlists
-                and alerts.
+                Algorithms are rules-based, data-verified, and transparent across our community.
+                <br />
+                <span style={{ color: "#67ffd1" }}>
+                  Avg. execution latency: 35ms • 12-month live test data
+                </span>
               </p>
             </article>
 
-            <article className="card">
-              <h3 className="card__title">OrcaBot</h3>
+            <article className="tile">
+              <h3>Insights in seconds</h3>
               <p>
-                Automated trend-following bot preview: strategy parameters, risk
-                controls, and execution logs.
+                Visual screener with multi-timeframe analysis, adaptable from scalpers to long-term investors.
               </p>
             </article>
 
-            <article className="card">
-              <h3 className="card__title">OrcaJournal</h3>
+            <article className="tile">
+              <h3>Community collaboration</h3>
               <p>
-                Performance tracking: stats, expectancy, and quick review prompts for
-                faster improvement.
+                We identify trader pain points together → analyze → develop solutions. Your feedback shapes the roadmap.
               </p>
             </article>
           </div>
         </div>
       </section>
 
-      {/* PRICING */}
+      {/* ---------- PRODUCTS ---------- */}
+      <section id="products" className="section">
+        <div className="container">
+          <h2 style={{ marginBottom: "1rem" }}>Product previews</h2>
+          <div className="grid grid--3">
+            <article className="tile">
+              <h3>OrcaScreener</h3>
+              <p>
+                Dashboard sample: trend strength, regime (bullish/bearish), watchlists and alerts.
+              </p>
+            </article>
+            <article className="tile">
+              <h3>OrcaBot</h3>
+              <p>
+                Automated trend-following bot preview: strategy parameters, risk controls, and execution logs.
+              </p>
+            </article>
+            <article className="tile">
+              <h3>OrcaJournal</h3>
+              <p>
+                Performance tracking: stats, expectancy, review prompts for fast improvement.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------- PRICING ---------- */}
       <section id="pricing" className="section">
         <div className="container">
-          <h2>Membership &amp; Pricing</h2>
-          <p className="lede">
-            Full access to the Screener is free during beta. Pricing begins at the V1
-            launch.
-          </p>
+          <h2 style={{ marginBottom: "1rem" }}>Membership &amp; Pricing</h2>
 
-          <div className="grid grid--pricing">
-            <article className="card plan">
-              <h3 className="card__title">Free</h3>
-              <div className="plan__price">€0</div>
-              <ul className="plan__features">
-                <li>Complete Screener</li>
-                <li>Community access</li>
+          {/* A. Standalone “Free during Beta” block — full width on mobile */}
+          <div className="pricing">
+            <div className="pricing__beta card--elevated">
+              <h3 style={{ marginBottom: "0.35rem" }}>
+                <span>Screener (Free during Beta)</span>
+                <span className="price"> €0</span>
+              </h3>
+              <ul className="ul">
+                <li>Full Screener access</li>
+                <li>Community &amp; updates</li>
                 <li>Basic alerts</li>
               </ul>
-              <a className="btn btn--brand" href="#">
+              <a className="btn btn--primary" href="#">
                 Choose plan
               </a>
-            </article>
+            </div>
 
-            <article className="card plan">
-              <h3 className="card__title">Premium</h3>
-              <div className="plan__price">€8.99</div>
-              <ul className="plan__features">
-                <li>Advanced alerts &amp; watchlists</li>
-                <li>Transparency dashboard</li>
-                <li>Priority support</li>
-              </ul>
-              <a className="btn btn--brand" href="#">
-                Choose plan
-              </a>
-            </article>
+            {/* Plans visible after V1 launch */}
+            <p style={{ margin: "0.75rem 0 0.25rem", fontWeight: 700, color: "#b7c6d8" }}>
+              After V1 Launch
+            </p>
 
-            <article className="card plan">
-              <h3 className="card__title">Institutional (Future)</h3>
-              <div className="plan__price">Custom</div>
-              <ul className="plan__features">
-                <li>Custom dashboards</li>
-                <li>Advanced APIs &amp; SLAs</li>
-                <li>Dedicated onboarding</li>
-              </ul>
-              <a className="btn btn--brand" href="#">
-                Choose plan
-              </a>
-            </article>
+            <div className="pricing__plans">
+              <article className="plan">
+                <h3>Free <span className="plan__price">€0</span></h3>
+                <ul className="ul">
+                  <li>Complete Screener</li>
+                  <li>Community access</li>
+                  <li>Basic alerts</li>
+                </ul>
+                <a className="btn btn--ghost" href="#">
+                  Choose plan
+                </a>
+              </article>
+
+              <article className="plan">
+                <h3>Premium <span className="plan__price">€8.99</span></h3>
+                <ul className="ul">
+                  <li>Advanced alerts &amp; watchlists</li>
+                  <li>Transparency dashboard</li>
+                  <li>Priority support</li>
+                </ul>
+                <a className="btn btn--primary" href="#">
+                  Choose plan
+                </a>
+              </article>
+
+              <article className="plan">
+                <h3>Institutional <span className="plan__price">(Future)</span></h3>
+                <ul className="ul">
+                  <li>Custom dashboards</li>
+                  <li>Advanced APIs &amp; SLAs</li>
+                  <li>Dedicated onboarding</li>
+                </ul>
+                <a className="btn btn--ghost" href="#">
+                  Choose plan
+                </a>
+              </article>
+            </div>
           </div>
         </div>
-      </section>
 
-      {/* COMPLIANCE */}
-      <section className="section">
-        <div className="container">
-          <h2>Trust &amp; compliance</h2>
-          <ul className="plan__features" style={{ maxWidth: 860 }}>
-            <li>German entity: OrcaTrading GmbH, Straelen</li>
-            <li>Data hosted in EU-compliant infrastructure</li>
-            <li>No investment advice — technology provider</li>
-          </ul>
-        </div>
+        <div className="page-bottom-safe" />
       </section>
     </>
   );

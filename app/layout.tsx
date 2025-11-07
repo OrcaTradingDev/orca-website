@@ -3,10 +3,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "OrcaTrading",
+  title: "OrcaTrading — Automate, Analyze, Trade Smarter",
   description:
     "OrcaTrading unites automation and market analytics in one transparent ecosystem.",
-  metadataBase: new URL("https://tradewithorca.com"),
 };
 
 export default function RootLayout({
@@ -16,15 +15,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      {/* Keep the viewport strict to stop zoom/overflow quirks on iOS */}
-      <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, viewport-fit=cover"
-        />
-      </head>
-      <body className="site">
-        <main className="site__main">{children}</main>
+      <body>
+        <div className="site">
+          {children}
+        </div>
       </body>
     </html>
   );
