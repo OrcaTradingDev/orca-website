@@ -113,6 +113,7 @@ h3 {
   text-decoration: none;
   font-weight: 700;
   padding: 0.9rem 1.15rem;
+  transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 
 .btn--primary {
@@ -124,6 +125,10 @@ h3 {
 .btn--ghost {
   background: rgba(255, 255, 255, 0.06);
   color: #dbe7f3;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
 }
 
 /* ------------- Grid utilities ------------- */
@@ -158,7 +163,7 @@ h3 {
 .tile p {
   color: #b7c6d8;
   margin: 0.25rem 0 0;
-  word-break: break-word;        /* keep narrow phones happy */
+  word-break: break-word;
   overflow-wrap: anywhere;
 }
 
@@ -168,7 +173,7 @@ h3 {
   gap: clamp(1rem, 2.5vw, 1.25rem);
 }
 
-/* 1) The highlighted “Free during Beta” block — full width on mobile */
+/* A) Highlighted “Free during Beta” — full width on mobile/desktop */
 .pricing__beta {
   padding: clamp(1rem, 2.5vw, 1.25rem);
   border-radius: 20px;
@@ -187,7 +192,7 @@ h3 {
   font-weight: 800;
 }
 
-/* 2) Normal plans — stack on mobile, 3-up on desktop */
+/* B) Normal plans — stack on mobile, 3-up on desktop */
 .pricing__plans {
   display: grid;
   gap: clamp(0.75rem, 2vw, 1rem);
@@ -204,7 +209,7 @@ h3 {
   }
 }
 
-/* plan card */
+/* Plan card */
 .plan {
   border-radius: 20px;
   background: #0f1822;
@@ -225,6 +230,14 @@ h3 {
 .ul li {
   margin: 0.25rem 0;
   color: #c8d6e6;
+}
+
+/* Make ALL pricing CTAs the same blue without touching other sections */
+.pricing .btn {
+  background: linear-gradient(180deg, #51f0ff, #22c1ff) !important;
+  color: #001018 !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 0 6px rgba(36, 198, 255, 0.13);
 }
 
 /* Make sure no horizontal scroll appears from any child */
