@@ -1,0 +1,110 @@
+/* app/dashboard/dashboard.css
+   Scoped tokens so the landing page remains unaffected.
+   These override only within `[data-theme="dashboard"]`.
+*/
+
+[data-theme="dashboard"] {
+  /* Colors */
+  --bg: #0b111b;
+  --bg-elev: #0f1724;
+  --bg-elev-2: #101a27;
+  --border: #142436;
+  --text: #e6eef7;
+  --text-muted: #9db4c9;
+  --text-soft: #7f97ad;
+
+  --primary-500: #3b82f6; /* blue-500 */
+  --primary-600: #2563eb; /* blue-600 */
+  --primary-700: #1d4ed8; /* blue-700 */
+  --accent-500: #6366f1;  /* indigo-500 */
+
+  --chip-bull: #123e2e;
+  --chip-bull-text: #6ee7b7;
+  --chip-bear: #3c1420;
+  --chip-bear-text: #fda4af;
+
+  /* Shape & shadows */
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --shadow-1: 0 4px 24px rgba(2, 8, 23, 0.35);
+
+  /* Typography */
+  --font-size-h1: 20px;
+  --font-size-h2: 16px;
+  --font-size-body: 14px;
+  --font-size-sm: 12px;
+
+  /* Spacing rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* Generic pieces for dashboard */
+[data-theme="dashboard"] .card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-1);
+}
+
+[data-theme="dashboard"] .chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--font-size-sm);
+  line-height: 18px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+[data-theme="dashboard"] .chip.bull {
+  background: var(--chip-bull);
+  color: var(--chip-bull-text);
+  border-color: transparent;
+}
+[data-theme="dashboard"] .chip.bear {
+  background: var(--chip-bear);
+  color: var(--chip-bear-text);
+  border-color: transparent;
+}
+
+[data-theme="dashboard"] .input {
+  height: 36px;
+  padding: 0 12px;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  outline: none;
+}
+
+[data-theme="dashboard"] .btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  background: var(--bg-elev-2);
+  transition: background 160ms ease, border-color 160ms ease;
+}
+[data-theme="dashboard"] .btn:hover {
+  background: #0f1d2b;
+  border-color: #1a2f46;
+}
+
+[data-theme="dashboard"] .btn-primary {
+  background: linear-gradient(135deg, var(--primary-600), var(--accent-500));
+  border: none;
+}
+[data-theme="dashboard"] .btn-primary:hover {
+  filter: brightness(1.05);
+}
+
