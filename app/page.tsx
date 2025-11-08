@@ -40,14 +40,14 @@ export default function Page() {
             <article className="tile">
               <h3>Insights in seconds</h3>
               <p>
-                Visual screener with multi-timeframe analysis, adaptable from scalpers to long-term investors.
+                Screener gives fast regime reads, trend strength, and a clean overview that aids real decisions.
               </p>
             </article>
 
             <article className="tile">
-              <h3>Community collaboration</h3>
+              <h3>Iterate with feedback</h3>
               <p>
-                We identify trader pain points together → analyze → develop solutions. Your feedback shapes the roadmap.
+                We publish changes, share metrics, and adjust features alongside users—not behind closed doors.
               </p>
             </article>
           </div>
@@ -82,7 +82,7 @@ export default function Page() {
       </section>
 
       {/* ---------- PRICING ---------- */}
-      <section id="pricing" className="section">
+      <section id="pricing" className="section" aria-label="Pricing">
         <div className="container">
           <h2 style={{ marginBottom: "1rem" }}>Membership &amp; Pricing</h2>
 
@@ -98,7 +98,9 @@ export default function Page() {
                 <li>Community &amp; updates</li>
                 <li>Basic alerts</li>
               </ul>
-              <a className="btn btn--primary" href="#">
+              <li>Watchlist/alerts</li>
+              <li>Discord support</li>
+              <a className="btn btn--primary btn--gradient-blue" href="#">
                 Choose plan
               </a>
             </div>
@@ -110,13 +112,13 @@ export default function Page() {
 
             <div className="pricing__plans">
               <article className="plan">
-                <h3>Free <span className="plan__price">€0</span></h3>
+                <h3>Starter <span className="plan__price">€3.99</span></h3>
                 <ul className="ul">
-                  <li>Complete Screener</li>
-                  <li>Community access</li>
-                  <li>Basic alerts</li>
+                  <li>Daily regime read</li>
+                  <li>Basic transparency</li>
+                  <li>Email support</li>
                 </ul>
-                <a className="btn btn--ghost" href="#">
+                <a className="btn btn--primary btn--gradient-blue" href="#">
                   Choose plan
                 </a>
               </article>
@@ -128,7 +130,7 @@ export default function Page() {
                   <li>Transparency dashboard</li>
                   <li>Priority support</li>
                 </ul>
-                <a className="btn btn--primary" href="#">
+                <a className="btn btn--primary btn--gradient-blue" href="#">
                   Choose plan
                 </a>
               </article>
@@ -140,7 +142,7 @@ export default function Page() {
                   <li>Advanced APIs &amp; SLAs</li>
                   <li>Dedicated onboarding</li>
                 </ul>
-                <a className="btn btn--ghost" href="#">
+                <a className="btn btn--primary btn--gradient-blue" href="#">
                   Choose plan
                 </a>
               </article>
