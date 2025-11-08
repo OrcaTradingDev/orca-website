@@ -97,9 +97,9 @@ export default function Page() {
                 <li>Full Screener access</li>
                 <li>Community &amp; updates</li>
                 <li>Basic alerts</li>
+                <li>Watchlist/alerts</li>
+                <li>Discord support</li>
               </ul>
-              <li>Watchlist/alerts</li>
-              <li>Discord support</li>
               <a className="btn btn--primary btn--gradient-blue" href="#">
                 Choose plan
               </a>
