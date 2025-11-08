@@ -86,7 +86,7 @@ export default function Page() {
         <div className="container">
           <h2 style={{ marginBottom: "1rem" }}>Membership &amp; Pricing</h2>
 
-          {/* A. Standalone “Free during Beta” block — full width on mobile */}
+        {/* A. Standalone “Free during Beta” block — full width on mobile */}
           <div className="pricing">
             <div className="pricing__beta card--elevated">
               <h3 style={{ marginBottom: "0.35rem" }}>
@@ -112,7 +112,7 @@ export default function Page() {
 
             <div className="pricing__plans">
               <article className="plan">
-                <h3>Starter <span className="plan__price">€3.99</span></h3>
+                <h3>Starter (Free) <span className="plan__price">€0</span></h3>
                 <ul className="ul">
                   <li>Daily regime read</li>
                   <li>Basic transparency</li>
