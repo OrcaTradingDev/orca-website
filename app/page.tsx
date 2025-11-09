@@ -16,6 +16,8 @@ export default function Page() {
           <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.15rem", flexWrap: "wrap" }}>
             <a className="btn btn--primary" href="#pricing">View Screener</a>
             <a className="btn btn--ghost" href="#products">Explore platform</a>
+            {/* NEW: temporary nav to dashboard */}
+            <a className="btn btn--ghost" href="/dashboard">Dashboard</a>
           </div>
         </div>
       </header>
@@ -58,7 +60,7 @@ export default function Page() {
       <section id="products" className="section">
         <div className="container">
           <h2 style={{ marginBottom: "1rem" }}>Product previews</h2>
-          <div className="grid grid--3">
+        <div className="grid grid--3">
             <article className="tile">
               <h3>OrcaScreener</h3>
               <p>
@@ -86,7 +88,7 @@ export default function Page() {
         <div className="container">
           <h2 style={{ marginBottom: "1rem" }}>Membership &amp; Pricing</h2>
 
-        {/* A. Standalone “Free during Beta” block — full width on mobile */}
+          {/* A. Standalone “Free during Beta” block — full width on mobile */}
           <div className="pricing">
             <div className="pricing__beta card--elevated">
               <h3 style={{ marginBottom: "0.35rem" }}>
