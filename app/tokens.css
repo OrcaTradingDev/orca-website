@@ -1,0 +1,27 @@
+/* app/tokens.css */
+/* Global design tokens (Figma → CSS variables) */
+
+:root {
+  /* Base */
+  --bg: #0A1628;           /* deep navy */
+  --surface: #0F1E36;      /* panel bg */
+  --card: #0D1B2A;
+  --border: #1E2A3A;
+  --ring: rgba(0, 212, 255, 0.35);
+
+  /* Text */
+  --text: #E6EDF7;         /* primary text */
+  --muted: #94A3B8;        /* secondary text */
+
+  /* Accents */
+  --primary: #00D4FF;      /* cyan accent */
+  --success: #10B981;      /* green */
+  --danger: #EF4444;       /* red (bearish) */
+}
+
+/* Optional dark aliasing (if you keep a theme class) */
+html, body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+

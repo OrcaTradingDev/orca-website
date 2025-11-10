@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from "next";
 import "./globals.css";
+import './tokens.css';
 
 export const metadata: Metadata = {
   title: "OrcaTrading — Automate, Analyze, Trade Smarter",

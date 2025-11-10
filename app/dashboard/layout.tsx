@@ -1,6 +1,5 @@
 // app/dashboard/layout.tsx
 import type { ReactNode } from "react";
-import "./tokens.css";      // if you added it; safe if missing
 import "./dashboard.css";   // existing scoped styles
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
