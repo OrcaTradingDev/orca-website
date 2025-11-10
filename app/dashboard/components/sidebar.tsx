@@ -47,15 +47,31 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar hidden md:flex md:flex-col">
-      <div className="flex items-center gap-3 px-5" style={{ height: 68 }}>
-        <div className="rounded-md" style={{ width: 28, height: 28, background: "hsl(var(--fs-primary))" }} />
-        <div>
-          <div className="text-white font-semibold leading-none">OrcaTrading</div>
-          <div className="text-[12px] muted">Flowscreener</div>
+      {/* Brand block */}
+      <div className="px-5 pt-4 pb-3">
+        <div className="flex items-center gap-3">
+          <div
+            className="rounded-xl"
+            style={{
+              width: 32,
+              height: 32,
+              background:
+                "linear-gradient(135deg, rgba(14,165,233,1) 0%, rgba(0,212,255,1) 100%)",
+              boxShadow: "0 6px 18px rgba(0,212,255,.35)",
+            }}
+          />
+          <div>
+            <div className="text-white font-semibold leading-none">
+              Flowscreener
+            </div>
+            <div className="text-[12px]" style={{ color: "hsl(var(--fs-muted))" }}>
+              by OrcaTrading
+            </div>
+          </div>
         </div>
       </div>
 
-      <nav className="mt-2 flex-1 px-2">
+      <nav className="mt-1 flex-1 px-2">
         {items.map(({ key, label, icon: Icon, soon }) => {
           const active = tab === key
           return (
@@ -76,16 +92,24 @@ export default function Sidebar() {
         })}
       </nav>
 
+      {/* User mini-card */}
       <div className="px-5 py-4 mt-auto">
         <div className="surface p-3 flex items-center gap-3">
-          <div className="rounded-full" style={{ width: 36, height: 36, background: "hsl(var(--fs-active-bg))" }} />
+          <div
+            className="rounded-full"
+            style={{ width: 36, height: 36, background: "hsl(var(--fs-active-bg))" }}
+          />
           <div className="min-w-0">
-            <div className="text-[13px] text-white truncate">You</div>
+            <div className="text-[13px] text-white truncate">John Doe</div>
             <div
               className="pill"
-              style={{ borderColor: "transparent", background: "rgba(255,215,0,.12)", color: "#FFD700" }}
+              style={{
+                borderColor: "transparent",
+                background: "rgba(255,215,0,.12)",
+                color: "#FFD700",
+              }}
             >
-              Free Plan
+              Premium
             </div>
           </div>
         </div>
