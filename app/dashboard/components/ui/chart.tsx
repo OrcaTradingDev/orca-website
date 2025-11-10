@@ -2,23 +2,14 @@
 
 import * as React from "react";
 import type { CSSProperties, ReactNode } from "react";
-import {
-  Tooltip as RechartsTooltip,
-  // NOTE: some Recharts versions don't export these types consistently.
-  // We only import the component and keep our own light typings below.
-} from "recharts";
-
-// If your `cn` lives elsewhere, tweak this import:
+import { Tooltip as RechartsTooltip } from "recharts";
 import { cn } from "./utils";
 
-/* -------------------------------------------------------------------------------------------------
- * Light, version-agnostic tooltip typings
- * -----------------------------------------------------------------------------------------------*/
+/* ----------------------------- Light typings ------------------------------ */
 
-// The only bits we actually read from Recharts tooltip props.
 type TooltipLike = {
   active?: boolean;
-  payload?: any[]; // array of { value, name, color, dataKey, ... }
+  payload?: any[];
   label?: any;
 };
 
@@ -27,9 +18,7 @@ export type ChartIndicator = "dot" | "line" | "dashed";
 export type ChartConfig = Record<
   string,
   {
-    /** Human label for a series/dataKey. */
     label?: string;
-    /** CSS color (used for indicators). */
     color?: string;
   }
 >;
@@ -38,7 +27,6 @@ export type ChartContainerProps = {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
-  /** Keys should match your Recharts `dataKey`s. */
   config?: ChartConfig;
 };
 
@@ -48,16 +36,12 @@ export type ChartTooltipContentProps = Partial<TooltipLike> & {
   hideLabel?: boolean;
 };
 
-/* -------------------------------------------------------------------------------------------------
- * Context for series config (labels/colors)
- * -----------------------------------------------------------------------------------------------*/
+/* ----------------------------- Config context ----------------------------- */
 
 const ChartConfigCtx = React.createContext<ChartConfig | undefined>(undefined);
 const useChartConfig = () => React.useContext(ChartConfigCtx);
 
-/* -------------------------------------------------------------------------------------------------
- * Container
- * -----------------------------------------------------------------------------------------------*/
+/* -------------------------------- Container ------------------------------- */
 
 export function ChartContainer({
   children,
@@ -65,11 +49,10 @@ export function ChartContainer({
   style,
   config,
 }: ChartContainerProps) {
-  // Expose each series color as a CSS var: --color-<dataKey>
   const cssVars: CSSProperties = { ...style };
   if (config) {
     for (const [key, value] of Object.entries(config)) {
-      if (value?.color) {
+      if (typeof value?.color === "string") {
         (cssVars as any)[`--color-${key}`] = value.color;
       }
     }
@@ -84,9 +67,7 @@ export function ChartContainer({
   );
 }
 
-/* -------------------------------------------------------------------------------------------------
- * Tooltip (wrapper) — keeps defaults and wires our content
- * -----------------------------------------------------------------------------------------------*/
+/* -------------------------------- Tooltip -------------------------------- */
 
 type AnyTooltipProps = Record<string, any>;
 
@@ -108,9 +89,7 @@ export function ChartTooltip(
   );
 }
 
-/* -------------------------------------------------------------------------------------------------
- * Tooltip Content — robust to Recharts version differences
- * -----------------------------------------------------------------------------------------------*/
+/* ---------------------------- Tooltip Content ----------------------------- */
 
 export function ChartTooltipContent({
   active,
@@ -125,8 +104,8 @@ export function ChartTooltipContent({
   if (!active || !payload || payload.length === 0) return null;
 
   const items = payload as Array<{
-    color?: string;
-    name?: string;
+    color?: unknown;
+    name?: unknown;
     value?: unknown;
     dataKey?: string | number;
   }>;
@@ -134,8 +113,7 @@ export function ChartTooltipContent({
   return (
     <div
       className={cn(
-        "rounded-md border bg-popover p-2 text-popover-foreground shadow-md",
-        "min-w-[8rem]",
+        "min-w-[8rem] rounded-md border bg-popover p-2 text-popover-foreground shadow-md",
         className,
       )}
     >
@@ -150,27 +128,37 @@ export function ChartTooltipContent({
           const dk = it.dataKey;
           const human =
             (typeof dk === "string" && config?.[dk]?.label) ??
-            it.name ??
+            (typeof it.name === "string" ? it.name : undefined) ??
             (typeof dk === "string" ? dk : `Series ${idx + 1}`);
 
-          const color =
-            (typeof dk === "string" && config?.[dk]?.color) ?? it.color;
+          // Force the color to be string|undefined only (avoid boolean/false creeping in)
+          const cfgColor =
+            typeof dk === "string" && typeof config?.[dk]?.color === "string"
+              ? (config![dk]!.color as string)
+              : undefined;
+          const itemColor = typeof it.color === "string" ? it.color : undefined;
+          const colorStr: string | undefined = cfgColor ?? itemColor;
+
+          // Computed styles that never return `false`
+          const background: string | undefined =
+            indicator !== "dashed" ? colorStr ?? "currentColor" : undefined;
+
+          const borderTop: string | undefined =
+            indicator === "dashed"
+              ? `1px dashed ${colorStr ?? "currentColor"}`
+              : undefined;
 
           return (
             <div key={idx} className="flex items-center gap-2">
               <span
                 className={cn(
-                  "inline-flex h-2 w-2 rounded-full shrink-0",
+                  "inline-flex h-2 w-2 shrink-0 rounded-full",
                   indicator === "line" && "h-0.5 w-3 rounded-none",
                   indicator === "dashed" && "h-0.5 w-3 rounded-none",
                 )}
                 style={{
-                  background:
-                    indicator === "dashed" ? undefined : color ?? "currentColor",
-                  borderTop:
-                    indicator === "dashed"
-                      ? `1px dashed ${color ?? "currentColor"}`
-                      : undefined,
+                  background, // string | undefined (never false)
+                  borderTop, // string | undefined
                 }}
               />
               <span className="text-xs font-medium">{human}</span>
@@ -185,9 +173,7 @@ export function ChartTooltipContent({
   );
 }
 
-/* -------------------------------------------------------------------------------------------------
- * Legend stub (optional)
- * -----------------------------------------------------------------------------------------------*/
+/* ------------------------------ Legend (stub) ----------------------------- */
 
 export function ChartLegendContent() {
   return null;
