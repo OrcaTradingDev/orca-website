@@ -183,7 +183,7 @@ export default function PremiumScreenerSection() {
         </p>
       </div>
 
-      {/* Controls — single-row on ≥lg; wraps gracefully on small screens */}
+      {/* Controls */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="flex flex-1 items-center gap-3">
           <SelectLike defaultValue="All Asset Classes" options={["All Asset Classes", "Forex", "Crypto", "Stocks", "Indices"]} />
@@ -313,13 +313,11 @@ export default function PremiumScreenerSection() {
                   <StackedBar red={r.daily.red} green={r.daily.green} />
                 </td>
 
-                {/* ADVANCED: four equal subcells with vertical separators */}
+                {/* ADVANCED */}
                 <td className="px-6 align-middle">
                   <div
                     className="grid grid-cols-4 items-center text-white"
-                    style={{
-                      columnGap: "18px",
-                    }}
+                    style={{ columnGap: "18px" }}
                   >
                     {/* ADX */}
                     <div className="text-center">
@@ -368,8 +366,12 @@ export default function PremiumScreenerSection() {
                       />
                     </div>
 
-                    {/* ALERT */}
-                    <div className="flex items-center justify-center">
+                    {/* ALERT (icon wrapped with title/aria) */}
+                    <div
+                      className="flex items-center justify-center"
+                      title={r.advanced.alert ? "Alert set" : "No alert"}
+                      aria-label={r.advanced.alert ? "Alert set" : "No alert"}
+                    >
                       <Bell
                         size={18}
                         color={
@@ -377,12 +379,11 @@ export default function PremiumScreenerSection() {
                             ? "hsl(var(--fs-primary))"
                             : "hsl(var(--fs-muted))"
                         }
-                        title={r.advanced.alert ? "Alert set" : "No alert"}
                       />
                     </div>
                   </div>
 
-                  {/* vertical dividers overlay (purely visual) */}
+                  {/* visual separators */}
                   <div className="pointer-events-none relative">
                     <div
                       className="absolute left-1/4 top-[-40px] bottom-[-40px]"
