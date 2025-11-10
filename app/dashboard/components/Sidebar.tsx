@@ -14,7 +14,7 @@ import {
   Crown,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { cn } from "./utils"; // add simple helper below if you don't have one
+import { cn as cx } from "./utils";  // add simple helper below if you don't have one
 
 export default function Sidebar() {
   const pathname = usePathname();
