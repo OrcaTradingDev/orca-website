@@ -11,6 +11,7 @@ import {
   Bot,
   User,
   Crown,
+  LineChart,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import React from "react"
@@ -19,11 +20,11 @@ type NavItem = {
   key: string
   label: string
   icon: LucideIcon
-  /** Show a small "Coming Soon" pill on the right */
   soon?: boolean
 }
 
 const items: NavItem[] = [
+  { key: "screener", label: "Premium Screener", icon: LineChart },
   { key: "watchlist", label: "Watchlist", icon: Star },
   { key: "alerts", label: "Saved Alerts", icon: Bell },
   { key: "filters", label: "Filters & Settings", icon: SlidersHorizontal },
@@ -37,7 +38,7 @@ const items: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname()
   const params = useSearchParams()
-  const tab = params.get("tab") ?? "watchlist"
+  const tab = params.get("tab") ?? "screener"
 
   const hrefFor = (key: string) => {
     const base = pathname || "/dashboard"
@@ -47,10 +48,7 @@ export default function Sidebar() {
   return (
     <aside className="sidebar hidden md:flex md:flex-col">
       <div className="flex items-center gap-3 px-5" style={{ height: 68 }}>
-        <div
-          className="rounded-md"
-          style={{ width: 28, height: 28, background: "hsl(var(--fs-primary))" }}
-        />
+        <div className="rounded-md" style={{ width: 28, height: 28, background: "hsl(var(--fs-primary))" }} />
         <div>
           <div className="text-white font-semibold leading-none">OrcaTrading</div>
           <div className="text-[12px] muted">Flowscreener</div>
@@ -80,19 +78,12 @@ export default function Sidebar() {
 
       <div className="px-5 py-4 mt-auto">
         <div className="surface p-3 flex items-center gap-3">
-          <div
-            className="rounded-full"
-            style={{ width: 36, height: 36, background: "hsl(var(--fs-active-bg))" }}
-          />
+          <div className="rounded-full" style={{ width: 36, height: 36, background: "hsl(var(--fs-active-bg))" }} />
           <div className="min-w-0">
             <div className="text-[13px] text-white truncate">You</div>
             <div
               className="pill"
-              style={{
-                borderColor: "transparent",
-                background: "rgba(255,215,0,.12)",
-                color: "#FFD700",
-              }}
+              style={{ borderColor: "transparent", background: "rgba(255,215,0,.12)", color: "#FFD700" }}
             >
               Free Plan
             </div>
