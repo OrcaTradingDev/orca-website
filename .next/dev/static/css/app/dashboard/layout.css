@@ -1,0 +1,104 @@
+/*!*************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** css ./node_modules/next/dist/build/webpack/loaders/css-loader/src/index.js??ruleSet[1].rules[15].oneOf[10].use[2]!./node_modules/next/dist/build/webpack/loaders/postcss-loader/src/index.js??ruleSet[1].rules[15].oneOf[10].use[3]!./app/dashboard/dashboard.css ***!
+  \*************************************************************************************************************************************************************************************************************************************************************************/
+/* ---- Flowscreener (Dashboard) Theme - Scoped to /app/dashboard ---- */
+.dashboard-theme {
+  /* Palette (HSL approximations of your hex) */
+  --fs-bg: 220 28% 7%;              /* ~ #0B0F19 */
+  --fs-bg-2: 220 18% 10%;           /* ~ #14181F */
+  --fs-border: 215 28% 22%;         /* ~ #1E293B */
+  --fs-border-2: 219 23% 28%;       /* ~ #2D3748 */
+  --fs-foreground: 0 0% 100%;       /* #FFFFFF */
+  --fs-muted: 215 20% 67%;          /* #94A3B8 */
+
+  --fs-primary: 199 100% 50%;       /* #00D4FF */
+  --fs-primary-2: 199 89% 56%;
+
+  --fs-accent-green: 160 84% 39%;   /* #10B981 */
+  --fs-accent-red: 0 84% 57%;       /* #EF4444 */
+
+  --fs-sidebar: 220 18% 12%;        /* ~ #0F1419 / #14181F */
+  --fs-active-bg: 232 25% 14%;
+  --fs-active-border: 199 100% 50%;
+
+  --fs-radius: 12px;
+}
+
+/* Base */
+.dashboard-theme {
+  background-color: hsl(var(--fs-bg));
+  color: hsl(var(--fs-foreground));
+}
+
+/* Surface & text helpers */
+.dashboard-theme .surface {
+  background-color: hsl(var(--fs-bg-2));
+  color: hsl(var(--fs-foreground));
+  border: 1px solid hsl(var(--fs-border));
+  border-radius: var(--fs-radius);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.18), 0 1px 2px rgba(0,0,0,0.14);
+}
+.dashboard-theme .muted { color: hsl(var(--fs-muted)); }
+.dashboard-theme .positive { color: hsl(var(--fs-accent-green)); }
+.dashboard-theme .negative { color: hsl(var(--fs-accent-red)); }
+
+/* Buttons */
+.dashboard-theme .btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: .5rem; height: 40px; padding: 0 14px;
+  border-radius: calc(var(--fs-radius) - 4px);
+  font-size: 0.95rem; font-weight: 500;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, transform .2s ease;
+  border: 1px solid hsl(var(--fs-border));
+  background: hsl(var(--fs-bg-2));
+  color: hsl(var(--fs-foreground));
+}
+.dashboard-theme .btn:hover { transform: translateY(-1px); }
+.dashboard-theme .btn-primary {
+  border-color: hsl(var(--fs-primary));
+  background: color-mix(in hsl, hsl(var(--fs-primary)) 18%, hsl(var(--fs-bg-2)));
+  color: hsl(0 0% 100%);
+}
+.dashboard-theme .btn-primary:hover {
+  background: color-mix(in hsl, hsl(var(--fs-primary-2)) 26%, hsl(var(--fs-bg-2)));
+}
+
+/* Pills */
+.dashboard-theme .pill {
+  display:inline-flex; align-items:center; gap:.4rem;
+  padding:.15rem .5rem; border-radius:999px;
+  border:1px solid hsl(var(--fs-border));
+  font-size:.75rem; color:hsl(var(--fs-muted));
+}
+
+/* Sidebar */
+.dashboard-theme .sidebar {
+  width: 264px;
+  border-right: 1px solid hsl(var(--fs-border));
+  background: hsl(var(--fs-sidebar));
+  min-height: 100dvh;
+  position: sticky;
+  top: 0;
+}
+.dashboard-theme .nav-item {
+  display:flex; align-items:center; gap:12px;
+  padding: 12px 14px; margin: 4px 4px; position: relative;
+  border-radius: 8px;
+  transition: background .2s ease, color .2s ease;
+  color: hsl(var(--fs-muted));
+  text-decoration: none;
+}
+.dashboard-theme .nav-item:hover {
+  background: color-mix(in hsl, hsl(var(--fs-active-bg)) 65%, transparent);
+  color: hsl(var(--fs-foreground));
+}
+.dashboard-theme .nav-item.active {
+  background: hsl(var(--fs-active-bg));
+  color: hsl(var(--fs-primary));
+}
+.dashboard-theme .nav-item .active-rail {
+  position: absolute; left: -2px; top: 6px; bottom: 6px; width: 4px; border-radius: 4px;
+  background: hsl(var(--fs-active-border));
+}
+
+

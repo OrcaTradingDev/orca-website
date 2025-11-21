@@ -1,92 +1,129 @@
-import asyncio
 import os
+import sys
+from pathlib import Path
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-# --- Load .env (python-dotenv required) ---
+# -----------------------
+# Path & env setup
+# -----------------------
+
+# BASE_DIR = backend/
+BASE_DIR = Path(__file__).resolve().parents[1]
+sys.path.append(str(BASE_DIR))
+
+# Load .env so DATABASE_URL etc. are available
 try:
-    from dotenv import load_dotenv
-except Exception:  # pragma: no cover
-    load_dotenv = None
+    from dotenv import load_dotenv  # type: ignore
 
-if load_dotenv:
-    here = os.path.dirname(os.path.abspath(__file__))
-    # try backend/.env then alembic/.env
-    for p in (os.path.join(here, "..", ".env"), os.path.join(here, ".env")):
-        if os.path.exists(p):
-            load_dotenv(p)
-            break
+    load_dotenv(BASE_DIR / ".env")
+except Exception:
+    # If python-dotenv isn't installed, migrations will still work
+    # as long as DATABASE_URL is already in the environment.
+    pass
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError(
-        "DATABASE_URL not found. Ensure backend/.env contains "
-        "DATABASE_URL=postgresql+asyncpg://orca:orca@localhost:5432/orca"
-    )
+# -----------------------
+# Alembic config & logging
+# -----------------------
 
-# Alembic Config object
 config = context.config
 
-# Inject URL from env (overrides alembic.ini)
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
 
-# Safe logging setup (only if ini has logging sections)
-if config.config_file_name:
-    try:
-        fileConfig(config.config_file_name)
-    except Exception:
-        # If logging sections are missing, continue without logging
-        pass
+# -----------------------
+# Import models & metadata
+# -----------------------
 
-# Import your metadata
 try:
-    from app.db import Base  # your project's declarative base
-except Exception:
-    Base = None
+    # Import models so they register with Base.metadata
+    import app.models  # noqa: F401
 
-target_metadata = getattr(Base, "metadata", None)
+    from app.db import Base
+
+    target_metadata = Base.metadata
+except Exception:
+    target_metadata = None
+
+
+def get_database_url() -> str:
+    """
+    Resolve the database URL.
+
+    Priority:
+    1. DATABASE_URL environment variable (from .env or shell)
+    2. sqlalchemy.url from alembic.ini
+    """
+    env_url = os.getenv("DATABASE_URL")
+    if env_url:
+        return env_url
+
+    return config.get_main_option("sqlalchemy.url")
+
+
+# -----------------------
+# Offline migrations
+# -----------------------
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_database_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
-def _run_migrations(connection: Connection) -> None:
+
+# -----------------------
+# Online migrations
+# -----------------------
+
+def do_run_migrations(connection: Connection) -> None:
+    """Shared migration logic for sync/async."""
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
         compare_server_default=True,
     )
+
     with context.begin_transaction():
         context.run_migrations()
 
+
 async def run_migrations_online() -> None:
-    """Run migrations in 'online' mode with async engine."""
-    engine = create_async_engine(
-        config.get_main_option("sqlalchemy.url"),
+    """Run migrations in 'online' mode using an async engine."""
+    url = get_database_url()
+
+    connectable: AsyncEngine = create_async_engine(
+        url,
         poolclass=pool.NullPool,
-        future=True,
     )
-    async with engine.connect() as conn:
-        await conn.run_sync(_run_migrations)
-    await engine.dispose()
+
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
+
+    await connectable.dispose()
+
+
+# -----------------------
+# Entrypoint
+# -----------------------
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
+    import asyncio
+
     asyncio.run(run_migrations_online())
 

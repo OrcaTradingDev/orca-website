@@ -1,32 +1,53 @@
-# Dependencies
-node_modules/
-.pnp.cjs
-.pnp.loader.mjs
-.pnpm-store/
+# Python
+__pycache__/
+*.py[cod]
+*.so
 
-# Build / output
-.next/
-out/
-dist/
-.cache/
-.turbo/
-coverage/
+# Virtual environment
+.venv/
+venv/
+env/
 
-# Env & local config
+# Environment files
 .env
 .env.*
-!.env.example
+*.env
 
-# OS / editor junk
+# Byte-compiled / optimized / DLL files
+*.pyc
+*.pyo
+*.pyd
+
+# FastAPI / Uvicorn
+*.log
+
+# Alembic
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+
+# Redis dump
+dump.rdb
+
+# SQLite (if used locally)
+*.sqlite3
+*.db
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# OS Files
 .DS_Store
 Thumbs.db
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
-# Vercel / tooling
-.vercel/
-.next/cache/
+# Node modules (if frontend lives in same repo)
+node_modules/
+
+# Build artifacts
+dist/
+build/
+coverage/
+htmlcov/
 
