@@ -3,12 +3,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal, Optional, List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
+from app.core.redis import get_redis_client
+from app.core.jobs import FXRefreshJob, REFRESH_QUEUE_KEY
 from app.models.fx_universe import FXUniverse
 
 router = APIRouter(prefix="/screener", tags=["screener"])
@@ -57,14 +59,15 @@ class ScreenerPage(BaseModel):
 # Helpers
 # -----------------------
 
-def _stub_metrics_for_symbol(symbol: str) -> ScreenerRow:
+def _stub_metrics_for_symbol(symbol: str, name: str) -> ScreenerRow:
     """
     Temporary stub metrics so the frontend has real-looking data,
     but rows are driven by what's actually in fx_universe.
 
-    You can replace this later once Phase 2 metrics are implemented.
+    Replace this later with real metrics that read market_prices/metrics tables.
     """
-    base = sum(ord(c) for c in symbol)  # cheap deterministic "randomness"
+    base = sum(ord(c) for c in symbol)  # deterministic "randomness"
+
     intraday_bull = 50 + (base % 25)   # 50–74
     intraday_bear = 100 - intraday_bull
 
@@ -74,9 +77,8 @@ def _stub_metrics_for_symbol(symbol: str) -> ScreenerRow:
     adx = 20 + (base % 60)             # 20–79
     vol = 30 + (base % 50)             # 30–79
 
-    adx_dir: TrendDir
     if adx > 55:
-        adx_dir = "up"
+        adx_dir: TrendDir = "up"
     elif adx < 35:
         adx_dir = "down"
     else:
@@ -87,9 +89,15 @@ def _stub_metrics_for_symbol(symbol: str) -> ScreenerRow:
 
     return ScreenerRow(
         symbol=symbol,
-        name=symbol,  # you’ll override with real name before returning
-        intraday=TrendBreakdown(bear=intraday_bear, bull=intraday_bull),
-        daily=TrendBreakdown(bear=daily_bear, bull=daily_bull),
+        name=name,
+        intraday=TrendBreakdown(
+            bear=intraday_bear,
+            bull=intraday_bull,
+        ),
+        daily=TrendBreakdown(
+            bear=daily_bear,
+            bull=daily_bull,
+        ),
         advanced=AdvancedMetrics(
             adx=adx,
             adx_dir=adx_dir,
@@ -104,6 +112,7 @@ def _stub_metrics_for_symbol(symbol: str) -> ScreenerRow:
 # Routes
 # -----------------------
 
+
 @router.get("/rows", response_model=ScreenerPage)
 async def get_screener_rows(
     page: int = Query(1, ge=1),
@@ -113,13 +122,11 @@ async def get_screener_rows(
         description="Optional search by symbol or name",
     ),
     db: AsyncSession = Depends(get_db),
-):
+) -> ScreenerPage:
     """
     Return paginated screener rows backed by fx_universe.
 
-    For now, metrics are stubbed but deterministic per symbol.
-    Later phases will replace the stub metrics with real computations
-    over market_prices / metrics tables.
+    Metrics are stubbed but deterministic per symbol for now.
     """
     offset = (page - 1) * page_size
 
@@ -146,30 +153,43 @@ async def get_screener_rows(
     result = await db.execute(stmt)
     symbols = result.scalars().all()
 
-    rows: List[ScreenerRow] = []
-    for sym in symbols:
-        row = _stub_metrics_for_symbol(sym.symbol)
-        # Inject real name from DB record
-        row.name = sym.name
-        rows.append(row)
+    rows: List[ScreenerRow] = [
+        _stub_metrics_for_symbol(sym.symbol, sym.name) for sym in symbols
+    ]
 
     return ScreenerPage(
         rows=rows,
         page=page,
-        pageSize=page_size,  # alias field name
+        page_size=page_size,
         total=total,
-        lastUpdated=datetime.now(timezone.utc).isoformat(),
+        last_updated=datetime.now(timezone.utc).isoformat(),
     )
 
 
 @router.post("/refresh")
-async def refresh_now():
+async def refresh_now(
+    symbols: Optional[List[str]] = Query(
+        default=None,
+        description="Optional list of symbols to refresh (e.g. symbols=EURUSD&symbols=GBPUSD)",
+    ),
+):
     """
-    Stub to enqueue a refresh job.
+    Enqueue a refresh job into Redis.
 
-    In Phase 1/2, wire this to a Redis-backed worker that fetches data
-    and fills market_prices / metrics tables.
+    refresh_worker.py should consume from jobs:screener:refresh and
+    write into market_prices.
     """
-    # TODO: connect to a background job (RQ/Celery/Arq/Redis queue/etc.)
-    return {"status": "queued"}
+    job = FXRefreshJob(symbols=symbols)
+
+    redis = get_redis_client()
+    try:
+        # worker.brpop(...) expects a list; we LPUSH jobs onto it
+        await redis.lpush(REFRESH_QUEUE_KEY, job.model_dump_json())
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to enqueue refresh job: {exc!s}",
+        )
+
+    return {"status": "queued", "kind": job.kind, "symbols": job.symbols}
 
