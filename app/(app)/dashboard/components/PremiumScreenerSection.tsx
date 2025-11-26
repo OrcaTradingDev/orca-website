@@ -1,454 +1,522 @@
-"use client"
+import { useState } from "react";
+import { Search, RefreshCw, Download, Star, Bell, TrendingUp, TrendingDown, ArrowRight, ChevronDown } from "lucide-react";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { Badge } from "./ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
+import { Skeleton } from "./ui/skeleton";
 
-import React from "react"
-import {
-  Star,
-  Star as StarOutline,
-  Download,
-  RefreshCcw,
-  Search,
-  Bell,
-  ArrowUp,
-  Check,
-  X,
-} from "lucide-react"
-
-/* --------------------------------- helpers -------------------------------- */
-function cx(...a: Array<string | false | undefined>) {
-  return a.filter(Boolean).join(" ")
+interface Asset {
+  symbol: string;
+  name: string;
+  assetClass: string;
+  inWatchlist: boolean;
+  intraday: {
+    bearish: number;
+    bullish: number;
+  };
+  daily: {
+    bearish: number;
+    bullish: number;
+  };
+  advanced: {
+    adx: number;
+    adxTrend: "up" | "down" | "neutral";
+    emaStatus: "aligned" | "crossed";
+    volume: number; // 0-100 for bar height
+    hasAlert: boolean;
+  };
 }
 
-/** Horizontal stacked bar with gradients, rounded corners, divider, and auto labels */
-function StackedBar({ red, green }: { red: number; green: number }) {
-  const showRed = red > 15
-  const showGreen = green > 15
+// Mock data
+const mockAssets: Asset[] = [
+  {
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    assetClass: "Stocks",
+    inWatchlist: true,
+    intraday: { bearish: 31, bullish: 69 },
+    daily: { bearish: 22, bullish: 78 },
+    advanced: { adx: 45, adxTrend: "up", emaStatus: "aligned", volume: 65, hasAlert: true },
+  },
+  {
+    symbol: "BTCUSD",
+    name: "Bitcoin",
+    assetClass: "Crypto",
+    inWatchlist: true,
+    intraday: { bearish: 53, bullish: 47 },
+    daily: { bearish: 37, bullish: 63 },
+    advanced: { adx: 32, adxTrend: "up", emaStatus: "crossed", volume: 92, hasAlert: true },
+  },
+  {
+    symbol: "EURUSD",
+    name: "Euro/Dollar",
+    assetClass: "Forex",
+    inWatchlist: false,
+    intraday: { bearish: 42, bullish: 58 },
+    daily: { bearish: 48, bullish: 52 },
+    advanced: { adx: 18, adxTrend: "neutral", emaStatus: "aligned", volume: 45, hasAlert: false },
+  },
+  {
+    symbol: "TSLA",
+    name: "Tesla Inc.",
+    assetClass: "Stocks",
+    inWatchlist: false,
+    intraday: { bearish: 67, bullish: 33 },
+    daily: { bearish: 58, bullish: 42 },
+    advanced: { adx: 38, adxTrend: "down", emaStatus: "crossed", volume: 78, hasAlert: false },
+  },
+  {
+    symbol: "ETHUSD",
+    name: "Ethereum",
+    assetClass: "Crypto",
+    inWatchlist: true,
+    intraday: { bearish: 28, bullish: 72 },
+    daily: { bearish: 35, bullish: 65 },
+    advanced: { adx: 41, adxTrend: "up", emaStatus: "aligned", volume: 71, hasAlert: true },
+  },
+  {
+    symbol: "GBPUSD",
+    name: "Pound/Dollar",
+    assetClass: "Forex",
+    inWatchlist: false,
+    intraday: { bearish: 51, bullish: 49 },
+    daily: { bearish: 46, bullish: 54 },
+    advanced: { adx: 22, adxTrend: "neutral", emaStatus: "aligned", volume: 52, hasAlert: false },
+  },
+  {
+    symbol: "NVDA",
+    name: "NVIDIA Corp.",
+    assetClass: "Stocks",
+    inWatchlist: true,
+    intraday: { bearish: 24, bullish: 76 },
+    daily: { bearish: 19, bullish: 81 },
+    advanced: { adx: 52, adxTrend: "up", emaStatus: "aligned", volume: 88, hasAlert: true },
+  },
+  {
+    symbol: "SPX",
+    name: "S&P 500",
+    assetClass: "Indices",
+    inWatchlist: false,
+    intraday: { bearish: 39, bullish: 61 },
+    daily: { bearish: 33, bullish: 67 },
+    advanced: { adx: 29, adxTrend: "up", emaStatus: "aligned", volume: 58, hasAlert: false },
+  },
+];
 
-  return (
-    <div
-      className="relative h-9 w-full overflow-hidden rounded-lg"
-      style={{
-        boxShadow:
-          "inset 0 0 0 1px rgba(31,41,55,.55), inset 0 1px 0 rgba(255,255,255,.03)",
-        background:
-          "linear-gradient(180deg, rgba(2,6,23,.18) 0%, rgba(2,6,23,.28) 100%)",
+export default function PremiumScreenerSection() {
+  const [assets, setAssets] = useState<Asset[]>(mockAssets);
+  const [assetClassFilter, setAssetClassFilter] = useState("All");
+  const [trendFilter, setTrendFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState("2 mins ago");
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  const handleRefresh = () => {
+    setIsLoading(true);
+    setTimeout(() => {
+      setIsLoading(false);
+      setLastUpdated("Just now");
+    }, 1500);
+  };
+
+  const toggleWatchlist = (symbol: string) => {
+    setAssets(assets.map(asset => 
+      asset.symbol === symbol 
+        ? { ...asset, inWatchlist: !asset.inWatchlist }
+        : asset
+    ));
+  };
+
+  const toggleAlert = (symbol: string) => {
+    setAssets(assets.map(asset => 
+      asset.symbol === symbol 
+        ? { ...asset, advanced: { ...asset.advanced, hasAlert: !asset.advanced.hasAlert }}
+        : asset
+    ));
+  };
+
+  const filteredAssets = assets.filter(asset => {
+    const matchesSearch = asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         asset.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesAssetClass = assetClassFilter === "All" || asset.assetClass === assetClassFilter;
+    
+    let matchesTrend = true;
+    if (trendFilter !== "All") {
+      const bullishPercent = asset.daily.bullish;
+      switch (trendFilter) {
+        case "Strong Bullish":
+          matchesTrend = bullishPercent >= 70;
+          break;
+        case "Bullish":
+          matchesTrend = bullishPercent >= 55 && bullishPercent < 70;
+          break;
+        case "Neutral":
+          matchesTrend = bullishPercent >= 45 && bullishPercent < 55;
+          break;
+        case "Bearish":
+          matchesTrend = bullishPercent >= 30 && bullishPercent < 45;
+          break;
+        case "Strong Bearish":
+          matchesTrend = bullishPercent < 30;
+          break;
+      }
+    }
+    
+    return matchesSearch && matchesAssetClass && matchesTrend;
+  });
+
+  const StackedBar = ({ bearish, bullish }: { bearish: number; bullish: number }) => (
+    <div className="relative w-full h-9 bg-[#1A1F2E] rounded-md overflow-hidden flex">
+      {/* Bearish section */}
+      <div 
+        className="h-full bg-gradient-to-r from-[#DC2626] via-[#EF4444] to-[#DC2626] flex items-center justify-center relative"
+        style={{ width: `${bearish}%` }}
+      >
+        {bearish > 15 && (
+          <span className="text-white text-sm z-10 drop-shadow-lg">{bearish}%</span>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
+      </div>
+      
+      {/* Bullish section */}
+      <div 
+        className="h-full bg-gradient-to-r from-[#059669] via-[#10B981] to-[#059669] flex items-center justify-center relative"
+        style={{ width: `${bullish}%` }}
+      >
+        {bullish > 15 && (
+          <span className="text-white text-sm z-10 drop-shadow-lg">{bullish}%</span>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
+      </div>
+    </div>
+  );
+
+  const AssetRow = ({ asset }: { asset: Asset }) => (
+    <tr 
+      className="border-b border-[#1E293B] hover:bg-[#14181F] transition-all duration-200 cursor-pointer"
+      onClick={() => {
+        setSelectedAsset(asset);
+        setShowDetailModal(true);
       }}
     >
-      <div
-        className="h-full flex items-center justify-center text-[13px] font-semibold text-white"
-        style={{
-          width: `${red}%`,
-          background:
-            "linear-gradient(90deg, rgba(239,68,68,.96) 0%, rgba(239,68,68,.86) 50%, rgba(239,68,68,.96) 100%)",
-          boxShadow: "inset 0 0 16px rgba(0,0,0,.18)",
-        }}
-      >
-        {showRed ? `${red}%` : ""}
-      </div>
-      <div
-        className="h-full flex items-center justify-center text-[13px] font-semibold text-white"
-        style={{
-          width: `${green}%`,
-          background:
-            "linear-gradient(90deg, rgba(16,185,129,.96) 0%, rgba(16,185,129,.86) 50%, rgba(16,185,129,.96) 100%)",
-          boxShadow: "inset 0 0 16px rgba(0,0,0,.18)",
-        }}
-      >
-        {showGreen ? `${green}%` : ""}
-      </div>
-      {/* crisp divider where the colors meet */}
-      <div
-        className="absolute top-0 bottom-0"
-        style={{
-          left: `${red}%`,
-          width: 1,
-          background: "rgba(0,0,0,.38)",
-          boxShadow: "0 0 0 1px rgba(255,255,255,.06)",
-        }}
-      />
-    </div>
-  )
-}
+      {/* SYMBOL */}
+      <td className="py-4 px-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleWatchlist(asset.symbol);
+            }}
+            className="transition-colors duration-200"
+          >
+            <Star 
+              className={`w-5 h-5 ${asset.inWatchlist ? 'fill-[#00D4FF] text-[#00D4FF]' : 'text-[#64748B]'}`}
+            />
+          </button>
+          <div>
+            <div className="text-white">{asset.symbol}</div>
+            <div className="text-[#94A3B8] text-sm">{asset.name}</div>
+          </div>
+        </div>
+      </td>
+      
+      {/* INTRADAY */}
+      <td className="py-4 px-4">
+        <StackedBar bearish={asset.intraday.bearish} bullish={asset.intraday.bullish} />
+      </td>
+      
+      {/* DAILY */}
+      <td className="py-4 px-4">
+        <StackedBar bearish={asset.daily.bearish} bullish={asset.daily.bullish} />
+      </td>
+      
+      {/* ADVANCED */}
+      <td className="py-4 px-4">
+        <div className="flex items-center gap-4 text-sm">
+          {/* ADX */}
+          <div className="flex items-center gap-1">
+            <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>
+              {asset.advanced.adx}
+            </span>
+            {asset.advanced.adxTrend === "up" && <TrendingUp className="w-4 h-4 text-[#10B981]" />}
+            {asset.advanced.adxTrend === "down" && <TrendingDown className="w-4 h-4 text-[#EF4444]" />}
+            {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-4 h-4 text-[#94A3B8]" />}
+          </div>
+          
+          {/* Divider */}
+          <div className="w-px h-6 bg-[#1E293B]"></div>
+          
+          {/* EMA */}
+          <div className={asset.advanced.emaStatus === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}>
+            {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
+          </div>
+          
+          {/* Divider */}
+          <div className="w-px h-6 bg-[#1E293B]"></div>
+          
+          {/* Volume */}
+          <div className="flex items-end gap-0.5 h-6">
+            <div className="w-2 bg-[#00D4FF] rounded-t" style={{ height: `${asset.advanced.volume}%` }}></div>
+          </div>
+          
+          {/* Divider */}
+          <div className="w-px h-6 bg-[#1E293B]"></div>
+          
+          {/* Alert */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleAlert(asset.symbol);
+            }}
+            className="transition-colors duration-200"
+          >
+            <Bell 
+              className={`w-5 h-5 ${asset.advanced.hasAlert ? 'fill-[#00D4FF] text-[#00D4FF]' : 'text-[#64748B]'}`}
+            />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
 
-function Pill({
-  children,
-  tone = "cyan",
-  className,
-}: {
-  children: React.ReactNode
-  tone?: "cyan" | "gold" | "muted"
-  className?: string
-}) {
-  const styles =
-    tone === "gold"
-      ? {
-          background: "rgba(255,215,0,.18)",
-          color: "#FFD700",
-          border: "1px solid rgba(255,215,0,.35)",
-        }
-      : tone === "muted"
-      ? {
-          background: "rgba(148,163,184,.12)",
-          color: "hsl(var(--fs-foreground))",
-          border: "1px solid rgba(148,163,184,.25)",
-        }
-      : {
-          background: "rgba(14,165,233,.16)",
-          color: "hsl(var(--fs-primary))",
-          border: "1px solid rgba(14,165,233,.35)",
-        }
-  return (
-    <span
-      className={cx(
-        "inline-flex items-center rounded-full px-2 py-[3px] text-[11px] font-semibold",
-        className
-      )}
-      style={styles}
-    >
-      {children}
-    </span>
-  )
-}
-
-/* ---------------------------------- view ---------------------------------- */
-export default function PremiumScreenerSection() {
-  // demo data to match prototype
-  const rows = [
-    {
-      symbol: "AAPL",
-      name: "Apple Inc.",
-      intraday: { red: 31, green: 69 },
-      daily: { red: 22, green: 78 },
-      advanced: { adx: 45, emaAligned: true, volPct: 74, alert: true, fav: true },
-    },
-    {
-      symbol: "BTCUSD",
-      name: "Bitcoin",
-      intraday: { red: 53, green: 47 },
-      daily: { red: 37, green: 63 },
-      advanced: { adx: 32, emaAligned: false, volPct: 62, alert: true, fav: true },
-    },
-    {
-      symbol: "EURUSD",
-      name: "Euro/Dollar",
-      intraday: { red: 42, green: 58 },
-      daily: { red: 48, green: 52 },
-      advanced: { adx: 18, emaAligned: true, volPct: 28, alert: false, fav: false },
-    },
-    {
-      symbol: "TSLA",
-      name: "Tesla Inc.",
-      intraday: { red: 67, green: 33 },
-      daily: { red: 58, green: 42 },
-      advanced: { adx: 38, emaAligned: false, volPct: 35, alert: false, fav: false },
-    },
-    {
-      symbol: "ETHUSD",
-      name: "Ethereum",
-      intraday: { red: 28, green: 72 },
-      daily: { red: 35, green: 65 },
-      advanced: { adx: 41, emaAligned: true, volPct: 58, alert: true, fav: false },
-    },
-    {
-      symbol: "GBPUSD",
-      name: "Pound/Dollar",
-      intraday: { red: 51, green: 49 },
-      daily: { red: 46, green: 54 },
-      advanced: { adx: 22, emaAligned: true, volPct: 19, alert: false, fav: false },
-    },
-    {
-      symbol: "NVDA",
-      name: "NVIDIA Corp.",
-      intraday: { red: 24, green: 76 },
-      daily: { red: 19, green: 81 },
-      advanced: { adx: 52, emaAligned: true, volPct: 73, alert: true, fav: true },
-    },
-    {
-      symbol: "SPX",
-      name: "S&P 500",
-      intraday: { red: 39, green: 61 },
-      daily: { red: 33, green: 67 },
-      advanced: { adx: 29, emaAligned: true, volPct: 31, alert: false, fav: false },
-    },
-  ]
+  const LoadingSkeleton = () => (
+    <>
+      {[...Array(8)].map((_, i) => (
+        <tr key={i} className="border-b border-[#1E293B]">
+          <td className="py-4 px-4">
+            <div className="flex items-center gap-3">
+              <Skeleton className="w-5 h-5 rounded" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          </td>
+          <td className="py-4 px-4">
+            <Skeleton className="h-9 w-full rounded-md" />
+          </td>
+          <td className="py-4 px-4">
+            <Skeleton className="h-9 w-full rounded-md" />
+          </td>
+          <td className="py-4 px-4">
+            <Skeleton className="h-6 w-full rounded" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Title */}
-      <div>
-        <h1 className="text-[34px] font-semibold text-white tracking-tight">
-          Premium Screener
-        </h1>
-        <p className="text-[16px]" style={{ color: "hsl(var(--fs-muted))" }}>
-          Real-time multi-timeframe trend analysis
-        </p>
+      {/* Header */}
+      <div className="space-y-2">
+        <h1 className="text-white text-[32px]">Premium Screener</h1>
+        <p className="text-[#94A3B8]">Real-time multi-timeframe trend analysis</p>
       </div>
 
-      {/* Controls */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="flex flex-1 items-center gap-3">
-          <SelectLike defaultValue="All Asset Classes" options={["All Asset Classes", "Forex", "Crypto", "Stocks", "Indices"]} />
-          <SelectLike defaultValue="All Trends" options={["All Trends", "Strong Bullish", "Bullish", "Neutral", "Bearish", "Strong Bearish"]} />
-          <div className="relative flex-1 max-w-md">
-            <Search
-              size={16}
-              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
-              color="hsl(var(--fs-muted))"
-            />
-            <input
+      {/* Top Controls Bar */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        {/* Left side - Filters */}
+        <div className="flex items-center gap-3">
+          <Select value={assetClassFilter} onValueChange={setAssetClassFilter}>
+            <SelectTrigger className="w-[180px] bg-[#14181F] border-[#1E293B] text-white">
+              <SelectValue placeholder="Asset Class" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#14181F] border-[#1E293B]">
+              <SelectItem value="All">All Asset Classes</SelectItem>
+              <SelectItem value="Forex">Forex</SelectItem>
+              <SelectItem value="Crypto">Crypto</SelectItem>
+              <SelectItem value="Stocks">Stocks</SelectItem>
+              <SelectItem value="Indices">Indices</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={trendFilter} onValueChange={setTrendFilter}>
+            <SelectTrigger className="w-[200px] bg-[#14181F] border-[#1E293B] text-white">
+              <SelectValue placeholder="Trend Strength" />
+            </SelectTrigger>
+            <SelectContent className="bg-[#14181F] border-[#1E293B]">
+              <SelectItem value="All">All Trends</SelectItem>
+              <SelectItem value="Strong Bullish">Strong Bullish</SelectItem>
+              <SelectItem value="Bullish">Bullish</SelectItem>
+              <SelectItem value="Neutral">Neutral</SelectItem>
+              <SelectItem value="Bearish">Bearish</SelectItem>
+              <SelectItem value="Strong Bearish">Strong Bearish</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Right side - Search, Refresh, Export */}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+            <Input
+              type="text"
               placeholder="Search symbols..."
-              className="h-10 w-full rounded-lg pl-9 pr-3 text-[14px]"
-              style={{
-                background: "hsl(var(--fs-bg-2))",
-                border: "1px solid hsl(var(--fs-border))",
-                color: "hsl(var(--fs-foreground))",
-                outline: "none",
-              }}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 w-[240px] bg-[#14181F] border-[#1E293B] text-white placeholder:text-[#64748B] focus:border-[#00D4FF]"
             />
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 lg:justify-end">
-          <button className="h-10 rounded-lg px-3 text-[14px] flex items-center"
-            style={{
-              background: "hsl(var(--fs-bg-2))",
-              border: "1px solid hsl(var(--fs-border))",
-              color: "hsl(var(--fs-foreground))",
-            }}>
-            <RefreshCcw size={16} className="mr-2" />
-            Last updated: 2 mins ago
-          </button>
-          <button
-            className="h-10 rounded-lg px-3 text-[14px] flex items-center"
-            style={{
-              background: "transparent",
-              border: "1px solid hsl(var(--fs-primary))",
-              color: "hsl(var(--fs-primary))",
-            }}
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
+            className="bg-[#14181F] border-[#1E293B] text-[#94A3B8] hover:text-white hover:bg-[#1A1F2E]"
           >
-            <Download size={16} className="mr-2" />
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="text-sm">Last updated: {lastUpdated}</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white"
+          >
+            <Download className="w-4 h-4 mr-2" />
             Export
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Table card */}
-      <div
-        className="overflow-hidden rounded-xl"
-        style={{
-          background: "hsl(var(--fs-bg-2))",
-          border: "1px solid hsl(var(--fs-border))",
-          boxShadow: "0 10px 30px rgba(0,0,0,.35)",
-        }}
-      >
-        <table className="w-full text-sm">
-          <thead>
-            <tr
-              className="[&>th]:py-4 [&>th]:px-6 text-left text-white"
-              style={{
-                background:
-                  "linear-gradient(180deg, rgba(15,23,42,.98) 0%, rgba(15,23,42,.92) 100%)",
-                borderBottom: "1px solid hsl(var(--fs-border))",
-              }}
-            >
-              <th className="w-[180px] font-semibold tracking-wide">SYMBOL</th>
-              <th className="text-center font-semibold tracking-wide">INTRADAY</th>
-              <th className="text-center font-semibold tracking-wide">DAILY</th>
-              <th className="text-center font-semibold tracking-wide">
-                <span className="align-middle">ADVANCED</span>{" "}
-                <Pill tone="gold" className="ml-2 align-middle">PRO</Pill>
-              </th>
-            </tr>
-            <tr
-              className="[&>th]:py-2 [&>th]:px-6 text-[12px] text-center"
-              style={{
-                color: "hsl(var(--fs-muted))",
-                borderBottom: "1px solid hsl(var(--fs-border))",
-                letterSpacing: ".02em",
-              }}
-            >
-              <th />
-              <th>1M | 5M | 15M | 1H</th>
-              <th>4H | 1D | 1W</th>
-              <th>ADX | EMA | VOL | ALERTS</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.map((r, i) => (
-              <tr
-                key={r.symbol}
-                className="group transition-colors"
-                style={{
-                  borderBottom: "1px solid hsl(var(--fs-border))",
-                  background: i % 2 ? "rgba(255,255,255,.01)" : "transparent",
-                  height: 72,
-                }}
-              >
-                {/* SYMBOL */}
-                <td className="px-6">
-                  <div className="flex items-center gap-3">
-                    {r.advanced.fav ? (
-                      <Star size={16} color="hsl(var(--fs-primary))" />
-                    ) : (
-                      <StarOutline size={16} color="hsl(var(--fs-muted))" />
-                    )}
-                    <div>
-                      <div className="text-white font-medium tracking-wide">
-                        {r.symbol}
-                      </div>
-                      <div className="text-[12px]" style={{ color: "hsl(var(--fs-muted))" }}>
-                        {r.name}
-                      </div>
-                    </div>
+      {/* Table */}
+      <div className="bg-[#14181F] border border-[#1E293B] rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#1E293B] bg-[#0A1628]">
+                <th className="py-4 px-4 text-left text-white w-[200px]">
+                  <div>SYMBOL</div>
+                </th>
+                <th className="py-4 px-4 text-center text-white">
+                  <div className="mb-1">INTRADAY</div>
+                  <div className="text-xs text-[#94A3B8]">1M | 5M | 15M | 1H</div>
+                </th>
+                <th className="py-4 px-4 text-center text-white">
+                  <div className="mb-1">DAILY</div>
+                  <div className="text-xs text-[#94A3B8]">4H | 1D | 1W</div>
+                </th>
+                <th className="py-4 px-4 text-center text-white w-[280px]">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <span>ADVANCED</span>
+                    <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">PRO</Badge>
                   </div>
-                </td>
-
-                {/* INTRADAY */}
-                <td className="px-6 align-middle">
-                  <StackedBar red={r.intraday.red} green={r.intraday.green} />
-                </td>
-
-                {/* DAILY */}
-                <td className="px-6 align-middle">
-                  <StackedBar red={r.daily.red} green={r.daily.green} />
-                </td>
-
-                {/* ADVANCED */}
-                <td className="px-6 align-middle">
-                  <div
-                    className="grid grid-cols-4 items-center text-white"
-                    style={{ columnGap: "18px" }}
-                  >
-                    {/* ADX */}
-                    <div className="text-center">
-                      <span
-                        className={cx(
-                          "text-[14px] font-medium",
-                          r.advanced.adx >= 25
-                            ? "text-[hsl(160,84%,39%)]"
-                            : "text-[hsl(215,20%,65%)]"
-                        )}
-                      >
-                        {r.advanced.adx}{" "}
-                        <ArrowUp size={14} className="inline -mt-[2px]" />
-                      </span>
-                    </div>
-
-                    {/* EMA */}
-                    <div className="flex items-center justify-center gap-1">
-                      {r.advanced.emaAligned ? (
-                        <>
-                          <Check size={16} color="hsl(160,84%,39%)" />
-                          <span className="text-[13px] text-[hsl(160,84%,39%)]">
-                            Aligned
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <X size={16} color="hsl(0,84%,57%)" />
-                          <span className="text-[13px] text-[hsl(0,84%,57%)]">
-                            Crossed
-                          </span>
-                        </>
-                      )}
-                    </div>
-
-                    {/* VOL */}
-                    <div className="flex items-center justify-center">
-                      <div
-                        className="w-[10px] rounded-sm"
-                        style={{
-                          height: `${Math.max(4, Math.min(26, (r.advanced.volPct / 100) * 26))}px`,
-                          background: "rgba(14,165,233,.85)",
-                          boxShadow: "0 0 6px rgba(14,165,233,.35)",
-                        }}
-                        title="Relative Volume"
-                      />
-                    </div>
-
-                    {/* ALERT (icon wrapped with title/aria) */}
-                    <div
-                      className="flex items-center justify-center"
-                      title={r.advanced.alert ? "Alert set" : "No alert"}
-                      aria-label={r.advanced.alert ? "Alert set" : "No alert"}
-                    >
-                      <Bell
-                        size={18}
-                        color={
-                          r.advanced.alert
-                            ? "hsl(var(--fs-primary))"
-                            : "hsl(var(--fs-muted))"
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  {/* visual separators */}
-                  <div className="pointer-events-none relative">
-                    <div
-                      className="absolute left-1/4 top-[-40px] bottom-[-40px]"
-                      style={{ width: 1, background: "rgba(148,163,184,.18)" }}
-                    />
-                    <div
-                      className="absolute left-2/4 top-[-40px] bottom-[-40px]"
-                      style={{ width: 1, background: "rgba(148,163,184,.18)" }}
-                    />
-                    <div
-                      className="absolute left-3/4 top-[-40px] bottom-[-40px]"
-                      style={{ width: 1, background: "rgba(148,163,184,.18)" }}
-                    />
-                  </div>
-                </td>
+                  <div className="text-xs text-[#94A3B8]">ADX | EMA | VOL | ALERTS</div>
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* footer */}
-        <div className="flex items-center justify-between px-6 py-4">
-          <div className="text-sm" style={{ color: "hsl(var(--fs-muted))" }}>
-            Showing 1–8 of 8 assets
-          </div>
-          <button
-            className="h-10 rounded-lg px-3 text-[14px]"
-            style={{
-              background: "transparent",
-              border: "1px solid hsl(var(--fs-primary))",
-              color: "hsl(var(--fs-primary))",
-            }}
-          >
-            Load More
-          </button>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <LoadingSkeleton />
+              ) : filteredAssets.length > 0 ? (
+                filteredAssets.map((asset) => <AssetRow key={asset.symbol} asset={asset} />)
+              ) : (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center">
+                    <div className="text-[#94A3B8]">No assets found. Try adjusting your filters.</div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* Pagination */}
+        {!isLoading && filteredAssets.length > 0 && (
+          <div className="border-t border-[#1E293B] py-4 px-6 flex items-center justify-between">
+            <div className="text-[#94A3B8] text-sm">
+              Showing 1-{filteredAssets.length} of {filteredAssets.length} assets
+            </div>
+            <Button
+              variant="outline"
+              className="bg-transparent border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white"
+            >
+              Load More
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Detail Modal */}
+      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">{selectedAsset?.symbol} - {selectedAsset?.name}</DialogTitle>
+            <DialogDescription className="text-[#94A3B8]">
+              Detailed multi-timeframe analysis
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedAsset && (
+            <div className="space-y-6 py-4">
+              {/* Chart Placeholder */}
+              <div className="bg-[#0A1628] rounded-lg p-6 h-64 flex items-center justify-center border border-[#1E293B]">
+                <div className="text-center text-[#94A3B8]">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-2 text-[#00D4FF]" />
+                  <p>Interactive chart would appear here</p>
+                  <p className="text-sm mt-1">Showing price action and indicators</p>
+                </div>
+              </div>
+
+              {/* Analysis Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">Intraday Trend</div>
+                  <StackedBar bearish={selectedAsset.intraday.bearish} bullish={selectedAsset.intraday.bullish} />
+                  <div className="text-xs text-[#64748B] mt-2">
+                    1M: Bullish | 5M: Bullish | 15M: Bullish | 1H: Bearish
+                  </div>
+                </div>
+
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">Daily Trend</div>
+                  <StackedBar bearish={selectedAsset.daily.bearish} bullish={selectedAsset.daily.bullish} />
+                  <div className="text-xs text-[#64748B] mt-2">
+                    4H: Bullish | 1D: Bullish | 1W: Bullish
+                  </div>
+                </div>
+
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">ADX Trend Strength</div>
+                  <div className="text-2xl text-white">{selectedAsset.advanced.adx}</div>
+                  <div className="text-sm text-[#10B981] mt-1">
+                    {selectedAsset.advanced.adx >= 25 ? "Strong Trend" : "Weak Trend"}
+                  </div>
+                </div>
+
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">EMA Alignment</div>
+                  <div className={`text-2xl ${selectedAsset.advanced.emaStatus === 'aligned' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
+                    {selectedAsset.advanced.emaStatus === 'aligned' ? '✓ Aligned' : '✗ Crossed'}
+                  </div>
+                  <div className="text-sm text-[#64748B] mt-1">
+                    All EMAs in correct order
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black">
+                  <Bell className="w-4 h-4 mr-2" />
+                  Add Alert
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex-1 border-[#1E293B] text-white hover:bg-[#1A1F2E]"
+                  onClick={() => toggleWatchlist(selectedAsset.symbol)}
+                >
+                  <Star className={`w-4 h-4 mr-2 ${selectedAsset.inWatchlist ? 'fill-[#00D4FF] text-[#00D4FF]' : ''}`} />
+                  {selectedAsset.inWatchlist ? 'Remove from' : 'Add to'} Watchlist
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }
-
-/* ------------------------------- small parts ------------------------------ */
-function SelectLike({
-  defaultValue,
-  options,
-}: {
-  defaultValue: string
-  options: string[]
-}) {
-  return (
-    <select
-      defaultValue={defaultValue}
-      className="h-10 rounded-lg px-3 text-[14px] min-w-[200px]"
-      style={{
-        background: "hsl(var(--fs-bg-2))",
-        border: "1px solid hsl(var(--fs-border))",
-        color: "hsl(var(--fs-foreground))",
-        outline: "none",
-        appearance: "none",
-      }}
-    >
-      {options.map((o) => (
-        <option key={o}>{o}</option>
-      ))}
-    </select>
-  )
-}
-
