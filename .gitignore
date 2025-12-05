@@ -51,3 +51,4 @@ build/
 coverage/
 htmlcov/
 
+.next
