@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from typing import AsyncGenerator
 
-from dotenv import load_dotenv
+from app.core.config import settings
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -12,15 +10,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-# Base directory = backend/
-BASE_DIR = Path(__file__).resolve().parents[2]
 
-# Load .env from backend/.env
-load_dotenv(BASE_DIR / ".env")
-
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set in environment or .env")
+DATABASE_URL = settings.DATABASE_URL
 
 # Async engine using asyncpg
 engine: AsyncEngine = create_async_engine(

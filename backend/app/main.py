@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # Local application
 from app.core.config import settings
 from app.core.lifespan import lifespan
-from app.routers import screener
+from app.routers import screener, ops
 
 
 
@@ -31,12 +31,9 @@ app.add_middleware(
 )
 
 
-# ---- Health ----
-@app.get("/healthz", tags=["meta"])
-async def healthz():
-    return {"ok": True}
 
 
 # ---- Routers ----
 app.include_router(screener.router)
+app.include_router(ops.router)
 
