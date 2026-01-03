@@ -20,7 +20,14 @@ class MarketPrice(Base):
         String(32),
         nullable=False,
         index=True,
-        doc="Instrument symbol (FK-like to fx_universe.symbol, not enforced yet).",
+        doc="Canonical instrument symbol (e.g. EURUSD).",
+    )
+
+    timeframe: Mapped[str] = mapped_column(
+        String(8),
+        nullable=False,
+        index=True,
+        doc="Candle timeframe (e.g. 5m, 30m, 1h, 4h, 1d).",
     )
 
     timestamp: Mapped[datetime] = mapped_column(
@@ -46,6 +53,7 @@ class MarketPrice(Base):
         Numeric(18, 8),
         nullable=False,
     )
+
     volume: Mapped[float] = mapped_column(
         Numeric(24, 8),
         nullable=True,
@@ -54,8 +62,9 @@ class MarketPrice(Base):
     __table_args__ = (
         UniqueConstraint(
             "symbol",
+            "timeframe",
             "timestamp",
-            name="uq_market_prices_symbol_timestamp",
+            name="uq_market_prices_symbol_timeframe_timestamp",
         ),
     )
 
