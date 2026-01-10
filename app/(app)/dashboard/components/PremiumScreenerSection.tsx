@@ -1,5 +1,15 @@
-import { useState } from "react";
-import { Search, RefreshCw, Download, Star, Bell, TrendingUp, TrendingDown, ArrowRight, ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  Search,
+  RefreshCw,
+  Download,
+  Star,
+  Bell,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  ChevronDown,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -179,7 +189,7 @@ const mockAssets: Asset[] = [
 ];
 
 export default function PremiumScreenerSection() {
-  const [assets, setAssets] = useState<Asset[]>(mockAssets);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [assetClassFilter, setAssetClassFilter] = useState("All");
   const [trendFilter, setTrendFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -188,35 +198,111 @@ export default function PremiumScreenerSection() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  const handleRefresh = () => {
+  // --- Live backend integration ---
+  type ApiTrendDir = "up" | "down" | "flat";
+
+  type ApiScreenerRow = {
+    symbol: string;
+    name: string;
+    intraday: { bear: number; bull: number };
+    daily: { bear: number; bull: number };
+    advanced: { adx: number; adx_dir: ApiTrendDir; ema: string; vol: number; alert: boolean };
+  };
+
+  type ApiScreenerPage = {
+    rows: ApiScreenerRow[];
+    page: number;
+    pageSize: number;
+    total: number;
+    lastUpdated: string;
+  };
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+  const inferAssetClass = (symbol: string): Asset["assetClass"] => {
+    const s = symbol.toUpperCase();
+    if (s.includes("XAU")) return "Commodities";
+    if (s.includes("/")) return "Forex";
+    if (s === "US500" || s === "US100") return "Indices";
+    return "Stocks";
+  };
+
+  const mapApiRowToAsset = (row: ApiScreenerRow): Asset => {
+    const adxTrend: Asset["advanced"]["adxTrend"] =
+      row.advanced.adx_dir === "up" ? "up" : row.advanced.adx_dir === "down" ? "down" : "neutral";
+
+    const emaStatus: Asset["advanced"]["emaStatus"] = row.advanced.ema === "aligned" ? "aligned" : "crossed";
+
+    return {
+      symbol: row.symbol,
+      name: row.name,
+      assetClass: inferAssetClass(row.symbol),
+      inWatchlist: false,
+      intraday: { bearish: row.intraday.bear, bullish: row.intraday.bull },
+      daily: { bearish: row.daily.bear, bullish: row.daily.bull },
+      advanced: {
+        adx: row.advanced.adx,
+        adxTrend,
+        emaStatus,
+        volume: row.advanced.vol,
+        hasAlert: row.advanced.alert,
+      },
+    };
+  };
+
+  const loadAssets = async () => {
     setIsLoading(true);
-    setTimeout(() => {
+    try {
+      const url = new URL("/screener/rows", API_BASE);
+      url.searchParams.set("page", "1");
+      url.searchParams.set("pageSize", "250");
+
+      const res = await fetch(url.toString(), { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = (await res.json()) as ApiScreenerPage;
+      setAssets(data.rows.map(mapApiRowToAsset));
+      setLastUpdated(new Date(data.lastUpdated).toLocaleString());
+    } catch (e) {
+      console.error("Failed to load screener rows; falling back to mock assets", e);
+      setAssets(mockAssets);
+      setLastUpdated("Mock data");
+    } finally {
       setIsLoading(false);
-      setLastUpdated("Just now");
-    }, 1500);
+    }
+  };
+
+  useEffect(() => {
+    void loadAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleRefresh = () => {
+    void loadAssets();
   };
 
   const toggleWatchlist = (symbol: string) => {
-    setAssets(assets.map(asset => 
-      asset.symbol === symbol 
-        ? { ...asset, inWatchlist: !asset.inWatchlist }
-        : asset
-    ));
+    setAssets(
+      assets.map((asset) => (asset.symbol === symbol ? { ...asset, inWatchlist: !asset.inWatchlist } : asset)),
+    );
   };
 
   const toggleAlert = (symbol: string) => {
-    setAssets(assets.map(asset => 
-      asset.symbol === symbol 
-        ? { ...asset, advanced: { ...asset.advanced, hasAlert: !asset.advanced.hasAlert }}
-        : asset
-    ));
+    setAssets(
+      assets.map((asset) =>
+        asset.symbol === symbol
+          ? { ...asset, advanced: { ...asset.advanced, hasAlert: !asset.advanced.hasAlert } }
+          : asset,
+      ),
+    );
   };
 
-  const filteredAssets = assets.filter(asset => {
-    const matchesSearch = asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         asset.name.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredAssets = assets.filter((asset) => {
+    const matchesSearch =
+      asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      asset.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesAssetClass = assetClassFilter === "All" || asset.assetClass === assetClassFilter;
-    
+
     let matchesTrend = true;
     if (trendFilter !== "All") {
       const bullishPercent = asset.daily.bullish;
@@ -238,38 +324,34 @@ export default function PremiumScreenerSection() {
           break;
       }
     }
-    
+
     return matchesSearch && matchesAssetClass && matchesTrend;
   });
 
   const StackedBar = ({ bearish, bullish }: { bearish: number; bullish: number }) => (
     <div className="relative w-full h-9 bg-[#1A1F2E] rounded-md overflow-hidden flex">
       {/* Bearish section */}
-      <div 
+      <div
         className="h-full bg-gradient-to-r from-[#DC2626] via-[#EF4444] to-[#DC2626] flex items-center justify-center relative"
         style={{ width: `${bearish}%` }}
       >
-        {bearish > 15 && (
-          <span className="text-white text-sm z-10 drop-shadow-lg">{bearish}%</span>
-        )}
+        {bearish > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bearish}%</span>}
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
       </div>
-      
+
       {/* Bullish section */}
-      <div 
+      <div
         className="h-full bg-gradient-to-r from-[#059669] via-[#10B981] to-[#059669] flex items-center justify-center relative"
         style={{ width: `${bullish}%` }}
       >
-        {bullish > 15 && (
-          <span className="text-white text-sm z-10 drop-shadow-lg">{bullish}%</span>
-        )}
+        {bullish > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bullish}%</span>}
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
       </div>
     </div>
   );
 
   const AssetRow = ({ asset }: { asset: Asset }) => (
-    <tr 
+    <tr
       className="border-b border-[#1E293B] hover:bg-[#14181F] transition-all duration-200 cursor-pointer"
       onClick={() => {
         setSelectedAsset(asset);
@@ -286,9 +368,7 @@ export default function PremiumScreenerSection() {
             }}
             className="transition-colors duration-200"
           >
-            <Star 
-              className={`w-5 h-5 ${asset.inWatchlist ? 'fill-[#00D4FF] text-[#00D4FF]' : 'text-[#64748B]'}`}
-            />
+            <Star className={`w-5 h-5 ${asset.inWatchlist ? "fill-[#00D4FF] text-[#00D4FF]" : "text-[#64748B]"}`} />
           </button>
           <div>
             <div className="text-white">{asset.symbol}</div>
@@ -296,50 +376,46 @@ export default function PremiumScreenerSection() {
           </div>
         </div>
       </td>
-      
+
       {/* INTRADAY */}
       <td className="py-4 px-4">
         <StackedBar bearish={asset.intraday.bearish} bullish={asset.intraday.bullish} />
       </td>
-      
+
       {/* DAILY */}
       <td className="py-4 px-4">
         <StackedBar bearish={asset.daily.bearish} bullish={asset.daily.bullish} />
       </td>
-      
+
       {/* ADVANCED */}
       <td className="py-4 px-4">
         <div className="flex items-center gap-4 text-sm">
           {/* ADX */}
           <div className="flex items-center gap-1">
-            <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>
-              {asset.advanced.adx}
-            </span>
+            <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>{asset.advanced.adx}</span>
             {asset.advanced.adxTrend === "up" && <TrendingUp className="w-4 h-4 text-[#10B981]" />}
             {asset.advanced.adxTrend === "down" && <TrendingDown className="w-4 h-4 text-[#EF4444]" />}
             {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-4 h-4 text-[#94A3B8]" />}
           </div>
-          
-          {/* Divider */}
-          <div className="w-px h-6 bg-[#1E293B]"></div>
-          
+
           {/* EMA */}
-          <div className={asset.advanced.emaStatus === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}>
-            {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
+          <Badge
+            className={`${
+              asset.advanced.emaStatus === "aligned" ? "bg-[#10B981]/20 text-[#10B981]" : "bg-[#EF4444]/20 text-[#EF4444]"
+            } border-0`}
+          >
+            EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
+          </Badge>
+
+          {/* VOLUME */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-2 bg-[#1E293B] rounded-full overflow-hidden">
+              <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.volume}%` }} />
+            </div>
+            <span className="text-[#94A3B8] text-xs">{asset.advanced.volume}</span>
           </div>
-          
-          {/* Divider */}
-          <div className="w-px h-6 bg-[#1E293B]"></div>
-          
-          {/* Volume */}
-          <div className="flex items-end gap-0.5 h-6">
-            <div className="w-2 bg-[#00D4FF] rounded-t" style={{ height: `${asset.advanced.volume}%` }}></div>
-          </div>
-          
-          {/* Divider */}
-          <div className="w-px h-6 bg-[#1E293B]"></div>
-          
-          {/* Alert */}
+
+          {/* ALERT */}
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -347,9 +423,7 @@ export default function PremiumScreenerSection() {
             }}
             className="transition-colors duration-200"
           >
-            <Bell 
-              className={`w-5 h-5 ${asset.advanced.hasAlert ? 'fill-[#00D4FF] text-[#00D4FF]' : 'text-[#64748B]'}`}
-            />
+            <Bell className={`w-4 h-4 ${asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"}`} />
           </button>
         </div>
       </td>
@@ -358,11 +432,11 @@ export default function PremiumScreenerSection() {
 
   const LoadingSkeleton = () => (
     <>
-      {[...Array(8)].map((_, i) => (
+      {[...Array(6)].map((_, i) => (
         <tr key={i} className="border-b border-[#1E293B]">
           <td className="py-4 px-4">
             <div className="flex items-center gap-3">
-              <Skeleton className="w-5 h-5 rounded" />
+              <Skeleton className="h-5 w-5 rounded" />
               <div className="space-y-2">
                 <Skeleton className="h-4 w-16" />
                 <Skeleton className="h-3 w-24" />
@@ -442,7 +516,7 @@ export default function PremiumScreenerSection() {
             onClick={handleRefresh}
             className="bg-[#14181F] border-[#1E293B] text-[#94A3B8] hover:text-white hover:bg-[#1A1F2E]"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             <span className="text-sm">Last updated: {lastUpdated}</span>
           </Button>
 
@@ -518,12 +592,12 @@ export default function PremiumScreenerSection() {
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
         <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl">{selectedAsset?.symbol} - {selectedAsset?.name}</DialogTitle>
-            <DialogDescription className="text-[#94A3B8]">
-              Detailed multi-timeframe analysis
-            </DialogDescription>
+            <DialogTitle className="text-2xl">
+              {selectedAsset?.symbol} - {selectedAsset?.name}
+            </DialogTitle>
+            <DialogDescription className="text-[#94A3B8]">Detailed multi-timeframe analysis</DialogDescription>
           </DialogHeader>
-          
+
           {selectedAsset && (
             <div className="space-y-6 py-4">
               {/* Chart Placeholder */}
@@ -540,35 +614,27 @@ export default function PremiumScreenerSection() {
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">Intraday Trend</div>
                   <StackedBar bearish={selectedAsset.intraday.bearish} bullish={selectedAsset.intraday.bullish} />
-                  <div className="text-xs text-[#64748B] mt-2">
-                    1M: Bullish | 5M: Bullish | 15M: Bullish | 1H: Bearish
-                  </div>
+                  <div className="text-xs text-[#64748B] mt-2">1M: Bullish | 5M: Bullish | 15M: Bullish | 1H: Bearish</div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">Daily Trend</div>
                   <StackedBar bearish={selectedAsset.daily.bearish} bullish={selectedAsset.daily.bullish} />
-                  <div className="text-xs text-[#64748B] mt-2">
-                    4H: Bullish | 1D: Bullish | 1W: Bullish
-                  </div>
+                  <div className="text-xs text-[#64748B] mt-2">4H: Bullish | 1D: Bullish | 1W: Bullish</div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">ADX Trend Strength</div>
                   <div className="text-2xl text-white">{selectedAsset.advanced.adx}</div>
-                  <div className="text-sm text-[#10B981] mt-1">
-                    {selectedAsset.advanced.adx >= 25 ? "Strong Trend" : "Weak Trend"}
-                  </div>
+                  <div className="text-sm text-[#10B981] mt-1">{selectedAsset.advanced.adx >= 25 ? "Strong Trend" : "Weak Trend"}</div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">EMA Alignment</div>
-                  <div className={`text-2xl ${selectedAsset.advanced.emaStatus === 'aligned' ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
-                    {selectedAsset.advanced.emaStatus === 'aligned' ? '✓ Aligned' : '✗ Crossed'}
+                  <div className={`text-2xl ${selectedAsset.advanced.emaStatus === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                    {selectedAsset.advanced.emaStatus === "aligned" ? "✓ Aligned" : "✗ Crossed"}
                   </div>
-                  <div className="text-sm text-[#64748B] mt-1">
-                    All EMAs in correct order
-                  </div>
+                  <div className="text-sm text-[#64748B] mt-1">All EMAs in correct order</div>
                 </div>
               </div>
 
@@ -578,13 +644,13 @@ export default function PremiumScreenerSection() {
                   <Bell className="w-4 h-4 mr-2" />
                   Add Alert
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="flex-1 border-[#1E293B] text-white hover:bg-[#1A1F2E]"
                   onClick={() => toggleWatchlist(selectedAsset.symbol)}
                 >
-                  <Star className={`w-4 h-4 mr-2 ${selectedAsset.inWatchlist ? 'fill-[#00D4FF] text-[#00D4FF]' : ''}`} />
-                  {selectedAsset.inWatchlist ? 'Remove from' : 'Add to'} Watchlist
+                  <Star className={`w-4 h-4 mr-2 ${selectedAsset.inWatchlist ? "fill-[#00D4FF] text-[#00D4FF]" : ""}`} />
+                  {selectedAsset.inWatchlist ? "Remove from" : "Add to"} Watchlist
                 </Button>
               </div>
             </div>
@@ -594,3 +660,4 @@ export default function PremiumScreenerSection() {
     </div>
   );
 }
+
