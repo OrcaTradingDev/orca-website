@@ -103,6 +103,79 @@ const mockAssets: Asset[] = [
     daily: { bearish: 33, bullish: 67 },
     advanced: { adx: 29, adxTrend: "up", emaStatus: "aligned", volume: 58, hasAlert: false },
   },
+  // Tim's Initial Asset List (10 Symbols)
+  {
+    symbol: "EUR/USD",
+    name: "Euro/Dollar",
+    assetClass: "Forex",
+    inWatchlist: false,
+    intraday: { bearish: 42, bullish: 58 },
+    daily: { bearish: 48, bullish: 52 },
+    advanced: { adx: 18, adxTrend: "neutral", emaStatus: "aligned", volume: 45, hasAlert: false },
+  },
+  {
+    symbol: "GBP/USD",
+    name: "Pound/Dollar",
+    assetClass: "Forex",
+    inWatchlist: false,
+    intraday: { bearish: 51, bullish: 49 },
+    daily: { bearish: 46, bullish: 54 },
+    advanced: { adx: 22, adxTrend: "neutral", emaStatus: "aligned", volume: 52, hasAlert: false },
+  },
+  {
+    symbol: "USD/JPY",
+    name: "Dollar/Yen",
+    assetClass: "Forex",
+    inWatchlist: false,
+    intraday: { bearish: 38, bullish: 62 },
+    daily: { bearish: 41, bullish: 59 },
+    advanced: { adx: 25, adxTrend: "up", emaStatus: "aligned", volume: 48, hasAlert: false },
+  },
+  {
+    symbol: "AUD/USD",
+    name: "Australian Dollar/Dollar",
+    assetClass: "Forex",
+    inWatchlist: false,
+    intraday: { bearish: 45, bullish: 55 },
+    daily: { bearish: 43, bullish: 57 },
+    advanced: { adx: 20, adxTrend: "neutral", emaStatus: "aligned", volume: 50, hasAlert: false },
+  },
+  {
+    symbol: "MSFT",
+    name: "Microsoft Corporation",
+    assetClass: "Stocks",
+    inWatchlist: false,
+    intraday: { bearish: 35, bullish: 65 },
+    daily: { bearish: 28, bullish: 72 },
+    advanced: { adx: 42, adxTrend: "up", emaStatus: "aligned", volume: 70, hasAlert: false },
+  },
+  {
+    symbol: "US500",
+    name: "S&P 500",
+    assetClass: "Stocks",
+    inWatchlist: false,
+    intraday: { bearish: 39, bullish: 61 },
+    daily: { bearish: 33, bullish: 67 },
+    advanced: { adx: 29, adxTrend: "up", emaStatus: "aligned", volume: 58, hasAlert: false },
+  },
+  {
+    symbol: "US100",
+    name: "Nasdaq 100",
+    assetClass: "Stocks",
+    inWatchlist: false,
+    intraday: { bearish: 36, bullish: 64 },
+    daily: { bearish: 30, bullish: 70 },
+    advanced: { adx: 31, adxTrend: "up", emaStatus: "aligned", volume: 62, hasAlert: false },
+  },
+  {
+    symbol: "XAU/USD",
+    name: "Gold",
+    assetClass: "Commodities",
+    inWatchlist: false,
+    intraday: { bearish: 44, bullish: 56 },
+    daily: { bearish: 40, bullish: 60 },
+    advanced: { adx: 26, adxTrend: "up", emaStatus: "aligned", volume: 55, hasAlert: false },
+  },
 ];
 
 export default function PremiumScreenerSection() {
@@ -332,6 +405,7 @@ export default function PremiumScreenerSection() {
               <SelectItem value="Crypto">Crypto</SelectItem>
               <SelectItem value="Stocks">Stocks</SelectItem>
               <SelectItem value="Indices">Indices</SelectItem>
+              <SelectItem value="Commodities">Commodities</SelectItem>
             </SelectContent>
           </Select>
 
