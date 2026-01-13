@@ -6,7 +6,8 @@ import logging
 import os
 import signal
 from datetime import datetime, timezone
-from typing import List, Optional
+from decimal import Decimal
+from typing import Any, Dict, List
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -38,6 +39,9 @@ def _parse_timeframes() -> List[str]:
 POLL_SECONDS = int(os.getenv("INGEST_POLL_SECONDS", "60"))
 LIMIT_PER_REQUEST = int(os.getenv("INGEST_LIMIT", "500"))
 
+# Smooth burst rate by sleeping between symbol requests (prevents 55/min cliff)
+PER_SYMBOL_SLEEP_SECONDS = float(os.getenv("INGEST_PER_SYMBOL_SLEEP_SECONDS", "1.0"))
+
 # If TwelveData rate-limits, we back off briefly (and keep the worker alive)
 RATE_LIMIT_BACKOFF_SECONDS = int(os.getenv("INGEST_RATE_LIMIT_BACKOFF_SECONDS", "20"))
 
@@ -48,10 +52,10 @@ def normalize_symbol(sym: str) -> str:
 
 def should_fetch_timeframe(timeframe: str, now_utc: datetime) -> bool:
     """
-    Keep the worker loop at 60s, but only fetch a timeframe when a *new candle could exist*.
+    Keep the worker loop at 60s, but only fetch a timeframe when a new candle could exist.
     Also offset minutes to avoid multiple timeframes firing on the same minute.
 
-    Offsets chosen:
+    Offsets:
       5min  -> minute % 5  == 1
       30min -> minute % 30 == 2
       1h    -> minute == 3
@@ -61,7 +65,7 @@ def should_fetch_timeframe(timeframe: str, now_utc: datetime) -> bool:
     m = now_utc.minute
     h = now_utc.hour
 
-    tf = timeframe.strip().lower()
+    tf = (timeframe or "").strip().lower().replace(" ", "")
 
     if tf == "5min":
         return m % 5 == 1
@@ -74,11 +78,11 @@ def should_fetch_timeframe(timeframe: str, now_utc: datetime) -> bool:
     if tf in ("1day", "1d", "daily"):
         return (h == 0) and (m == 5)
 
-    # For any other timeframe string, default to fetching every loop (not recommended).
+    # Any other timeframe: fetch every loop (not recommended)
     return True
 
 
-async def upsert_market_prices(rows) -> int:
+async def upsert_market_prices(rows: List[Dict[str, Any]]) -> int:
     if not rows:
         return 0
 
@@ -108,36 +112,75 @@ async def fetch_symbols() -> List[str]:
 
 
 def _looks_like_rate_limit(exc: Exception) -> bool:
-    """
-    TwelveDataService may raise different exception types depending on implementation.
-    We catch and detect common rate-limit signals without tightly coupling.
-    """
     msg = str(exc).lower()
     return any(s in msg for s in ("429", "rate limit", "too many requests", "too_many_requests"))
+
+
+async def _sleep_or_shutdown(seconds: float) -> None:
+    if seconds <= 0:
+        return
+    try:
+        await asyncio.wait_for(shutdown_event.wait(), timeout=seconds)
+    except asyncio.TimeoutError:
+        return
+
+
+def _coerce_decimal(x: Any) -> Decimal:
+    # defensive: TwelveDataService should already return Decimals, but keep this safe
+    if isinstance(x, Decimal):
+        return x
+    return Decimal(str(x))
 
 
 async def ingest_timeframe(td: TwelveDataService, timeframe: str, symbols: List[str]) -> None:
     """
     Fetch + upsert one timeframe across all symbols.
+    Includes per-symbol sleep to smooth burst rate and avoid 55 calls/min cliffs.
     """
-    for symbol in symbols:
-        ohlc_rows = await td.fetch_ohlc(symbol=symbol, timeframe=timeframe, limit=LIMIT_PER_REQUEST)
+    for i, symbol in enumerate(symbols):
+        if shutdown_event.is_set():
+            return
 
-        cleaned = [
-            {
-                "symbol": symbol,
-                "timeframe": timeframe,
-                "timestamp": r["timestamp"],  # tz-aware UTC datetime
-                "open": r["open"],
-                "high": r["high"],
-                "low": r["low"],
-                "close": r["close"],
-                "volume": r.get("volume"),
-            }
-            for r in ohlc_rows
-        ]
+        try:
+            ohlc_rows = await td.fetch_ohlc(symbol=symbol, timeframe=timeframe, limit=LIMIT_PER_REQUEST)
+        except Exception as e:
+            if _looks_like_rate_limit(e):
+                logger.warning(
+                    "[rate-limit] hit rate limit while ingesting %s (%s). backing off %ss",
+                    timeframe,
+                    symbol,
+                    RATE_LIMIT_BACKOFF_SECONDS,
+                )
+                await _sleep_or_shutdown(RATE_LIMIT_BACKOFF_SECONDS)
+                # continue to next symbol after backoff
+                continue
 
-        n = await upsert_market_prices(cleaned)
+            logger.exception("Error fetching OHLC: symbol=%s timeframe=%s", symbol, timeframe)
+            # continue to next symbol
+            continue
+
+        cleaned: List[Dict[str, Any]] = []
+        for r in ohlc_rows:
+            cleaned.append(
+                {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "timestamp": r["timestamp"],  # tz-aware UTC datetime
+                    "open": _coerce_decimal(r["open"]),
+                    "high": _coerce_decimal(r["high"]),
+                    "low": _coerce_decimal(r["low"]),
+                    "close": _coerce_decimal(r["close"]),
+                    "volume": r.get("volume"),
+                }
+            )
+
+        try:
+            n = await upsert_market_prices(cleaned)
+        except Exception:
+            logger.exception("DB upsert error: symbol=%s timeframe=%s", symbol, timeframe)
+            # continue to next symbol
+            n = 0
+
         if cleaned:
             logger.info(
                 "[ingest] %s %s rows=%d %s → %s",
@@ -149,6 +192,9 @@ async def ingest_timeframe(td: TwelveDataService, timeframe: str, symbols: List[
             )
         else:
             logger.info("[ingest] %s %s rows=0", symbol, timeframe)
+
+        # Smooth the request burst to stay under TwelveData per-minute caps
+        await _sleep_or_shutdown(PER_SYMBOL_SLEEP_SECONDS)
 
 
 async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
@@ -164,31 +210,13 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
         logger.info("[tick] no timeframes due at %s", now.isoformat())
         return
 
-    # Process due timeframes sequentially to control call rate spikes.
+    # Process due timeframes sequentially to control burst size.
     for timeframe in due_timeframes:
         if shutdown_event.is_set():
             return
 
-        try:
-            logger.info("[tick] ingesting timeframe=%s at %s", timeframe, now.isoformat())
-            await ingest_timeframe(td, timeframe, symbols)
-        except Exception as e:
-            if _looks_like_rate_limit(e):
-                logger.warning(
-                    "[rate-limit] hit rate limit while ingesting %s. backing off %ss",
-                    timeframe,
-                    RATE_LIMIT_BACKOFF_SECONDS,
-                )
-                # Back off but stay responsive to shutdown.
-                try:
-                    await asyncio.wait_for(shutdown_event.wait(), timeout=RATE_LIMIT_BACKOFF_SECONDS)
-                except asyncio.TimeoutError:
-                    pass
-                # After backoff, continue to next timeframe (or next loop)
-                continue
-
-            # Non-rate-limit errors: log and continue loop.
-            logger.exception("Error ingesting timeframe=%s", timeframe)
+        logger.info("[tick] ingesting timeframe=%s at %s", timeframe, now.isoformat())
+        await ingest_timeframe(td, timeframe, symbols)
 
 
 async def main():
@@ -203,10 +231,11 @@ async def main():
     )
 
     logger.info(
-        "Starting poll ingest worker: timeframes=%s poll=%ss limit=%s rate_limit_backoff=%ss",
+        "Starting poll ingest worker: timeframes=%s poll=%ss limit=%s per_symbol_sleep=%ss rate_limit_backoff=%ss",
         timeframes,
         POLL_SECONDS,
         LIMIT_PER_REQUEST,
+        PER_SYMBOL_SLEEP_SECONDS,
         RATE_LIMIT_BACKOFF_SECONDS,
     )
 
@@ -216,11 +245,7 @@ async def main():
         except Exception:
             logger.exception("Ingest loop error")
 
-        # Sleep, but wake early if shutting down.
-        try:
-            await asyncio.wait_for(shutdown_event.wait(), timeout=POLL_SECONDS)
-        except asyncio.TimeoutError:
-            pass
+        await _sleep_or_shutdown(POLL_SECONDS)
 
     logger.info("Worker stopped.")
 
