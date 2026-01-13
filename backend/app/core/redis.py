@@ -1,24 +1,43 @@
-from __future__ import annotations
+import os
+from typing import Optional
 
-# Standard library
-from functools import lru_cache
+import redis.asyncio as redis
 
-# Third-party
-from redis.asyncio import Redis
-
-# Local application
-from app.core.config import settings
+_redis_client: Optional[redis.Redis] = None
 
 
-@lru_cache
-def get_redis_url() -> str:
-    url = settings.REDIS_URL
+def _redis_url() -> Optional[str]:
+    url = os.getenv("REDIS_URL", "").strip()
+    return url or None
+
+
+async def get_redis_client() -> Optional[redis.Redis]:
+    """
+    Redis is OPTIONAL.
+    - If REDIS_URL is not set -> None
+    - If Redis is unreachable -> None
+    - Otherwise -> cached Redis client
+    """
+    global _redis_client
+
+    url = _redis_url()
     if not url:
-        raise RuntimeError("REDIS_URL is not set in environment or .env")
-    return url
+        return None
 
+    # Reuse a cached client if present
+    if _redis_client is not None:
+        try:
+            await _redis_client.ping()
+            return _redis_client
+        except Exception:
+            _redis_client = None  # stale client; recreate
 
-@lru_cache
-def get_redis_client() -> Redis:
-    return Redis.from_url(get_redis_url(), decode_responses=True)
+    try:
+        client = redis.from_url(url, decode_responses=True)
+        await client.ping()
+        _redis_client = client
+        return _redis_client
+    except Exception:
+        _redis_client = None
+        return None
 

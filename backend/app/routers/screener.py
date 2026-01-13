@@ -3,20 +3,19 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
-from app.core.redis import get_redis_client
 from app.core.jobs import FXRefreshJob, REFRESH_QUEUE_KEY
 from app.models.fx_universe import FXUniverse
 from app.schemas.screener import (
-    ScreenerPage, 
-    ScreenerRow, 
-    TrendBreakdown, 
-    AdvancedMetrics, 
-    TrendDir
+    ScreenerPage,
+    ScreenerRow,
+    TrendBreakdown,
+    AdvancedMetrics,
+    TrendDir,
 )
 
 router = APIRouter(prefix="/screener", tags=["screener"])
@@ -79,7 +78,6 @@ def _stub_metrics_for_symbol(symbol: str, name: str) -> ScreenerRow:
 # Routes
 # -----------------------
 
-
 @router.get("/rows", response_model=ScreenerPage)
 async def get_screener_rows(
     page: int = Query(1, ge=1),
@@ -135,6 +133,7 @@ async def get_screener_rows(
 
 @router.post("/refresh")
 async def refresh_now(
+    request: Request,
     symbols: Optional[List[str]] = Query(
         default=None,
         description="Optional list of symbols to refresh (e.g. symbols=EURUSD&symbols=GBPUSD)",
@@ -143,12 +142,16 @@ async def refresh_now(
     """
     Enqueue a refresh job into Redis.
 
-    refresh_worker.py should consume from jobs:screener:refresh and
-    write into market_prices.
+    With the current "no redis yet" intent:
+    - If Redis isn't configured/connected, return 503 instead of crashing.
     """
+    # Redis is optional right now; lifespan should set app.state.redis
+    redis = getattr(request.app.state, "redis", None)
+    if redis is None:
+        raise HTTPException(status_code=503, detail="Redis not configured yet")
+
     job = FXRefreshJob(symbols=symbols)
 
-    redis = get_redis_client()
     try:
         # worker.brpop(...) expects a list; we LPUSH jobs onto it
         await redis.lpush(REFRESH_QUEUE_KEY, job.model_dump_json())

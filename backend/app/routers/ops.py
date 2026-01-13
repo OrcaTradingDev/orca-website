@@ -7,57 +7,59 @@ from app.core.redis import get_redis_client
 
 router = APIRouter(tags=["ops"])
 
+
 @router.get("/healthz")
 async def healthz():
     """
-        Liveness Probe - If the pod is down or not
+    Liveness Probe - process is up.
     """
-    return {"status" : "ok"}
+    return {"status": "ok"}
 
 
 @router.get("/readyz")
 async def readyz(db: AsyncSession = Depends(get_db)):
     """
-        Readiness Probe - If the external connections are active or not.
+    Readiness Probe - external dependencies.
+    Intent (no-redis-yet):
+      - Database is REQUIRED
+      - Redis is OPTIONAL (report status, but do not block readiness)
     """
     status_data = {
-        "status" : "unknown",
-        "database" : "unknown",
-        "redis" : "unknown"
+        "status": "unknown",
+        "database": "unknown",
+        "redis": "unknown",
     }
 
-    # Check Database
-
-    try : 
+    # --- Check Database (required) ---
+    try:
         await db.execute(text("SELECT 1"))
         status_data["database"] = "connected"
     except Exception as e:
-        # In production, log the actual error here (e.g. logger.error(e)) for now print()
-        print(f" Database error: {e}")
+        print(f"Database error: {e}")
         status_data["database"] = "disconnected"
 
-    # Check redis
-
-    try :
-        redis = get_redis_client()
-        if await redis.ping():
-            status_data["redis"] = "connected"
+    # --- Check Redis (optional) ---
+    try:
+        redis = await get_redis_client()
+        if redis is None:
+            # REDIS_URL not set or redis unreachable, but that's OK for now
+            status_data["redis"] = "disabled"
         else:
-            status_data["redis"] = "disconnected"
-
+            ok = await redis.ping()
+            status_data["redis"] = "connected" if ok else "disconnected"
     except Exception as e:
-        # In production, log the actual error here (e.g. logger.error(e)) for now print()
-        print(f"Redis error : {e}")
-        status_data["redis"] = "disconnected"
+        # Never fail readiness due to Redis in no-redis mode
+        print(f"Redis error: {e}")
+        status_data["redis"] = "disabled"
 
-    # Now verify all services
-    if status_data["database"] == "connected" and status_data["redis"] == "connected":
+    # --- Decide readiness ---
+    if status_data["database"] == "connected":
         status_data["status"] = "ready"
         return status_data
 
-    # If status is not ready
     status_data["status"] = "not_ready"
     raise HTTPException(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=status_data
+        detail=status_data,
     )
+
