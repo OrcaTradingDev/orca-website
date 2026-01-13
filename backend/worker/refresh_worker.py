@@ -3,8 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from redis.asyncio import Redis
 from sqlalchemy import select
@@ -23,8 +22,8 @@ from app.services.twelve_data import TwelveDataService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("refresh_worker")
-
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
 
 def normalize_symbol(sym: str) -> str:
     """
@@ -73,7 +72,7 @@ async def upsert_market_prices(
         },
     )
 
-    result = await db.execute(stmt)
+    await db.execute(stmt)
     # asyncpg doesn't always give rowcount reliably on upserts, but we can approximate
     return len(rows)
 
@@ -190,7 +189,12 @@ async def worker_loop(redis: Redis) -> None:
 
 
 async def main() -> None:
-    redis = get_redis_client()
+    # IMPORTANT: get_redis_client is async and may return None in "no redis yet" mode
+    redis = await get_redis_client()
+    if redis is None:
+        logger.error("REDIS_URL not set or Redis unavailable. Worker cannot run without Redis. Exiting.")
+        return
+
     await worker_loop(redis)
 
 
