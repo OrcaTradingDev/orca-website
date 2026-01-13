@@ -9,12 +9,22 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 
-_TIMEFRAME_TO_INTERVAL: Dict[str, str] = {
-    "5m": "5min",
-    "30m": "30min",
+# Normalize many user-friendly timeframes into TwelveData intervals
+# TwelveData interval values are like: 5min, 30min, 1h, 4h, 1day
+_TIMEFRAME_ALIASES: Dict[str, str] = {
+    # canonical / preferred
+    "5min": "5min",
+    "30min": "30min",
     "1h": "1h",
     "4h": "4h",
+    "1day": "1day",
+    # shorthand aliases
+    "5m": "5min",
+    "30m": "30min",
+    "60min": "1h",
     "1d": "1day",
+    "daily": "1day",
+    "day": "1day",
 }
 
 
@@ -69,6 +79,13 @@ def _to_decimal(x: Any) -> Optional[Decimal]:
     return Decimal(s)
 
 
+def _normalize_timeframe(timeframe: str) -> str:
+    tf = (timeframe or "").strip().lower()
+    # allow inputs like "5MIN" or " 5min "
+    tf = tf.replace(" ", "")
+    return _TIMEFRAME_ALIASES.get(tf, tf)
+
+
 @dataclass
 class TwelveDataService:
     api_key: str
@@ -83,7 +100,9 @@ class TwelveDataService:
         """
         Input:
           symbol: canonical (e.g. EURUSD)
-          timeframe: 5m, 30m, 1h, 4h, 1d
+          timeframe: accepts either:
+            - 5min, 30min, 1h, 4h, 1day   (preferred / worker format)
+            - 5m, 30m, 60min, 1d, daily   (aliases)
 
         Output rows:
           [{
@@ -95,11 +114,12 @@ class TwelveDataService:
             "volume": Decimal|None,
           }, ...] sorted ascending by timestamp
         """
-        tf = timeframe.strip()
-        if tf not in _TIMEFRAME_TO_INTERVAL:
+        tf_norm = _normalize_timeframe(timeframe)
+        if tf_norm not in _TIMEFRAME_ALIASES:
             raise ValueError(f"Unsupported timeframe: {timeframe}")
 
-        interval = _TIMEFRAME_TO_INTERVAL[tf]
+        interval = _TIMEFRAME_ALIASES[tf_norm]
+
         canonical = symbol.strip().upper().replace("/", "")
         provider_symbol = _to_provider_symbol(canonical)
 
