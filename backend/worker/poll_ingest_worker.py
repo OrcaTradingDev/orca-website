@@ -197,7 +197,6 @@ def _adx_wilder(
     # ADX: Wilder average of DX
     adx: List[Optional[float]] = [None] * n
     start = period * 2
-    # first ADX = average of DX over period after first DI window
     dx_window = [d for d in dx[period + 1 : start + 1] if d is not None]
     if len(dx_window) < period:
         return (adx, plus_di, minus_di)
@@ -217,8 +216,7 @@ def _adx_wilder(
 
 def compute_latest_indicators(ohlc_rows: List[Dict]) -> Optional[Dict]:
     """
-    Input rows: [{"timestamp": dt, "open":..., "high":..., "low":..., "close":..., "volume":...}, ...]
-    Must be ascending by timestamp.
+    Input rows must be ascending by timestamp.
     Returns dict of latest indicator values.
     """
     if not ohlc_rows or len(ohlc_rows) < 30:
@@ -243,7 +241,6 @@ def compute_latest_indicators(ohlc_rows: List[Dict]) -> Optional[Dict]:
             continue
         macd_line[i] = float(ema12[i]) - float(ema26[i])
 
-    # MACD signal is EMA(9) of macd_line where defined
     macd_values = [v if v is not None else 0.0 for v in macd_line]
     macd_signal = _ema(macd_values, 9)
     macd_hist: List[Optional[float]] = [None] * len(closes)
@@ -292,13 +289,6 @@ def _safe_float(x: Any) -> Optional[float]:
 
 
 def score_timeframe_from_indicators(ind: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """
-    Returns dict with:
-      score (float) in [-100, 100]
-      bullish_pct / bearish_pct
-      confidence in [0,1]
-      component scores (ema/rsi/macd) in [-1,1]
-    """
     ema9 = _safe_float(ind.get("ema_9"))
     ema21 = _safe_float(ind.get("ema_21"))
     ema50 = _safe_float(ind.get("ema_50"))
@@ -307,13 +297,11 @@ def score_timeframe_from_indicators(ind: Dict[str, Any]) -> Optional[Dict[str, A
     adx = _safe_float(ind.get("adx_14"))
     atr = _safe_float(ind.get("atr_14"))
 
-    # Need a baseline set to avoid junk output
     if any(v is None for v in [ema9, ema21, ema50, rsi, macd_hist, adx, atr]):
         return None
     if atr is None or atr <= 0:
         return None
 
-    # --- EMA model: structure + normalized separation ---
     stack_dir = 0.0
     if ema9 > ema21 and ema21 > ema50:
         stack_dir = 1.0
@@ -323,24 +311,20 @@ def score_timeframe_from_indicators(ind: Dict[str, Any]) -> Optional[Dict[str, A
         stack_dir = 0.0
 
     sep = ((ema9 - ema21) + (ema21 - ema50)) / (2.0 * atr)
-    sep = _clamp(sep, -3.0, 3.0) / 3.0  # -> [-1,1]
+    sep = _clamp(sep, -3.0, 3.0) / 3.0
     ema_score = _clamp(0.6 * stack_dir + 0.4 * sep, -1.0, 1.0)
 
-    # --- RSI model: normalize around 50 ---
     rsi_score = _clamp((rsi - 50.0) / 20.0, -1.0, 1.0)
 
-    # --- MACD model: histogram normalized by ATR ---
     macd_score = _clamp((macd_hist / atr) * 5.0, -1.0, 1.0)
 
-    # --- Base signal ---
     w_ema, w_rsi, w_macd = 0.45, 0.25, 0.30
     raw_signal = (w_ema * ema_score) + (w_rsi * rsi_score) + (w_macd * macd_score)
     raw_signal = _clamp(raw_signal, -1.0, 1.0)
 
-    # --- Confidence from ADX ---
     confidence = _clamp((adx - 15.0) / 25.0, 0.0, 1.0)
 
-    score = raw_signal * confidence  # [-1,1]
+    score = raw_signal * confidence
     score_100 = float(_clamp(score * 100.0, -100.0, 100.0))
 
     bullish = int(round(_clamp((score_100 + 100.0) / 2.0, 0.0, 100.0)))
@@ -357,8 +341,25 @@ def score_timeframe_from_indicators(ind: Dict[str, Any]) -> Optional[Dict[str, A
     }
 
 
+# ----------------------------
+# Trend tables + aggregate tables (safe create-if-not-exists)
+# ----------------------------
+INTRADAY_TIMEFRAMES = ("5min", "30min", "1h")
+DAILY_TIMEFRAMES = ("4h", "1day")
+
+# TF weights (longer = heavier)
+TF_WEIGHTS: Dict[str, float] = {
+    "5min": 1.0,
+    "30min": 2.0,
+    "1h": 3.0,
+    "4h": 3.0,
+    "1day": 4.0,
+}
+
+
 async def ensure_trend_tables_exist() -> None:
     async with AsyncSessionLocal() as db:
+        # Per-(symbol,timeframe) latest trend scores
         await db.execute(
             text(
                 """
@@ -386,15 +387,39 @@ async def ensure_trend_tables_exist() -> None:
         """
             )
         )
+
+        # Per-symbol aggregates (intraday + daily)
+        await db.execute(
+            text(
+                """
+        CREATE TABLE IF NOT EXISTS market_trend_aggregates_latest (
+          id BIGSERIAL PRIMARY KEY,
+          symbol TEXT NOT NULL,
+          intraday_last_timestamp TIMESTAMPTZ,
+          intraday_score DOUBLE PRECISION,
+          intraday_bullish_pct INTEGER,
+          intraday_bearish_pct INTEGER,
+          daily_last_timestamp TIMESTAMPTZ,
+          daily_score DOUBLE PRECISION,
+          daily_bullish_pct INTEGER,
+          daily_bearish_pct INTEGER,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        """
+            )
+        )
+        await db.execute(
+            text(
+                """
+        CREATE INDEX IF NOT EXISTS idx_trend_aggs_symbol
+        ON market_trend_aggregates_latest(symbol);
+        """
+            )
+        )
         await db.commit()
 
 
 async def upsert_trend_score_latest(symbol: str, timeframe: str, last_ts: datetime, s: Dict[str, Any]) -> None:
-    """
-    We don't assume a unique constraint exists, so we do:
-      DELETE existing (symbol,timeframe)
-      INSERT new latest row
-    """
     async with AsyncSessionLocal() as db:
         await db.execute(
             text("DELETE FROM market_trend_scores_latest WHERE symbol=:s AND timeframe=:t"),
@@ -430,8 +455,109 @@ async def upsert_trend_score_latest(symbol: str, timeframe: str, last_ts: dateti
         await db.commit()
 
 
+def _pct_from_score(score: float) -> Tuple[int, int]:
+    bull = int(round(_clamp((score + 100.0) / 2.0, 0.0, 100.0)))
+    bear = 100 - bull
+    return bull, bear
+
+
+async def compute_symbol_aggregate(symbol: str, tfs: Tuple[str, ...]) -> Optional[Dict[str, Any]]:
+    """
+    Pull trend rows for the symbol for the requested timeframes and compute a weighted aggregate score.
+    Uses: effective_weight = tf_weight * (0.5 + 0.5*confidence)
+    Returns: {score, bullish_pct, bearish_pct, last_timestamp}
+    """
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(
+            text(
+                """
+                SELECT timeframe, score, confidence, last_timestamp
+                FROM market_trend_scores_latest
+                WHERE symbol = :s AND timeframe = ANY(:tfs)
+                """
+            ),
+            {"s": symbol, "tfs": list(tfs)},
+        )
+        rows = res.fetchall()
+
+    if not rows:
+        return None
+
+    num = 0.0
+    den = 0.0
+    max_ts: Optional[datetime] = None
+
+    for timeframe, score, confidence, last_ts in rows:
+        if score is None or confidence is None:
+            continue
+        w = TF_WEIGHTS.get(str(timeframe), 0.0)
+        if w <= 0:
+            continue
+        eff = w * (0.5 + 0.5 * float(confidence))
+        num += float(score) * eff
+        den += eff
+        if last_ts is not None:
+            if max_ts is None or last_ts > max_ts:
+                max_ts = last_ts
+
+    if den <= 0 or max_ts is None:
+        return None
+
+    agg_score = float(num / den)
+    agg_score = _clamp(agg_score, -100.0, 100.0)
+    bull, bear = _pct_from_score(agg_score)
+
+    return {
+        "score": agg_score,
+        "bullish_pct": bull,
+        "bearish_pct": bear,
+        "last_timestamp": max_ts,
+    }
+
+
+async def upsert_symbol_aggregates_latest(
+    symbol: str,
+    intraday: Optional[Dict[str, Any]],
+    daily: Optional[Dict[str, Any]],
+) -> None:
+    """
+    One row per symbol. Keep the same "delete + insert" approach (no uniqueness assumptions).
+    """
+    async with AsyncSessionLocal() as db:
+        await db.execute(text("DELETE FROM market_trend_aggregates_latest WHERE symbol=:s"), {"s": symbol})
+        await db.execute(
+            text(
+                """
+                INSERT INTO market_trend_aggregates_latest (
+                  symbol,
+                  intraday_last_timestamp, intraday_score, intraday_bullish_pct, intraday_bearish_pct,
+                  daily_last_timestamp, daily_score, daily_bullish_pct, daily_bearish_pct,
+                  updated_at
+                ) VALUES (
+                  :symbol,
+                  :intraday_last_timestamp, :intraday_score, :intraday_bullish_pct, :intraday_bearish_pct,
+                  :daily_last_timestamp, :daily_score, :daily_bullish_pct, :daily_bearish_pct,
+                  NOW()
+                )
+                """
+            ),
+            {
+                "symbol": symbol,
+                "intraday_last_timestamp": None if intraday is None else intraday["last_timestamp"],
+                "intraday_score": None if intraday is None else intraday["score"],
+                "intraday_bullish_pct": None if intraday is None else intraday["bullish_pct"],
+                "intraday_bearish_pct": None if intraday is None else intraday["bearish_pct"],
+                "daily_last_timestamp": None if daily is None else daily["last_timestamp"],
+                "daily_score": None if daily is None else daily["score"],
+                "daily_bullish_pct": None if daily is None else daily["bullish_pct"],
+                "daily_bearish_pct": None if daily is None else daily["bearish_pct"],
+            },
+        )
+        await db.commit()
+
+
 # ----------------------------
-# DB helpers
+# Existing DB helpers
 # ----------------------------
 _timeframe_column_cache: Optional[bool] = None
 
@@ -478,7 +604,6 @@ async def upsert_market_prices(rows: List[Dict], has_tf: bool) -> int:
             },
         )
     else:
-        # legacy schema: no timeframe column, unique(symbol,timestamp)
         rows_no_tf = []
         for r in rows:
             rr = dict(r)
@@ -503,11 +628,6 @@ async def upsert_market_prices(rows: List[Dict], has_tf: bool) -> int:
 
 
 async def upsert_latest_indicators(symbol: str, timeframe: str, ind: Dict) -> None:
-    """
-    We don't assume a unique constraint exists, so we do:
-      DELETE existing (symbol,timeframe)
-      INSERT new latest row
-    """
     async with AsyncSessionLocal() as db:
         await db.execute(
             text("DELETE FROM market_indicators_latest WHERE symbol=:s AND timeframe=:t"),
@@ -603,7 +723,7 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
                     {
                         "symbol": symbol,
                         "timeframe": timeframe,
-                        "timestamp": r["timestamp"],  # tz-aware UTC datetime
+                        "timestamp": r["timestamp"],
                         "open": r["open"],
                         "high": r["high"],
                         "low": r["low"],
@@ -612,7 +732,6 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
                     }
                 )
 
-            # Sort, then drop “future” timestamps before writing
             cleaned.sort(key=lambda x: x["timestamp"])
             cleaned = _filter_future_rows(cleaned)
 
@@ -630,7 +749,6 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
             else:
                 logger.info("[ingest] %s %s rows=0", symbol, timeframe)
 
-            # ✅ Compute and store indicators from the same data we just fetched (no extra API calls)
             ind = compute_latest_indicators(cleaned)
             if ind is None:
                 logger.info("[ind] %s %s skipped (insufficient rows=%d)", symbol, timeframe, len(cleaned))
@@ -653,7 +771,6 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
                 logger.exception("[ind] failed upserting indicators for %s %s", symbol, timeframe)
                 continue
 
-            # ✅ Trend Matrix scoring (DB-only, derived from indicators; no vendor/API calls)
             trend = score_timeframe_from_indicators(ind)
             if trend is None:
                 logger.info("[trend] %s %s skipped (missing inputs)", symbol, timeframe)
@@ -675,6 +792,34 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
                 )
             except Exception:
                 logger.exception("[trend] failed upserting trend score for %s %s", symbol, timeframe)
+                continue
+
+            # ✅ Per-symbol aggregates: intraday (5m/30m/1h) and daily (4h/1d)
+            try:
+                intraday = await compute_symbol_aggregate(symbol, INTRADAY_TIMEFRAMES)
+                daily = await compute_symbol_aggregate(symbol, DAILY_TIMEFRAMES)
+                await upsert_symbol_aggregates_latest(symbol, intraday, daily)
+
+                if intraday is not None:
+                    logger.info(
+                        "[agg] %s intraday score=%.2f bull=%s bear=%s last_ts=%s",
+                        symbol,
+                        float(intraday["score"]),
+                        intraday["bullish_pct"],
+                        intraday["bearish_pct"],
+                        intraday["last_timestamp"],
+                    )
+                if daily is not None:
+                    logger.info(
+                        "[agg] %s daily    score=%.2f bull=%s bear=%s last_ts=%s",
+                        symbol,
+                        float(daily["score"]),
+                        daily["bullish_pct"],
+                        daily["bearish_pct"],
+                        daily["last_timestamp"],
+                    )
+            except Exception:
+                logger.exception("[agg] failed computing/upserting aggregates for %s", symbol)
 
 
 async def main():
@@ -688,7 +833,7 @@ async def main():
         base_url=settings.TWELVE_DATA_BASE_URL,
     )
 
-    # DB-only table creation for trend scores (safe, no Alembic replay)
+    # DB-only table creation (safe, no Alembic replay)
     await ensure_trend_tables_exist()
 
     logger.info(
