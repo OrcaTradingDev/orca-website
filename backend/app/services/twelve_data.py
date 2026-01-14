@@ -109,6 +109,7 @@ class TwelveDataService:
             "outputsize": int(limit),
             "apikey": self.api_key,
             "format": "JSON",
+            "timezone": "UTC",
         }
 
         # Twelve Data expects FX requests to include exchange=FX (your earlier constraint)
