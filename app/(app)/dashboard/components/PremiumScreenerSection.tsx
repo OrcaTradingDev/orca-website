@@ -42,79 +42,6 @@ interface Asset {
 // Mock data
 const mockAssets: Asset[] = [
   {
-    symbol: "AAPL",
-    name: "Apple Inc.",
-    assetClass: "Stocks",
-    inWatchlist: true,
-    intraday: { bearish: 31, bullish: 69 },
-    daily: { bearish: 22, bullish: 78 },
-    advanced: { adx: 45, adxTrend: "up", emaStatus: "aligned", volume: 65, hasAlert: true },
-  },
-  {
-    symbol: "BTCUSD",
-    name: "Bitcoin",
-    assetClass: "Crypto",
-    inWatchlist: true,
-    intraday: { bearish: 53, bullish: 47 },
-    daily: { bearish: 37, bullish: 63 },
-    advanced: { adx: 32, adxTrend: "up", emaStatus: "crossed", volume: 92, hasAlert: true },
-  },
-  {
-    symbol: "EURUSD",
-    name: "Euro/Dollar",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 42, bullish: 58 },
-    daily: { bearish: 48, bullish: 52 },
-    advanced: { adx: 18, adxTrend: "neutral", emaStatus: "aligned", volume: 45, hasAlert: false },
-  },
-  {
-    symbol: "TSLA",
-    name: "Tesla Inc.",
-    assetClass: "Stocks",
-    inWatchlist: false,
-    intraday: { bearish: 67, bullish: 33 },
-    daily: { bearish: 58, bullish: 42 },
-    advanced: { adx: 38, adxTrend: "down", emaStatus: "crossed", volume: 78, hasAlert: false },
-  },
-  {
-    symbol: "ETHUSD",
-    name: "Ethereum",
-    assetClass: "Crypto",
-    inWatchlist: true,
-    intraday: { bearish: 28, bullish: 72 },
-    daily: { bearish: 35, bullish: 65 },
-    advanced: { adx: 41, adxTrend: "up", emaStatus: "aligned", volume: 71, hasAlert: true },
-  },
-  {
-    symbol: "GBPUSD",
-    name: "Pound/Dollar",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 51, bullish: 49 },
-    daily: { bearish: 46, bullish: 54 },
-    advanced: { adx: 22, adxTrend: "neutral", emaStatus: "aligned", volume: 52, hasAlert: false },
-  },
-  {
-    symbol: "NVDA",
-    name: "NVIDIA Corp.",
-    assetClass: "Stocks",
-    inWatchlist: true,
-    intraday: { bearish: 24, bullish: 76 },
-    daily: { bearish: 19, bullish: 81 },
-    advanced: { adx: 52, adxTrend: "up", emaStatus: "aligned", volume: 88, hasAlert: true },
-  },
-  {
-    symbol: "SPX",
-    name: "S&P 500",
-    assetClass: "Indices",
-    inWatchlist: false,
-    intraday: { bearish: 39, bullish: 61 },
-    daily: { bearish: 33, bullish: 67 },
-    advanced: { adx: 29, adxTrend: "up", emaStatus: "aligned", volume: 58, hasAlert: false },
-  },
-  // Tim's Initial Asset List (10 Symbols)
-  {
     symbol: "EUR/USD",
     name: "Euro/Dollar",
     assetClass: "Forex",
@@ -151,6 +78,15 @@ const mockAssets: Asset[] = [
     advanced: { adx: 20, adxTrend: "neutral", emaStatus: "aligned", volume: 50, hasAlert: false },
   },
   {
+    symbol: "AAPL",
+    name: "Apple Inc.",
+    assetClass: "Stocks",
+    inWatchlist: true,
+    intraday: { bearish: 31, bullish: 69 },
+    daily: { bearish: 22, bullish: 78 },
+    advanced: { adx: 45, adxTrend: "up", emaStatus: "aligned", volume: 65, hasAlert: true },
+  },
+  {
     symbol: "MSFT",
     name: "Microsoft Corporation",
     assetClass: "Stocks",
@@ -158,6 +94,15 @@ const mockAssets: Asset[] = [
     intraday: { bearish: 35, bullish: 65 },
     daily: { bearish: 28, bullish: 72 },
     advanced: { adx: 42, adxTrend: "up", emaStatus: "aligned", volume: 70, hasAlert: false },
+  },
+  {
+    symbol: "NVDA",
+    name: "NVIDIA Corp.",
+    assetClass: "Stocks",
+    inWatchlist: true,
+    intraday: { bearish: 24, bullish: 76 },
+    daily: { bearish: 19, bullish: 81 },
+    advanced: { adx: 52, adxTrend: "up", emaStatus: "aligned", volume: 88, hasAlert: true },
   },
   {
     symbol: "US500",
@@ -644,14 +589,21 @@ export default function PremiumScreenerSection() {
                   <Bell className="w-4 h-4 mr-2" />
                   Add Alert
                 </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 border-[#1E293B] text-white hover:bg-[#1A1F2E]"
-                  onClick={() => toggleWatchlist(selectedAsset.symbol)}
+
+
+              <Button
+                variant="outline"
+                className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
+                onClick={() => toggleWatchlist(selectedAsset.symbol)}
                 >
-                  <Star className={`w-4 h-4 mr-2 ${selectedAsset.inWatchlist ? "fill-[#00D4FF] text-[#00D4FF]" : ""}`} />
+              <Star
+                  className="w-4 h-4 mr-2"
+                  stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
+                  fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
+                />
                   {selectedAsset.inWatchlist ? "Remove from" : "Add to"} Watchlist
-                </Button>
+              </Button>
+
               </div>
             </div>
           )}
