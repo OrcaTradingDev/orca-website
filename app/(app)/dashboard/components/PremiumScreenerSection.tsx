@@ -589,14 +589,21 @@ export default function PremiumScreenerSection() {
                   <Bell className="w-4 h-4 mr-2" />
                   Add Alert
                 </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1 border-[#1E293B] text-white hover:bg-[#1A1F2E]"
-                  onClick={() => toggleWatchlist(selectedAsset.symbol)}
+
+
+              <Button
+                variant="outline"
+                className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
+                onClick={() => toggleWatchlist(selectedAsset.symbol)}
                 >
-                  <Star className={`w-4 h-4 mr-2 ${selectedAsset.inWatchlist ? "fill-[#00D4FF] text-[#00D4FF]" : ""}`} />
+              <Star
+                  className="w-4 h-4 mr-2"
+                  stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
+                  fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
+                />
                   {selectedAsset.inWatchlist ? "Remove from" : "Add to"} Watchlist
-                </Button>
+              </Button>
+
               </div>
             </div>
           )}

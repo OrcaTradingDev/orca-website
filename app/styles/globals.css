@@ -229,3 +229,26 @@ a {
 a:hover {
   color: #cbe7ff;
 }
+
+/* ============ SHADCN/UI COMPONENT OVERRIDES ============ */
+/* Fixes for dropdown visibility and button backgrounds */
+
+/* Fix Select Dropdown - Dark background with white text */
+[data-slot="select-content"] {
+  background: #14181f !important;
+  border-color: #1e293b !important;
+  color: #e6eef7 !important;
+}
+
+[data-slot="select-item"] {
+  color: #e6eef7 !important;
+}
+
+[data-slot="select-item"]:hover,
+[data-slot="select-item"][data-highlighted] {
+  background: #1a1f2e !important;
+  color: #ffffff !important;
+}
+
+
+
