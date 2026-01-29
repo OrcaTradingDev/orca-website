@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+// PremiumScreenerSection.tsx
+
+import { useEffect, useState, useCallback } from "react";
 import {
   Search,
   RefreshCw,
@@ -8,7 +10,6 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowRight,
-  ChevronDown,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -34,12 +35,31 @@ interface Asset {
     adx: number;
     adxTrend: "up" | "down" | "neutral";
     emaStatus: "aligned" | "crossed";
-    volume: number; // 0-100 for bar height
+    volume: number;
     hasAlert: boolean;
   };
 }
 
-// Mock data
+// API types matching backend
+type ApiTrendDir = "up" | "down" | "flat";
+
+type ApiScreenerRow = {
+  symbol: string;
+  name: string;
+  intraday: { bear: number; bull: number };
+  daily: { bear: number; bull: number };
+  advanced: { adx: number; adx_dir: ApiTrendDir; ema: string; vol: number; alert: boolean };
+};
+
+type ApiScreenerPage = {
+  rows: ApiScreenerRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  lastUpdated: string;
+};
+
+// Fallback mock data for development
 const mockAssets: Asset[] = [
   {
     symbol: "EUR/USD",
@@ -60,24 +80,6 @@ const mockAssets: Asset[] = [
     advanced: { adx: 22, adxTrend: "neutral", emaStatus: "aligned", volume: 52, hasAlert: false },
   },
   {
-    symbol: "USD/JPY",
-    name: "Dollar/Yen",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 38, bullish: 62 },
-    daily: { bearish: 41, bullish: 59 },
-    advanced: { adx: 25, adxTrend: "up", emaStatus: "aligned", volume: 48, hasAlert: false },
-  },
-  {
-    symbol: "AUD/USD",
-    name: "Australian Dollar/Dollar",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 45, bullish: 55 },
-    daily: { bearish: 43, bullish: 57 },
-    advanced: { adx: 20, adxTrend: "neutral", emaStatus: "aligned", volume: 50, hasAlert: false },
-  },
-  {
     symbol: "AAPL",
     name: "Apple Inc.",
     assetClass: "Stocks",
@@ -85,15 +87,6 @@ const mockAssets: Asset[] = [
     intraday: { bearish: 31, bullish: 69 },
     daily: { bearish: 22, bullish: 78 },
     advanced: { adx: 45, adxTrend: "up", emaStatus: "aligned", volume: 65, hasAlert: true },
-  },
-  {
-    symbol: "MSFT",
-    name: "Microsoft Corporation",
-    assetClass: "Stocks",
-    inWatchlist: false,
-    intraday: { bearish: 35, bullish: 65 },
-    daily: { bearish: 28, bullish: 72 },
-    advanced: { adx: 42, adxTrend: "up", emaStatus: "aligned", volume: 70, hasAlert: false },
   },
   {
     symbol: "NVDA",
@@ -104,33 +97,6 @@ const mockAssets: Asset[] = [
     daily: { bearish: 19, bullish: 81 },
     advanced: { adx: 52, adxTrend: "up", emaStatus: "aligned", volume: 88, hasAlert: true },
   },
-  {
-    symbol: "US500",
-    name: "S&P 500",
-    assetClass: "Stocks",
-    inWatchlist: false,
-    intraday: { bearish: 39, bullish: 61 },
-    daily: { bearish: 33, bullish: 67 },
-    advanced: { adx: 29, adxTrend: "up", emaStatus: "aligned", volume: 58, hasAlert: false },
-  },
-  {
-    symbol: "US100",
-    name: "Nasdaq 100",
-    assetClass: "Stocks",
-    inWatchlist: false,
-    intraday: { bearish: 36, bullish: 64 },
-    daily: { bearish: 30, bullish: 70 },
-    advanced: { adx: 31, adxTrend: "up", emaStatus: "aligned", volume: 62, hasAlert: false },
-  },
-  {
-    symbol: "XAU/USD",
-    name: "Gold",
-    assetClass: "Commodities",
-    inWatchlist: false,
-    intraday: { bearish: 44, bullish: 56 },
-    daily: { bearish: 40, bullish: 60 },
-    advanced: { adx: 26, adxTrend: "up", emaStatus: "aligned", volume: 55, hasAlert: false },
-  },
 ];
 
 export default function PremiumScreenerSection() {
@@ -139,36 +105,22 @@ export default function PremiumScreenerSection() {
   const [trendFilter, setTrendFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState("2 mins ago");
+  const [lastUpdated, setLastUpdated] = useState<string>("");
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalAssets, setTotalAssets] = useState(0);
+  const [pageSize] = useState(50);
 
-  // --- Live backend integration ---
-  type ApiTrendDir = "up" | "down" | "flat";
-
-  type ApiScreenerRow = {
-    symbol: string;
-    name: string;
-    intraday: { bear: number; bull: number };
-    daily: { bear: number; bull: number };
-    advanced: { adx: number; adx_dir: ApiTrendDir; ema: string; vol: number; alert: boolean };
-  };
-
-  type ApiScreenerPage = {
-    rows: ApiScreenerRow[];
-    page: number;
-    pageSize: number;
-    total: number;
-    lastUpdated: string;
-  };
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+  // Production API base URL
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/";
 
   const inferAssetClass = (symbol: string): Asset["assetClass"] => {
     const s = symbol.toUpperCase();
-    if (s.includes("XAU")) return "Commodities";
+    if (s.includes("XAU") || s.includes("XAG") || s.includes("OIL")) return "Commodities";
     if (s.includes("/")) return "Forex";
-    if (s === "US500" || s === "US100") return "Indices";
+    if (s === "US500" || s === "US100" || s === "US30") return "Indices";
+    if (s.includes("BTC") || s.includes("ETH") || s.includes("USDT")) return "Crypto";
     return "Stocks";
   };
 
@@ -176,7 +128,8 @@ export default function PremiumScreenerSection() {
     const adxTrend: Asset["advanced"]["adxTrend"] =
       row.advanced.adx_dir === "up" ? "up" : row.advanced.adx_dir === "down" ? "down" : "neutral";
 
-    const emaStatus: Asset["advanced"]["emaStatus"] = row.advanced.ema === "aligned" ? "aligned" : "crossed";
+    const emaStatus: Asset["advanced"]["emaStatus"] = 
+      row.advanced.ema === "aligned" ? "aligned" : "crossed";
 
     return {
       symbol: row.symbol,
@@ -195,41 +148,104 @@ export default function PremiumScreenerSection() {
     };
   };
 
-  const loadAssets = async () => {
+  const loadAssets = useCallback(async (page: number = 1) => {
     setIsLoading(true);
     try {
       const url = new URL("/screener/rows", API_BASE);
-      url.searchParams.set("page", "1");
-      url.searchParams.set("pageSize", "250");
+      url.searchParams.set("page", page.toString());
+      url.searchParams.set("pageSize", pageSize.toString());
 
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(url.toString(), { 
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
 
       const data = (await res.json()) as ApiScreenerPage;
-      setAssets(data.rows.map(mapApiRowToAsset));
-      setLastUpdated(new Date(data.lastUpdated).toLocaleString());
+      
+      // Handle empty data gracefully
+      if (data.rows && data.rows.length > 0) {
+        const mappedAssets = data.rows.map(mapApiRowToAsset);
+        setAssets(mappedAssets);
+        setTotalAssets(data.total);
+        setCurrentPage(data.page);
+        
+        // Format lastUpdated timestamp
+        try {
+          const date = new Date(data.lastUpdated);
+          const now = new Date();
+          const diffMs = now.getTime() - date.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          
+          if (diffMins < 1) {
+            setLastUpdated("Just now");
+          } else if (diffMins < 60) {
+            setLastUpdated(`${diffMins} min${diffMins > 1 ? 's' : ''} ago`);
+          } else {
+            const diffHours = Math.floor(diffMins / 60);
+            setLastUpdated(`${diffHours} hour${diffHours > 1 ? 's' : ''} ago`);
+          }
+        } catch (e) {
+          setLastUpdated(new Date(data.lastUpdated).toLocaleString());
+        }
+      } else {
+        // Handle warming up state
+        setAssets([]);
+        setLastUpdated("Data warming up...");
+      }
     } catch (e) {
-      console.error("Failed to load screener rows; falling back to mock assets", e);
-      setAssets(mockAssets);
-      setLastUpdated("Mock data");
+      console.error("Failed to load screener rows:", e);
+      // Only use mock data in development
+      if (process.env.NODE_ENV === "development") {
+        setAssets(mockAssets);
+        setLastUpdated("Mock data (dev)");
+        setTotalAssets(mockAssets.length);
+      } else {
+        setAssets([]);
+        setLastUpdated("Connection error");
+      }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [API_BASE, pageSize]);
 
+  // Initial load
   useEffect(() => {
-    void loadAssets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void loadAssets(1);
+  }, [loadAssets]);
+
+  // 60-second polling
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void loadAssets(currentPage);
+    }, 60000); // 60 seconds
+
+    return () => clearInterval(interval);
+  }, [loadAssets, currentPage]);
 
   const handleRefresh = () => {
-    void loadAssets();
+    void loadAssets(currentPage);
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = currentPage + 1;
+    void loadAssets(nextPage);
   };
 
   const toggleWatchlist = (symbol: string) => {
     setAssets(
-      assets.map((asset) => (asset.symbol === symbol ? { ...asset, inWatchlist: !asset.inWatchlist } : asset)),
+      assets.map((asset) => 
+        asset.symbol === symbol ? { ...asset, inWatchlist: !asset.inWatchlist } : asset
+      )
     );
+    if (selectedAsset && selectedAsset.symbol === symbol) {
+      setSelectedAsset({ ...selectedAsset, inWatchlist: !selectedAsset.inWatchlist });
+    }
   };
 
   const toggleAlert = (symbol: string) => {
@@ -237,9 +253,15 @@ export default function PremiumScreenerSection() {
       assets.map((asset) =>
         asset.symbol === symbol
           ? { ...asset, advanced: { ...asset.advanced, hasAlert: !asset.advanced.hasAlert } }
-          : asset,
-      ),
+          : asset
+      )
     );
+    if (selectedAsset && selectedAsset.symbol === symbol) {
+      setSelectedAsset({
+        ...selectedAsset,
+        advanced: { ...selectedAsset.advanced, hasAlert: !selectedAsset.advanced.hasAlert },
+      });
+    }
   };
 
   const filteredAssets = assets.filter((asset) => {
@@ -272,6 +294,34 @@ export default function PremiumScreenerSection() {
 
     return matchesSearch && matchesAssetClass && matchesTrend;
   });
+
+  const handleExport = () => {
+    // Export filtered assets to CSV
+    const headers = ["Symbol", "Name", "Asset Class", "Intraday Bullish %", "Daily Bullish %", "ADX", "EMA Status", "Volume"];
+    const rows = filteredAssets.map(asset => [
+      asset.symbol,
+      asset.name,
+      asset.assetClass,
+      asset.intraday.bullish,
+      asset.daily.bullish,
+      asset.advanced.adx,
+      asset.advanced.emaStatus,
+      asset.advanced.volume,
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `screener-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   const StackedBar = ({ bearish, bullish }: { bearish: number; bullish: number }) => (
     <div className="relative w-full h-9 bg-[#1A1F2E] rounded-md overflow-hidden flex">
@@ -459,15 +509,18 @@ export default function PremiumScreenerSection() {
           <Button
             variant="outline"
             onClick={handleRefresh}
+            disabled={isLoading}
             className="bg-[#14181F] border-[#1E293B] text-[#94A3B8] hover:text-white hover:bg-[#1A1F2E]"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            <span className="text-sm">Last updated: {lastUpdated}</span>
+            <span className="text-sm">{lastUpdated || "Loading..."}</span>
           </Button>
 
           <Button
             variant="outline"
-            className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white"
+            onClick={handleExport}
+            disabled={filteredAssets.length === 0}
+            className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4 mr-2" />
             Export
@@ -509,7 +562,9 @@ export default function PremiumScreenerSection() {
               ) : (
                 <tr>
                   <td colSpan={4} className="py-12 text-center">
-                    <div className="text-[#94A3B8]">No assets found. Try adjusting your filters.</div>
+                    <div className="text-[#94A3B8]">
+                      {assets.length === 0 ? "No data available. Data may be warming up..." : "No assets found. Try adjusting your filters."}
+                    </div>
                   </td>
                 </tr>
               )}
@@ -521,14 +576,18 @@ export default function PremiumScreenerSection() {
         {!isLoading && filteredAssets.length > 0 && (
           <div className="border-t border-[#1E293B] py-4 px-6 flex items-center justify-between">
             <div className="text-[#94A3B8] text-sm">
-              Showing 1-{filteredAssets.length} of {filteredAssets.length} assets
+              Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalAssets)} of {totalAssets} assets
             </div>
-            <Button
-              variant="outline"
-              className="bg-transparent border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white"
-            >
-              Load More
-            </Button>
+            {currentPage * pageSize < totalAssets && (
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={isLoading}
+                className="bg-transparent border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white"
+              >
+                Load More
+              </Button>
+            )}
           </div>
         )}
       </div>
@@ -559,13 +618,13 @@ export default function PremiumScreenerSection() {
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">Intraday Trend</div>
                   <StackedBar bearish={selectedAsset.intraday.bearish} bullish={selectedAsset.intraday.bullish} />
-                  <div className="text-xs text-[#64748B] mt-2">1M: Bullish | 5M: Bullish | 15M: Bullish | 1H: Bearish</div>
+                  <div className="text-xs text-[#64748B] mt-2">Based on 1M, 5M, 15M, 1H timeframes</div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">Daily Trend</div>
                   <StackedBar bearish={selectedAsset.daily.bearish} bullish={selectedAsset.daily.bullish} />
-                  <div className="text-xs text-[#64748B] mt-2">4H: Bullish | 1D: Bullish | 1W: Bullish</div>
+                  <div className="text-xs text-[#64748B] mt-2">Based on 4H, 1D, 1W timeframes</div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
@@ -579,31 +638,32 @@ export default function PremiumScreenerSection() {
                   <div className={`text-2xl ${selectedAsset.advanced.emaStatus === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
                     {selectedAsset.advanced.emaStatus === "aligned" ? "✓ Aligned" : "✗ Crossed"}
                   </div>
-                  <div className="text-sm text-[#64748B] mt-1">All EMAs in correct order</div>
+                  <div className="text-sm text-[#64748B] mt-1">EMA 9, 21, 50, 200 alignment</div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                <Button className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black">
+                <Button 
+                  className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
+                  onClick={() => toggleAlert(selectedAsset.symbol)}
+                >
                   <Bell className="w-4 h-4 mr-2" />
-                  Add Alert
+                  {selectedAsset.advanced.hasAlert ? "Remove Alert" : "Add Alert"}
                 </Button>
 
-
-              <Button
-                variant="outline"
-                className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
-                onClick={() => toggleWatchlist(selectedAsset.symbol)}
+                <Button
+                  variant="outline"
+                  className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
+                  onClick={() => toggleWatchlist(selectedAsset.symbol)}
                 >
-              <Star
-                  className="w-4 h-4 mr-2"
-                  stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
-                  fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
-                />
+                  <Star
+                    className="w-4 h-4 mr-2"
+                    stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
+                    fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
+                  />
                   {selectedAsset.inWatchlist ? "Remove from" : "Add to"} Watchlist
-              </Button>
-
+                </Button>
               </div>
             </div>
           )}
@@ -612,4 +672,3 @@ export default function PremiumScreenerSection() {
     </div>
   );
 }
-
