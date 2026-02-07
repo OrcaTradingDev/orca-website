@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select, outerjoin
+from sqlalchemy import func, select, outerjoin, Table, Column, MetaData
+from sqlalchemy import Text, Float, DateTime, and_, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
@@ -20,16 +21,62 @@ from app.schemas.screener import (
 
 router = APIRouter(prefix="/screener", tags=["screener"])
 
+# ---- Lightweight table definition (no new model file needed) ----
+_metadata = MetaData()
 
-def _adx_dir_from_score(score: float | None) -> TrendDir:
-    # If you have a real directional column later, use that.
-    if score is None:
+MarketIndicatorsLatest = Table(
+    "market_indicators_latest",
+    _metadata,
+    Column("symbol", Text),
+    Column("timeframe", Text),
+    Column("last_timestamp", DateTime(timezone=True)),
+    Column("ema_9", Float),
+    Column("ema_21", Float),
+    Column("ema_50", Float),
+    Column("ema_200", Float),
+    Column("adx_14", Float),
+    Column("plus_di_14", Float),
+    Column("minus_di_14", Float),
+)
+
+
+def _clamp_int(v: float | None, lo: int = 0, hi: int = 100) -> int:
+    if v is None:
+        return lo
+    try:
+        x = int(round(float(v)))
+    except Exception:
+        return lo
+    return max(lo, min(hi, x))
+
+
+def _adx_dir_from_di(plus_di: float | None, minus_di: float | None, score_fallback: float | None) -> TrendDir:
+    # Prefer real DI direction when available; otherwise fall back to score-based heuristic.
+    if plus_di is not None and minus_di is not None:
+        if plus_di > minus_di:
+            return "up"
+        if minus_di > plus_di:
+            return "down"
         return "flat"
-    if score > 0.05:
+
+    if score_fallback is None:
+        return "flat"
+    if score_fallback > 0.05:
         return "up"
-    if score < -0.05:
+    if score_fallback < -0.05:
         return "down"
     return "flat"
+
+
+def _ema_state_from_emas(ema9: float | None, ema21: float | None, ema50: float | None, score_fallback: float | None) -> str:
+    # If we have real EMAs, infer alignment; otherwise fallback to score.
+    if ema9 is not None and ema21 is not None and ema50 is not None:
+        if ema9 > ema21 > ema50:
+            return "aligned"
+        if ema9 < ema21 < ema50:
+            return "aligned"
+        return "mixed"
+    return "aligned" if (score_fallback or 0) >= 0 else "mixed"
 
 
 @router.get("/rows", response_model=ScreenerPage)
@@ -42,12 +89,11 @@ async def get_screener_rows(
     """
     Return paginated screener rows backed by FXUniverse + market_trend_aggregates_latest.
 
-    This is the parity layer between the worker (DB writes) and the frontend (API reads).
+    Parity layer between worker (DB writes) and frontend (API reads).
     """
     offset = (page - 1) * page_size
 
     base_query = select(FXUniverse)
-
     if search:
         like = f"%{search.upper()}%"
         base_query = base_query.where(
@@ -59,11 +105,20 @@ async def get_screener_rows(
     count_stmt = select(func.count()).select_from(base_query.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
 
-    # Join FXUniverse -> aggregates table (latest metrics)
-    j = outerjoin(
+    # Join FXUniverse -> aggregates -> indicators (daily: "1day")
+    j1 = outerjoin(
         FXUniverse,
         MarketTrendAggregatesLatest,
         FXUniverse.symbol == MarketTrendAggregatesLatest.symbol,
+    )
+
+    j2 = outerjoin(
+        j1,
+        MarketIndicatorsLatest,
+        and_(
+            FXUniverse.symbol == MarketIndicatorsLatest.c.symbol,
+            MarketIndicatorsLatest.c.timeframe == literal("1day"),
+        ),
     )
 
     stmt = (
@@ -77,8 +132,15 @@ async def get_screener_rows(
             MarketTrendAggregatesLatest.intraday_score,
             MarketTrendAggregatesLatest.daily_score,
             MarketTrendAggregatesLatest.updated_at,
+            # real indicators (daily timeframe)
+            MarketIndicatorsLatest.c.adx_14,
+            MarketIndicatorsLatest.c.plus_di_14,
+            MarketIndicatorsLatest.c.minus_di_14,
+            MarketIndicatorsLatest.c.ema_9,
+            MarketIndicatorsLatest.c.ema_21,
+            MarketIndicatorsLatest.c.ema_50,
         )
-        .select_from(j)
+        .select_from(j2)
         .order_by(FXUniverse.symbol.asc())
         .offset(offset)
         .limit(page_size)
@@ -107,20 +169,27 @@ async def get_screener_rows(
         intraday_score,
         daily_score,
         updated_at,
+        adx_14,
+        plus_di_14,
+        minus_di_14,
+        ema9,
+        ema21,
+        ema50,
     ) in rows_db:
-        # If no aggregate exists yet, return neutral-ish values (or pick a fallback you prefer)
+        # If no aggregate exists yet, return neutral-ish values
         intraday_bull = int(intraday_bull) if intraday_bull is not None else 50
         intraday_bear = int(intraday_bear) if intraday_bear is not None else 50
         daily_bull = int(daily_bull) if daily_bull is not None else 50
         daily_bear = int(daily_bear) if daily_bear is not None else 50
 
-        # Advanced section: you can wire these to real columns later
-        # For now, keep something consistent and derived
-        adx = int(max(0, min(100, round(abs((daily_score or 0) * 100)))))  # placeholder “strength”
-        adx_dir = _adx_dir_from_score(daily_score)
-        ema_state = "aligned" if (daily_score or 0) >= 0 else "mixed"
-        vol = 50  # placeholder until you store/compute volume score
-        alert_flag = False  # placeholder until you store alerts in DB
+        # ---- Advanced: use real ADX if present ----
+        adx = _clamp_int(adx_14, 0, 100)
+        adx_dir = _adx_dir_from_di(plus_di_14, minus_di_14, daily_score)
+        ema_state = _ema_state_from_emas(ema9, ema21, ema50, daily_score)
+
+        # still placeholders (until you compute/store them)
+        vol = 50
+        alert_flag = False
 
         rows.append(
             ScreenerRow(
