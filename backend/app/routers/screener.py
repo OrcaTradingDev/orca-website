@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select, outerjoin, Table, Column, MetaData
-from sqlalchemy import Text, Float, DateTime, and_, literal
+from sqlalchemy import func, select, outerjoin, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_db
 from app.models.fx_universe import FXUniverse
 from app.models.market_trend_aggregates_latest import MarketTrendAggregatesLatest
+from app.models.market_indicators_latest import MarketIndicatorsLatest
 from app.schemas.screener import (
     ScreenerPage,
     ScreenerRow,
@@ -21,62 +21,36 @@ from app.schemas.screener import (
 
 router = APIRouter(prefix="/screener", tags=["screener"])
 
-# ---- Lightweight table definition (no new model file needed) ----
-_metadata = MetaData()
 
-MarketIndicatorsLatest = Table(
-    "market_indicators_latest",
-    _metadata,
-    Column("symbol", Text),
-    Column("timeframe", Text),
-    Column("last_timestamp", DateTime(timezone=True)),
-    Column("ema_9", Float),
-    Column("ema_21", Float),
-    Column("ema_50", Float),
-    Column("ema_200", Float),
-    Column("adx_14", Float),
-    Column("plus_di_14", Float),
-    Column("minus_di_14", Float),
-)
-
-
-def _clamp_int(v: float | None, lo: int = 0, hi: int = 100) -> int:
-    if v is None:
-        return lo
-    try:
-        x = int(round(float(v)))
-    except Exception:
-        return lo
-    return max(lo, min(hi, x))
-
-
-def _adx_dir_from_di(plus_di: float | None, minus_di: float | None, score_fallback: float | None) -> TrendDir:
-    # Prefer real DI direction when available; otherwise fall back to score-based heuristic.
-    if plus_di is not None and minus_di is not None:
-        if plus_di > minus_di:
-            return "up"
-        if minus_di > plus_di:
-            return "down"
+def _adx_dir_from_di(plus_di: float | None, minus_di: float | None) -> TrendDir:
+    if plus_di is None or minus_di is None:
         return "flat"
-
-    if score_fallback is None:
-        return "flat"
-    if score_fallback > 0.05:
+    diff = plus_di - minus_di
+    if diff > 1.0:
         return "up"
-    if score_fallback < -0.05:
+    if diff < -1.0:
         return "down"
     return "flat"
 
 
-def _ema_state_from_emas(ema9: float | None, ema21: float | None, ema50: float | None, score_fallback: float | None) -> str:
-    # If we have real EMAs, infer alignment; otherwise fallback to score.
-    if ema9 is not None and ema21 is not None and ema50 is not None:
-        if ema9 > ema21 > ema50:
-            return "aligned"
-        if ema9 < ema21 < ema50:
-            return "aligned"
+def _ema_state(ema9: float | None, ema21: float | None, ema50: float | None) -> str:
+    if ema9 is None or ema21 is None or ema50 is None:
         return "mixed"
-    return "aligned" if (score_fallback or 0) >= 0 else "mixed"
+    if ema9 > ema21 > ema50:
+        return "aligned"
+    if ema9 < ema21 < ema50:
+        return "aligned"
+    return "mixed"
+
+
+def _normalize_to_0_100(x: float | None, lo: float, hi: float) -> int:
+    if x is None:
+        return 50
+    if hi <= lo:
+        return 50
+    pct = (x - lo) / (hi - lo)
+    pct = max(0.0, min(1.0, pct))
+    return int(round(pct * 100))
 
 
 @router.get("/rows", response_model=ScreenerPage)
@@ -87,9 +61,8 @@ async def get_screener_rows(
     db: AsyncSession = Depends(get_db),
 ) -> ScreenerPage:
     """
-    Return paginated screener rows backed by FXUniverse + market_trend_aggregates_latest.
-
-    Parity layer between worker (DB writes) and frontend (API reads).
+    Return paginated screener rows backed by FXUniverse + market_trend_aggregates_latest,
+    plus "advanced" metrics from market_indicators_latest (daily timeframe).
     """
     offset = (page - 1) * page_size
 
@@ -101,23 +74,23 @@ async def get_screener_rows(
             | func.upper(FXUniverse.name).like(like)
         )
 
-    # total count
     count_stmt = select(func.count()).select_from(base_query.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
 
-    # Join FXUniverse -> aggregates -> indicators (daily: "1day")
-    j1 = outerjoin(
+    # Join FXUniverse -> aggregates (bull/bear snapshots)
+    j = outerjoin(
         FXUniverse,
         MarketTrendAggregatesLatest,
         FXUniverse.symbol == MarketTrendAggregatesLatest.symbol,
     )
 
-    j2 = outerjoin(
-        j1,
+    # Join in daily indicators (timeframe='1d') for advanced metrics
+    j = outerjoin(
+        j,
         MarketIndicatorsLatest,
         and_(
-            FXUniverse.symbol == MarketIndicatorsLatest.c.symbol,
-            MarketIndicatorsLatest.c.timeframe == literal("1day"),
+            FXUniverse.symbol == MarketIndicatorsLatest.symbol,
+            MarketIndicatorsLatest.timeframe == "1d",
         ),
     )
 
@@ -129,18 +102,17 @@ async def get_screener_rows(
             MarketTrendAggregatesLatest.intraday_bearish_pct,
             MarketTrendAggregatesLatest.daily_bullish_pct,
             MarketTrendAggregatesLatest.daily_bearish_pct,
-            MarketTrendAggregatesLatest.intraday_score,
-            MarketTrendAggregatesLatest.daily_score,
             MarketTrendAggregatesLatest.updated_at,
-            # real indicators (daily timeframe)
-            MarketIndicatorsLatest.c.adx_14,
-            MarketIndicatorsLatest.c.plus_di_14,
-            MarketIndicatorsLatest.c.minus_di_14,
-            MarketIndicatorsLatest.c.ema_9,
-            MarketIndicatorsLatest.c.ema_21,
-            MarketIndicatorsLatest.c.ema_50,
+            # Advanced (from indicators_latest)
+            MarketIndicatorsLatest.adx_14,
+            MarketIndicatorsLatest.plus_di_14,
+            MarketIndicatorsLatest.minus_di_14,
+            MarketIndicatorsLatest.ema_9,
+            MarketIndicatorsLatest.ema_21,
+            MarketIndicatorsLatest.ema_50,
+            MarketIndicatorsLatest.atr_14,
         )
-        .select_from(j2)
+        .select_from(j)
         .order_by(FXUniverse.symbol.asc())
         .offset(offset)
         .limit(page_size)
@@ -156,6 +128,11 @@ async def get_screener_rows(
     result = await db.execute(stmt)
     rows_db = result.all()
 
+    # Compute VOL score range from ATR on *this page* (cheap + gives real variation)
+    atr_vals = [r[-1] for r in rows_db if r[-1] is not None]
+    atr_lo = min(atr_vals) if atr_vals else 0.0
+    atr_hi = max(atr_vals) if atr_vals else 0.0
+
     rows: List[ScreenerRow] = []
     last_updated: Optional[datetime] = None
 
@@ -166,8 +143,6 @@ async def get_screener_rows(
         intraday_bear,
         daily_bull,
         daily_bear,
-        intraday_score,
-        daily_score,
         updated_at,
         adx_14,
         plus_di_14,
@@ -175,21 +150,24 @@ async def get_screener_rows(
         ema9,
         ema21,
         ema50,
+        atr_14,
     ) in rows_db:
-        # If no aggregate exists yet, return neutral-ish values
         intraday_bull = int(intraday_bull) if intraday_bull is not None else 50
         intraday_bear = int(intraday_bear) if intraday_bear is not None else 50
         daily_bull = int(daily_bull) if daily_bull is not None else 50
         daily_bear = int(daily_bear) if daily_bear is not None else 50
 
-        # ---- Advanced: use real ADX if present ----
-        adx = _clamp_int(adx_14, 0, 100)
-        adx_dir = _adx_dir_from_di(plus_di_14, minus_di_14, daily_score)
-        ema_state = _ema_state_from_emas(ema9, ema21, ema50, daily_score)
+        # ADX: use true ADX if present
+        adx = int(max(0, min(100, round(adx_14)))) if adx_14 is not None else 0
+        adx_dir = _adx_dir_from_di(plus_di_14, minus_di_14)
 
-        # still placeholders (until you compute/store them)
-        vol = 50
-        alert_flag = False
+        ema_state = _ema_state(ema9, ema21, ema50)
+
+        # VOL: normalized ATR (proxy for volatility)
+        vol = _normalize_to_0_100(atr_14, atr_lo, atr_hi)
+
+        # Alert: simple first pass (tweak later)
+        alert_flag = bool(adx >= 25 and ema_state == "aligned")
 
         rows.append(
             ScreenerRow(
