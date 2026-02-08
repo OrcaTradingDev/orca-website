@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from sqlalchemy import Column, Integer, Text, Float, TIMESTAMP
-from sqlalchemy.orm import declarative_base
+from app.models.base import Base
 
-Base = declarative_base()
 
 class MarketTrendAggregatesLatest(Base):
     __tablename__ = "market_trend_aggregates_latest"
