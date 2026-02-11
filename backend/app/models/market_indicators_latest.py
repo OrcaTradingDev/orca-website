@@ -3,7 +3,8 @@ from __future__ import annotations
 from sqlalchemy import Column, BigInteger, Text, Float, DateTime
 from sqlalchemy.sql import func
 
-from app.core.db import Base
+from app.models.base import Base
+
 
 
 class MarketIndicatorsLatest(Base):
