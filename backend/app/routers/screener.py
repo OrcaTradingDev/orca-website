@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, List, Tuple
+from typing import Optional, List
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, outerjoin, and_
@@ -25,32 +25,34 @@ router = APIRouter(prefix="/screener", tags=["screener"])
 def _adx_dir_from_di(plus_di: float | None, minus_di: float | None) -> TrendDir:
     if plus_di is None or minus_di is None:
         return "flat"
-    diff = plus_di - minus_di
-    if diff > 1.0:
+    if plus_di > minus_di:
         return "up"
-    if diff < -1.0:
+    if minus_di > plus_di:
         return "down"
     return "flat"
 
 
 def _ema_state(ema9: float | None, ema21: float | None, ema50: float | None) -> str:
+    """
+    Preserve existing frontend contract:
+      - "aligned" => show check
+      - anything else => show X (often "mixed")
+    """
     if ema9 is None or ema21 is None or ema50 is None:
         return "mixed"
-    if ema9 > ema21 > ema50:
-        return "aligned"
-    if ema9 < ema21 < ema50:
+    if (ema9 > ema21 > ema50) or (ema9 < ema21 < ema50):
         return "aligned"
     return "mixed"
 
 
-def _normalize_to_0_100(x: float | None, lo: float, hi: float) -> int:
-    if x is None:
+def _vol_score_from_atr(atr: float | None) -> int:
+    """
+    Truth-backed v1: use ATR as the underlying source, mapped into a 0-100-ish score.
+    (Later: switch to ATR% once you have price/close in this endpoint.)
+    """
+    if atr is None:
         return 50
-    if hi <= lo:
-        return 50
-    pct = (x - lo) / (hi - lo)
-    pct = max(0.0, min(1.0, pct))
-    return int(round(pct * 100))
+    return int(max(0, min(100, round(atr * 10))))
 
 
 @router.get("/rows", response_model=ScreenerPage)
@@ -61,12 +63,15 @@ async def get_screener_rows(
     db: AsyncSession = Depends(get_db),
 ) -> ScreenerPage:
     """
-    Return paginated screener rows backed by FXUniverse + market_trend_aggregates_latest,
-    plus "advanced" metrics from market_indicators_latest (daily timeframe).
+    Return paginated screener rows backed by FXUniverse + market_trend_aggregates_latest + market_indicators_latest.
+
+    Trend aggregates = % bars
+    Indicators (1day) = advanced metrics
     """
     offset = (page - 1) * page_size
 
     base_query = select(FXUniverse)
+
     if search:
         like = f"%{search.upper()}%"
         base_query = base_query.where(
@@ -74,23 +79,25 @@ async def get_screener_rows(
             | func.upper(FXUniverse.name).like(like)
         )
 
+    # total count
     count_stmt = select(func.count()).select_from(base_query.subquery())
     total = (await db.execute(count_stmt)).scalar_one()
 
-    # Join FXUniverse -> aggregates (bull/bear snapshots)
+    # Join FXUniverse -> aggregates (trend bars)
     j = outerjoin(
         FXUniverse,
         MarketTrendAggregatesLatest,
         FXUniverse.symbol == MarketTrendAggregatesLatest.symbol,
     )
 
-    # Join in daily indicators (timeframe='1d') for advanced metrics
+    # Join in daily indicators (advanced metrics)
+    # IMPORTANT: timeframe filter must be inside the join condition to preserve outer join behavior.
     j = outerjoin(
         j,
         MarketIndicatorsLatest,
         and_(
             FXUniverse.symbol == MarketIndicatorsLatest.symbol,
-            MarketIndicatorsLatest.timeframe == "1d",
+            MarketIndicatorsLatest.timeframe == "1day",
         ),
     )
 
@@ -102,14 +109,16 @@ async def get_screener_rows(
             MarketTrendAggregatesLatest.intraday_bearish_pct,
             MarketTrendAggregatesLatest.daily_bullish_pct,
             MarketTrendAggregatesLatest.daily_bearish_pct,
+            MarketTrendAggregatesLatest.intraday_score,
+            MarketTrendAggregatesLatest.daily_score,
             MarketTrendAggregatesLatest.updated_at,
-            # Advanced (from indicators_latest)
-            MarketIndicatorsLatest.adx_14,
-            MarketIndicatorsLatest.plus_di_14,
-            MarketIndicatorsLatest.minus_di_14,
+            # Daily indicators used for advanced metrics
             MarketIndicatorsLatest.ema_9,
             MarketIndicatorsLatest.ema_21,
             MarketIndicatorsLatest.ema_50,
+            MarketIndicatorsLatest.adx_14,
+            MarketIndicatorsLatest.plus_di_14,
+            MarketIndicatorsLatest.minus_di_14,
             MarketIndicatorsLatest.atr_14,
         )
         .select_from(j)
@@ -128,11 +137,6 @@ async def get_screener_rows(
     result = await db.execute(stmt)
     rows_db = result.all()
 
-    # Compute VOL score range from ATR on *this page* (cheap + gives real variation)
-    atr_vals = [r[-1] for r in rows_db if r[-1] is not None]
-    atr_lo = min(atr_vals) if atr_vals else 0.0
-    atr_hi = max(atr_vals) if atr_vals else 0.0
-
     rows: List[ScreenerRow] = []
     last_updated: Optional[datetime] = None
 
@@ -143,31 +147,29 @@ async def get_screener_rows(
         intraday_bear,
         daily_bull,
         daily_bear,
+        intraday_score,
+        daily_score,
         updated_at,
+        ema_9,
+        ema_21,
+        ema_50,
         adx_14,
         plus_di_14,
         minus_di_14,
-        ema9,
-        ema21,
-        ema50,
         atr_14,
     ) in rows_db:
+        # If no aggregate exists yet, return neutral-ish values (or pick a fallback you prefer)
         intraday_bull = int(intraday_bull) if intraday_bull is not None else 50
         intraday_bear = int(intraday_bear) if intraday_bear is not None else 50
         daily_bull = int(daily_bull) if daily_bull is not None else 50
         daily_bear = int(daily_bear) if daily_bear is not None else 50
 
-        # ADX: use true ADX if present
+        # Advanced metrics: real indicator-backed values (1day)
         adx = int(max(0, min(100, round(adx_14)))) if adx_14 is not None else 0
         adx_dir = _adx_dir_from_di(plus_di_14, minus_di_14)
-
-        ema_state = _ema_state(ema9, ema21, ema50)
-
-        # VOL: normalized ATR (proxy for volatility)
-        vol = _normalize_to_0_100(atr_14, atr_lo, atr_hi)
-
-        # Alert: simple first pass (tweak later)
-        alert_flag = bool(adx >= 25 and ema_state == "aligned")
+        ema_state = _ema_state(ema_9, ema_21, ema_50)
+        vol = _vol_score_from_atr(atr_14)
+        alert_flag = False  # placeholder until alerts are stored/derived
 
         rows.append(
             ScreenerRow(
@@ -195,4 +197,3 @@ async def get_screener_rows(
         total=total,
         last_updated=(last_updated or datetime.now(timezone.utc)).isoformat(),
     )
-
