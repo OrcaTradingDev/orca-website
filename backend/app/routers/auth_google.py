@@ -1,4 +1,3 @@
-# app/routers/auth_google.py
 from __future__ import annotations
 
 import os
@@ -54,17 +53,23 @@ async def google_callback(request: Request):
     try:
         token = await oauth.google.authorize_access_token(request)
 
-        # Some configurations return only access_token (no id_token).
-        # If id_token exists, use it; otherwise fall back to userinfo endpoint.
-        if token.get("id_token"):
-            user = await oauth.google.parse_id_token(request, token)
-        else:
-            user = await oauth.google.userinfo(token=token)
+        # Bulletproof: don't rely on id_token being present.
+        # Use Google's UserInfo endpoint to get the profile.
+        user = await oauth.google.userinfo(token=token)
 
     except OAuthError as e:
         return JSONResponse({"error": "oauth_error", "detail": str(e)}, status_code=400)
     except Exception as e:
-        return JSONResponse({"error": "callback_failed", "detail": repr(e)}, status_code=500)
+        # Show the true issue in-browser
+        safe_token_keys = []
+        try:
+            safe_token_keys = list(getattr(token, "keys", lambda: [])())
+        except Exception:
+            pass
+        return JSONResponse(
+            {"error": "callback_failed", "detail": repr(e), "token_keys": safe_token_keys},
+            status_code=500,
+        )
 
     sub = user.get("sub")
     email = user.get("email")
@@ -77,5 +82,4 @@ async def google_callback(request: Request):
         return JSONResponse({"error": "missing APP_JWT_SECRET"}, status_code=500)
 
     app_token = _issue_app_jwt(sub=sub, email=email, name=name, picture=picture)
-
     return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback#token={app_token}")
