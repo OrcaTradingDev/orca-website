@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 # Third-party
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 # Local application
 from app.core.config import settings
 from app.core.lifespan import lifespan
-from app.routers import screener, ops
+from app.routers import screener, ops, auth_google
 
 
 app = FastAPI(
@@ -16,6 +19,14 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
+)
+
+# ---- Sessions (required for OAuth state/nonce) ----
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.getenv("SESSION_SECRET", "dev-secret-change-me"),
+    same_site="lax",
+    https_only=True,  # Render is HTTPS
 )
 
 # ---- Basic health / root endpoints (important for Render) ----
@@ -56,4 +67,4 @@ else:
 # ---- Routers ----
 app.include_router(screener.router)
 app.include_router(ops.router)
-
+app.include_router(auth_google.router)
