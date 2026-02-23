@@ -53,11 +53,17 @@ async def google_login(request: Request):
 async def google_callback(request: Request):
     try:
         token = await oauth.google.authorize_access_token(request)
-        user = await oauth.google.parse_id_token(request, token)
+
+        # Some configurations return only access_token (no id_token).
+        # If id_token exists, use it; otherwise fall back to userinfo endpoint.
+        if token.get("id_token"):
+            user = await oauth.google.parse_id_token(request, token)
+        else:
+            user = await oauth.google.userinfo(token=token)
+
     except OAuthError as e:
         return JSONResponse({"error": "oauth_error", "detail": str(e)}, status_code=400)
     except Exception as e:
-        # Catch missing-session/state issues and surface the root cause
         return JSONResponse({"error": "callback_failed", "detail": repr(e)}, status_code=500)
 
     sub = user.get("sub")
@@ -66,11 +72,10 @@ async def google_callback(request: Request):
     picture = user.get("picture")
 
     if not sub or not email:
-        return JSONResponse({"error": "missing_claims"}, status_code=400)
+        return JSONResponse({"error": "missing_claims", "user": dict(user)}, status_code=400)
     if not APP_JWT_SECRET:
         return JSONResponse({"error": "missing APP_JWT_SECRET"}, status_code=500)
 
     app_token = _issue_app_jwt(sub=sub, email=email, name=name, picture=picture)
 
-    # Send token back to frontend in URL fragment (MVP). Frontend reads #token=...
     return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback#token={app_token}")
