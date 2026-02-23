@@ -1,3 +1,4 @@
+# app/routers/auth_google.py
 from __future__ import annotations
 
 import os
@@ -55,6 +56,9 @@ async def google_callback(request: Request):
         user = await oauth.google.parse_id_token(request, token)
     except OAuthError as e:
         return JSONResponse({"error": "oauth_error", "detail": str(e)}, status_code=400)
+    except Exception as e:
+        # Catch missing-session/state issues and surface the root cause
+        return JSONResponse({"error": "callback_failed", "detail": repr(e)}, status_code=500)
 
     sub = user.get("sub")
     email = user.get("email")
