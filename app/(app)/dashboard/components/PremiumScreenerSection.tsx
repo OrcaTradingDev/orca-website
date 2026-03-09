@@ -1,14 +1,12 @@
-import { useEffect, useState } from "react";
+// /components/PremiumScreenerSection.tsx
+"use client";
+
+import { useState } from "react";
+import { useScreener } from "@/hooks/useScreener";
+import { ScreenerRow } from "@/types/screener";
 import {
-  Search,
-  RefreshCw,
-  Download,
-  Star,
-  Bell,
-  TrendingUp,
-  TrendingDown,
-  ArrowRight,
-  ChevronDown,
+  Search, RefreshCw, Download, Star, Bell,
+  TrendingUp, TrendingDown, ArrowRight,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -17,362 +15,162 @@ import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 import { Skeleton } from "./ui/skeleton";
 
-interface Asset {
-  symbol: string;
-  name: string;
+// UI Types - extends API types with UI-only fields
+interface Asset extends Omit<ScreenerRow, "advanced"> {
   assetClass: string;
   inWatchlist: boolean;
-  intraday: {
-    bearish: number;
-    bullish: number;
-  };
-  daily: {
-    bearish: number;
-    bullish: number;
-  };
-  advanced: {
-    adx: number;
+  advanced: ScreenerRow["advanced"] & {
     adxTrend: "up" | "down" | "neutral";
     emaStatus: "aligned" | "crossed";
-    volume: number; // 0-100 for bar height
     hasAlert: boolean;
   };
 }
 
-// Mock data
-const mockAssets: Asset[] = [
-  {
-    symbol: "EUR/USD",
-    name: "Euro/Dollar",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 42, bullish: 58 },
-    daily: { bearish: 48, bullish: 52 },
-    advanced: { adx: 18, adxTrend: "neutral", emaStatus: "aligned", volume: 45, hasAlert: false },
-  },
-  {
-    symbol: "GBP/USD",
-    name: "Pound/Dollar",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 51, bullish: 49 },
-    daily: { bearish: 46, bullish: 54 },
-    advanced: { adx: 22, adxTrend: "neutral", emaStatus: "aligned", volume: 52, hasAlert: false },
-  },
-  {
-    symbol: "USD/JPY",
-    name: "Dollar/Yen",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 38, bullish: 62 },
-    daily: { bearish: 41, bullish: 59 },
-    advanced: { adx: 25, adxTrend: "up", emaStatus: "aligned", volume: 48, hasAlert: false },
-  },
-  {
-    symbol: "AUD/USD",
-    name: "Australian Dollar/Dollar",
-    assetClass: "Forex",
-    inWatchlist: false,
-    intraday: { bearish: 45, bullish: 55 },
-    daily: { bearish: 43, bullish: 57 },
-    advanced: { adx: 20, adxTrend: "neutral", emaStatus: "aligned", volume: 50, hasAlert: false },
-  },
-  {
-    symbol: "AAPL",
-    name: "Apple Inc.",
-    assetClass: "Stocks",
-    inWatchlist: true,
-    intraday: { bearish: 31, bullish: 69 },
-    daily: { bearish: 22, bullish: 78 },
-    advanced: { adx: 45, adxTrend: "up", emaStatus: "aligned", volume: 65, hasAlert: true },
-  },
-  {
-    symbol: "MSFT",
-    name: "Microsoft Corporation",
-    assetClass: "Stocks",
-    inWatchlist: false,
-    intraday: { bearish: 35, bullish: 65 },
-    daily: { bearish: 28, bullish: 72 },
-    advanced: { adx: 42, adxTrend: "up", emaStatus: "aligned", volume: 70, hasAlert: false },
-  },
-  {
-    symbol: "NVDA",
-    name: "NVIDIA Corp.",
-    assetClass: "Stocks",
-    inWatchlist: true,
-    intraday: { bearish: 24, bullish: 76 },
-    daily: { bearish: 19, bullish: 81 },
-    advanced: { adx: 52, adxTrend: "up", emaStatus: "aligned", volume: 88, hasAlert: true },
-  },
-  {
-    symbol: "US500",
-    name: "S&P 500",
-    assetClass: "Stocks",
-    inWatchlist: false,
-    intraday: { bearish: 39, bullish: 61 },
-    daily: { bearish: 33, bullish: 67 },
-    advanced: { adx: 29, adxTrend: "up", emaStatus: "aligned", volume: 58, hasAlert: false },
-  },
-  {
-    symbol: "US100",
-    name: "Nasdaq 100",
-    assetClass: "Stocks",
-    inWatchlist: false,
-    intraday: { bearish: 36, bullish: 64 },
-    daily: { bearish: 30, bullish: 70 },
-    advanced: { adx: 31, adxTrend: "up", emaStatus: "aligned", volume: 62, hasAlert: false },
-  },
-  {
-    symbol: "XAU/USD",
-    name: "Gold",
-    assetClass: "Commodities",
-    inWatchlist: false,
-    intraday: { bearish: 44, bullish: 56 },
-    daily: { bearish: 40, bullish: 60 },
-    advanced: { adx: 26, adxTrend: "up", emaStatus: "aligned", volume: 55, hasAlert: false },
-  },
-];
-
 export default function PremiumScreenerSection() {
-  const [assets, setAssets] = useState<Asset[]>([]);
+  // UI State
+  const [page, setPage] = useState(1);
   const [assetClassFilter, setAssetClassFilter] = useState("All");
   const [trendFilter, setTrendFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState("2 mins ago");
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // --- Live backend integration ---
-  type ApiTrendDir = "up" | "down" | "flat";
+  // Local state for watchlist and alerts
+  const [watchedSymbols, setWatchedSymbols] = useState<string[]>([]);
+  const [alertSymbols, setAlertSymbols] = useState<string[]>([]);
 
-  type ApiScreenerRow = {
-    symbol: string;
-    name: string;
-    intraday: { bear: number; bull: number };
-    daily: { bear: number; bull: number };
-    advanced: { adx: number; adx_dir: ApiTrendDir; ema: string; vol: number; alert: boolean };
-  };
+  // Data fetching hook
+  const { data, isLoading, isError, refetch } = useScreener(page, 50);
 
-  type ApiScreenerPage = {
-    rows: ApiScreenerRow[];
-    page: number;
-    pageSize: number;
-    total: number;
-    lastUpdated: string;
-  };
-
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
-
-  const inferAssetClass = (symbol: string): Asset["assetClass"] => {
-    const s = symbol.toUpperCase();
-    if (s.includes("XAU")) return "Commodities";
-    if (s.includes("/")) return "Forex";
-    if (s === "US500" || s === "US100") return "Indices";
-    return "Stocks";
-  };
-
-  const mapApiRowToAsset = (row: ApiScreenerRow): Asset => {
-    const adxTrend: Asset["advanced"]["adxTrend"] =
-      row.advanced.adx_dir === "up" ? "up" : row.advanced.adx_dir === "down" ? "down" : "neutral";
-
-    const emaStatus: Asset["advanced"]["emaStatus"] = row.advanced.ema === "aligned" ? "aligned" : "crossed";
+  // Transform API data to UI format
+  const assets: Asset[] = (data?.rows || []).map((row) => {
+    const inferAssetClass = (s: string) => {
+      if (s.includes("XAU") || s.includes("XAG") || s.includes("OIL")) return "Commodities";
+      if (s.includes("/")) return "Forex";
+      if (s === "US500" || s === "US100" || s === "US30") return "Indices";
+      if (s.includes("BTC") || s.includes("ETH") || s.includes("USDT")) return "Crypto";
+      return "Stocks";
+    };
 
     return {
-      symbol: row.symbol,
-      name: row.name,
+      ...row,
       assetClass: inferAssetClass(row.symbol),
-      inWatchlist: false,
-      intraday: { bearish: row.intraday.bear, bullish: row.intraday.bull },
-      daily: { bearish: row.daily.bear, bullish: row.daily.bull },
+      inWatchlist: watchedSymbols.includes(row.symbol),
       advanced: {
-        adx: row.advanced.adx,
-        adxTrend,
-        emaStatus,
-        volume: row.advanced.vol,
-        hasAlert: row.advanced.alert,
+        ...row.advanced,
+        adxTrend: row.advanced.adx_dir === "flat" ? "neutral" : row.advanced.adx_dir,
+        emaStatus: row.advanced.ema === "aligned" ? "aligned" : "crossed",
+        hasAlert: alertSymbols.includes(row.symbol),
       },
     };
-  };
+  });
 
-  const loadAssets = async () => {
-    setIsLoading(true);
-    try {
-      const url = new URL("/screener/rows", API_BASE);
-      url.searchParams.set("page", "1");
-      url.searchParams.set("pageSize", "250");
+  // Format timestamp
+  const lastUpdatedLabel = data?.lastUpdated 
+    ? (() => {
+        const date = new Date(data.lastUpdated);
+        const now = new Date();
+        const diffMs = now.getTime() - date.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        
+        if (diffMins < 1) return "Just now";
+        if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+      })()
+    : "Loading...";
 
-      const res = await fetch(url.toString(), { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = (await res.json()) as ApiScreenerPage;
-      setAssets(data.rows.map(mapApiRowToAsset));
-      setLastUpdated(new Date(data.lastUpdated).toLocaleString());
-    } catch (e) {
-      console.error("Failed to load screener rows; falling back to mock assets", e);
-      setAssets(mockAssets);
-      setLastUpdated("Mock data");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadAssets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleRefresh = () => {
-    void loadAssets();
-  };
-
-  const toggleWatchlist = (symbol: string) => {
-    setAssets(
-      assets.map((asset) => (asset.symbol === symbol ? { ...asset, inWatchlist: !asset.inWatchlist } : asset)),
-    );
-  };
-
-  const toggleAlert = (symbol: string) => {
-    setAssets(
-      assets.map((asset) =>
-        asset.symbol === symbol
-          ? { ...asset, advanced: { ...asset.advanced, hasAlert: !asset.advanced.hasAlert } }
-          : asset,
-      ),
-    );
-  };
-
+  // Client-side filtering
   const filteredAssets = assets.filter((asset) => {
     const matchesSearch =
       asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
       asset.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
     const matchesAssetClass = assetClassFilter === "All" || asset.assetClass === assetClassFilter;
 
     let matchesTrend = true;
     if (trendFilter !== "All") {
-      const bullishPercent = asset.daily.bullish;
-      switch (trendFilter) {
-        case "Strong Bullish":
-          matchesTrend = bullishPercent >= 70;
-          break;
-        case "Bullish":
-          matchesTrend = bullishPercent >= 55 && bullishPercent < 70;
-          break;
-        case "Neutral":
-          matchesTrend = bullishPercent >= 45 && bullishPercent < 55;
-          break;
-        case "Bearish":
-          matchesTrend = bullishPercent >= 30 && bullishPercent < 45;
-          break;
-        case "Strong Bearish":
-          matchesTrend = bullishPercent < 30;
-          break;
-      }
+      const bull = asset.daily.bull;
+      if (trendFilter === "Strong Bullish") matchesTrend = bull >= 70;
+      else if (trendFilter === "Bullish") matchesTrend = bull >= 55 && bull < 70;
+      else if (trendFilter === "Neutral") matchesTrend = bull >= 45 && bull < 55;
+      else if (trendFilter === "Bearish") matchesTrend = bull >= 30 && bull < 45;
+      else if (trendFilter === "Strong Bearish") matchesTrend = bull < 30;
     }
-
     return matchesSearch && matchesAssetClass && matchesTrend;
   });
 
-  const StackedBar = ({ bearish, bullish }: { bearish: number; bullish: number }) => (
+  // Handlers
+  const toggleWatchlist = (symbol: string) => {
+    setWatchedSymbols(prev => 
+      prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]
+    );
+    if (selectedAsset && selectedAsset.symbol === symbol) {
+      setSelectedAsset({ ...selectedAsset, inWatchlist: !selectedAsset.inWatchlist });
+    }
+  };
+
+  const toggleAlert = (symbol: string) => {
+    setAlertSymbols(prev => 
+      prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]
+    );
+    if (selectedAsset && selectedAsset.symbol === symbol) {
+      setSelectedAsset({
+        ...selectedAsset,
+        advanced: { ...selectedAsset.advanced, hasAlert: !selectedAsset.advanced.hasAlert },
+      });
+    }
+  };
+
+  const handleExport = () => {
+    if (!filteredAssets.length) return;
+    const headers = ["Symbol", "Name", "Asset Class", "Intraday Bullish %", "Daily Bullish %", "ADX", "EMA Status", "Volume"];
+    const rows = filteredAssets.map(asset => [
+      asset.symbol,
+      asset.name,
+      asset.assetClass,
+      asset.intraday.bull,
+      asset.daily.bull,
+      asset.advanced.adx,
+      asset.advanced.emaStatus,
+      asset.advanced.vol,
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `screener-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Stacked Bar Component with Original Gradients
+  const StackedBar = ({ bear, bull }: { bear: number; bull: number }) => (
     <div className="relative w-full h-9 bg-[#1A1F2E] rounded-md overflow-hidden flex">
       {/* Bearish section */}
       <div
         className="h-full bg-gradient-to-r from-[#DC2626] via-[#EF4444] to-[#DC2626] flex items-center justify-center relative"
-        style={{ width: `${bearish}%` }}
+        style={{ width: `${bear}%` }}
       >
-        {bearish > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bearish}%</span>}
+        {bear > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bear}%</span>}
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
       </div>
 
       {/* Bullish section */}
       <div
         className="h-full bg-gradient-to-r from-[#059669] via-[#10B981] to-[#059669] flex items-center justify-center relative"
-        style={{ width: `${bullish}%` }}
+        style={{ width: `${bull}%` }}
       >
-        {bullish > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bullish}%</span>}
+        {bull > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bull}%</span>}
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
       </div>
     </div>
-  );
-
-  const AssetRow = ({ asset }: { asset: Asset }) => (
-    <tr
-      className="border-b border-[#1E293B] hover:bg-[#14181F] transition-all duration-200 cursor-pointer"
-      onClick={() => {
-        setSelectedAsset(asset);
-        setShowDetailModal(true);
-      }}
-    >
-      {/* SYMBOL */}
-      <td className="py-4 px-4">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleWatchlist(asset.symbol);
-            }}
-            className="transition-colors duration-200"
-          >
-            <Star className={`w-5 h-5 ${asset.inWatchlist ? "fill-[#00D4FF] text-[#00D4FF]" : "text-[#64748B]"}`} />
-          </button>
-          <div>
-            <div className="text-white">{asset.symbol}</div>
-            <div className="text-[#94A3B8] text-sm">{asset.name}</div>
-          </div>
-        </div>
-      </td>
-
-      {/* INTRADAY */}
-      <td className="py-4 px-4">
-        <StackedBar bearish={asset.intraday.bearish} bullish={asset.intraday.bullish} />
-      </td>
-
-      {/* DAILY */}
-      <td className="py-4 px-4">
-        <StackedBar bearish={asset.daily.bearish} bullish={asset.daily.bullish} />
-      </td>
-
-      {/* ADVANCED */}
-      <td className="py-4 px-4">
-        <div className="flex items-center gap-4 text-sm">
-          {/* ADX */}
-          <div className="flex items-center gap-1">
-            <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>{asset.advanced.adx}</span>
-            {asset.advanced.adxTrend === "up" && <TrendingUp className="w-4 h-4 text-[#10B981]" />}
-            {asset.advanced.adxTrend === "down" && <TrendingDown className="w-4 h-4 text-[#EF4444]" />}
-            {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-4 h-4 text-[#94A3B8]" />}
-          </div>
-
-          {/* EMA */}
-          <Badge
-            className={`${
-              asset.advanced.emaStatus === "aligned" ? "bg-[#10B981]/20 text-[#10B981]" : "bg-[#EF4444]/20 text-[#EF4444]"
-            } border-0`}
-          >
-            EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
-          </Badge>
-
-          {/* VOLUME */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-2 bg-[#1E293B] rounded-full overflow-hidden">
-              <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.volume}%` }} />
-            </div>
-            <span className="text-[#94A3B8] text-xs">{asset.advanced.volume}</span>
-          </div>
-
-          {/* ALERT */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleAlert(asset.symbol);
-            }}
-            className="transition-colors duration-200"
-          >
-            <Bell className={`w-4 h-4 ${asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"}`} />
-          </button>
-        </div>
-      </td>
-    </tr>
   );
 
   const LoadingSkeleton = () => (
@@ -458,16 +256,19 @@ export default function PremiumScreenerSection() {
 
           <Button
             variant="outline"
-            onClick={handleRefresh}
+            onClick={() => refetch()}
+            disabled={isLoading}
             className="bg-[#14181F] border-[#1E293B] text-[#94A3B8] hover:text-white hover:bg-[#1A1F2E]"
           >
             <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            <span className="text-sm">Last updated: {lastUpdated}</span>
+            <span className="text-sm">{lastUpdatedLabel}</span>
           </Button>
 
           <Button
             variant="outline"
-            className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white"
+            onClick={handleExport}
+            disabled={filteredAssets.length === 0}
+            className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4 mr-2" />
             Export
@@ -504,14 +305,101 @@ export default function PremiumScreenerSection() {
             <tbody>
               {isLoading ? (
                 <LoadingSkeleton />
-              ) : filteredAssets.length > 0 ? (
-                filteredAssets.map((asset) => <AssetRow key={asset.symbol} asset={asset} />)
-              ) : (
+              ) : isError ? (
                 <tr>
                   <td colSpan={4} className="py-12 text-center">
-                    <div className="text-[#94A3B8]">No assets found. Try adjusting your filters.</div>
+                    <div className="text-red-400">Failed to load market data. Please check your connection.</div>
                   </td>
                 </tr>
+              ) : filteredAssets.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center">
+                    <div className="text-[#94A3B8]">
+                      {assets.length === 0 ? "No data available. Data may be warming up..." : "No assets found. Try adjusting your filters."}
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredAssets.map((asset) => (
+                  <tr
+                    key={asset.symbol}
+                    className="border-b border-[#1E293B] hover:bg-[#14181F] transition-all duration-200 cursor-pointer"
+                    onClick={() => {
+                      setSelectedAsset(asset);
+                      setShowDetailModal(true);
+                    }}
+                  >
+                    {/* SYMBOL */}
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleWatchlist(asset.symbol);
+                          }}
+                          className="transition-colors duration-200"
+                        >
+                          <Star className={`w-5 h-5 ${asset.inWatchlist ? "fill-[#00D4FF] text-[#00D4FF]" : "text-[#64748B]"}`} />
+                        </button>
+                        <div>
+                          <div className="text-white">{asset.symbol}</div>
+                          <div className="text-[#94A3B8] text-sm">{asset.name}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* INTRADAY */}
+                    <td className="py-4 px-4">
+                      <StackedBar bear={asset.intraday.bear} bull={asset.intraday.bull} />
+                    </td>
+
+                    {/* DAILY */}
+                    <td className="py-4 px-4">
+                      <StackedBar bear={asset.daily.bear} bull={asset.daily.bull} />
+                    </td>
+
+                    {/* ADVANCED */}
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-4 text-sm">
+                        {/* ADX */}
+                        <div className="flex items-center gap-1">
+                          <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>{asset.advanced.adx}</span>
+                          {asset.advanced.adxTrend === "up" && <TrendingUp className="w-4 h-4 text-[#10B981]" />}
+                          {asset.advanced.adxTrend === "down" && <TrendingDown className="w-4 h-4 text-[#EF4444]" />}
+                          {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-4 h-4 text-[#94A3B8]" />}
+                        </div>
+
+                        {/* EMA */}
+                        <Badge
+                          className={`${
+                            asset.advanced.emaStatus === "aligned" ? "bg-[#10B981]/20 text-[#10B981]" : "bg-[#EF4444]/20 text-[#EF4444]"
+                          } border-0`}
+                        >
+                          EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
+                        </Badge>
+
+                        {/* VOLUME */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-2 bg-[#1E293B] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.vol}%` }} />
+                          </div>
+                          <span className="text-[#94A3B8] text-xs">{asset.advanced.vol}</span>
+                        </div>
+
+                        {/* ALERT */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAlert(asset.symbol);
+                          }}
+                          className="transition-colors duration-200"
+                        >
+                          <Bell className={`w-4 h-4 ${asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"}`} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
@@ -521,14 +409,28 @@ export default function PremiumScreenerSection() {
         {!isLoading && filteredAssets.length > 0 && (
           <div className="border-t border-[#1E293B] py-4 px-6 flex items-center justify-between">
             <div className="text-[#94A3B8] text-sm">
-              Showing 1-{filteredAssets.length} of {filteredAssets.length} assets
+              Showing {(page - 1) * 50 + 1}-{Math.min(page * 50, (data?.total || 0))} of {data?.total || 0} assets
             </div>
-            <Button
-              variant="outline"
-              className="bg-transparent border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white"
-            >
-              Load More
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="bg-transparent border-[#1E293B] text-[#94A3B8] hover:bg-[#1E293B] hover:text-white disabled:opacity-50"
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => p + 1)}
+                disabled={!data || data.rows.length < 50}
+                className="bg-transparent border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white disabled:opacity-50"
+              >
+                Next
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -558,14 +460,14 @@ export default function PremiumScreenerSection() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">Intraday Trend</div>
-                  <StackedBar bearish={selectedAsset.intraday.bearish} bullish={selectedAsset.intraday.bullish} />
-                  <div className="text-xs text-[#64748B] mt-2">1M: Bullish | 5M: Bullish | 15M: Bullish | 1H: Bearish</div>
+                  <StackedBar bear={selectedAsset.intraday.bear} bull={selectedAsset.intraday.bull} />
+                  <div className="text-xs text-[#64748B] mt-2">Based on 1M, 5M, 15M, 1H timeframes</div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">Daily Trend</div>
-                  <StackedBar bearish={selectedAsset.daily.bearish} bullish={selectedAsset.daily.bullish} />
-                  <div className="text-xs text-[#64748B] mt-2">4H: Bullish | 1D: Bullish | 1W: Bullish</div>
+                  <StackedBar bear={selectedAsset.daily.bear} bull={selectedAsset.daily.bull} />
+                  <div className="text-xs text-[#64748B] mt-2">Based on 4H, 1D, 1W timeframes</div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
@@ -579,31 +481,32 @@ export default function PremiumScreenerSection() {
                   <div className={`text-2xl ${selectedAsset.advanced.emaStatus === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
                     {selectedAsset.advanced.emaStatus === "aligned" ? "✓ Aligned" : "✗ Crossed"}
                   </div>
-                  <div className="text-sm text-[#64748B] mt-1">All EMAs in correct order</div>
+                  <div className="text-sm text-[#64748B] mt-1">EMA 9, 21, 50, 200 alignment</div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                <Button className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black">
+                <Button 
+                  className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
+                  onClick={() => toggleAlert(selectedAsset.symbol)}
+                >
                   <Bell className="w-4 h-4 mr-2" />
-                  Add Alert
+                  {selectedAsset.advanced.hasAlert ? "Remove Alert" : "Add Alert"}
                 </Button>
 
-
-              <Button
-                variant="outline"
-                className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
-                onClick={() => toggleWatchlist(selectedAsset.symbol)}
+                <Button
+                  variant="outline"
+                  className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
+                  onClick={() => toggleWatchlist(selectedAsset.symbol)}
                 >
-              <Star
-                  className="w-4 h-4 mr-2"
-                  stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
-                  fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
-                />
+                  <Star
+                    className="w-4 h-4 mr-2"
+                    stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
+                    fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
+                  />
                   {selectedAsset.inWatchlist ? "Remove from" : "Add to"} Watchlist
-              </Button>
-
+                </Button>
               </div>
             </div>
           )}
@@ -612,4 +515,3 @@ export default function PremiumScreenerSection() {
     </div>
   );
 }
-
