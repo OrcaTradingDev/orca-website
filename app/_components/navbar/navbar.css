@@ -1,4 +1,5 @@
 /* app/_components/navbar/navbar.css */
+/* app/_components/navbar/navbar.css */
 
 /* ============ NAVBAR COMPONENT STYLES ============ */
 
@@ -22,20 +23,40 @@
   gap: 2rem;
 }
 
-/* Logo */
+/* ============ LOGO ============ */
 .navbar__logo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  transition: opacity 0.2s;
   font-size: 1.15rem;
   font-weight: 700;
   color: #e6eef7;
-  text-decoration: none;
   letter-spacing: -0.02em;
 }
 
 .navbar__logo:hover {
+  opacity: 0.85;
   color: #24c6ff;
 }
 
-/* Desktop Layout */
+/* Logo image (when using PNG/SVG) */
+.navbar__logo-image {
+  height: auto;
+  width: auto;
+  max-height: 40px;
+  object-fit: contain;
+}
+
+/* Responsive logo sizing */
+@media (max-width: 480px) {
+  .navbar__logo-image {
+    max-height: 32px;
+    max-width: 120px;
+  }
+}
+
+/* ============ DESKTOP LAYOUT ============ */
 .navbar__desktop {
   display: none;
   align-items: center;
@@ -75,7 +96,7 @@
   align-items: center;
 }
 
-/* Hamburger button (mobile only) */
+/* ============ MOBILE HAMBURGER ============ */
 .navbar__hamburger {
   display: flex;
   align-items: center;
@@ -101,7 +122,7 @@
   }
 }
 
-/* Mobile Menu */
+/* ============ MOBILE MENU ============ */
 .navbar__mobile {
   display: flex;
   flex-direction: column;
@@ -159,7 +180,7 @@
   color: #9db4c9;
 }
 
-/* Avatar */
+/* ============ AVATAR ============ */
 .avatar {
   width: 36px;
   height: 36px;
@@ -173,9 +194,29 @@
   font-size: 0.9rem;
   letter-spacing: -0.02em;
   flex-shrink: 0;
+  overflow: hidden;
+  transition: all 0.2s;
 }
 
-/* User Menu (Desktop) */
+/* Avatar with profile image */
+.avatar--image {
+  padding: 0;
+  background: none;
+  border: 2px solid #2a3f55;
+}
+
+.avatar--image:hover {
+  border-color: #24c6ff;
+}
+
+/* Avatar image element */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ============ USER MENU (DESKTOP) ============ */
 .user-menu {
   position: relative;
 }
@@ -280,6 +321,11 @@
 .user-menu__item svg {
   flex-shrink: 0;
   opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.user-menu__item:hover svg {
+  opacity: 1;
 }
 
 /* Danger item (logout) */
@@ -291,3 +337,95 @@
   background: rgba(255, 107, 107, 0.1);
   color: #ff8787;
 }
+
+.user-menu__item--danger:hover svg {
+  opacity: 1;
+}
+
+/* ============ SKELETON LOADER ============ */
+.skeleton-loader {
+  background: linear-gradient(
+    90deg,
+    rgba(42, 63, 85, 0.3) 0%,
+    rgba(42, 63, 85, 0.5) 50%,
+    rgba(42, 63, 85, 0.3) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Skeleton variants */
+.skeleton-loader--circle {
+  border-radius: 50%;
+}
+
+.skeleton-loader--pill {
+  border-radius: 999px;
+}
+
+/* ============ RESPONSIVE ADJUSTMENTS ============ */
+@media (max-width: 767px) {
+  .navbar__inner {
+    gap: 1rem;
+  }
+  
+  .navbar__logo {
+    font-size: 1rem;
+  }
+}
+
+/* ============ ACCESSIBILITY ============ */
+/* Focus states for keyboard navigation */
+.navbar__link:focus-visible,
+.navbar__hamburger:focus-visible,
+.user-menu__trigger:focus-visible,
+.user-menu__item:focus-visible {
+  outline: 2px solid #24c6ff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .navbar__mobile,
+  .user-menu__dropdown,
+  .skeleton-loader {
+    animation: none;
+  }
+  
+  .navbar__link,
+  .navbar__hamburger,
+  .user-menu__trigger,
+  .user-menu__item,
+  .avatar {
+    transition: none;
+  }
+}
+
+/* ============ DARK MODE READY ============ */
+/* If you implement dark mode toggle, these vars can be used */
+:root {
+  --navbar-bg: rgba(11, 20, 30, 0.8);
+  --navbar-border: rgba(42, 63, 85, 0.5);
+  --navbar-text: #e6eef7;
+  --navbar-text-muted: #b7c6d8;
+  --navbar-accent: #24c6ff;
+}
+
+/* Example dark mode overrides (if needed) */
+/* 
+.dark .navbar {
+  background: var(--navbar-bg);
+  border-bottom-color: var(--navbar-border);
+}
+*/

@@ -3,58 +3,62 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { jwtDecode } from 'jwt-decode';
 
 interface JWTPayload {
-  username?: string; 
-  exp?: number;
+  iss: string;
+  sub: string;     // Google's unique ID
+  email: string;
+  name: string;
+  picture: string | null;
+  iat: number;
+  exp: number;
 }
 
 interface AuthState {
   token: string | null;
-  userName: string | null;
-  exp: number | null;
+  user: {
+    id: string | null;
+    email: string | null;
+    name: string | null;
+    picture: string | null;
+  } | null;
   isHydrated: boolean;
   setAuth: (token: string) => void;
   logout: () => void;
   setHasHydrated: (state: boolean) => void;
 }
 
-const initialState = {
-  token: null,
-  userName: null,
-  exp: null,
-};
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      ...initialState,
-      isHydrated: false, // We keep this out of initialState so it doesn't reset on logout
+      token: null,
+      user: null,
+      isHydrated: false,
 
       setAuth: (token: string) => {
         try {
           const decoded = jwtDecode<JWTPayload>(token);
-          set({ 
-            token, 
-            userName: decoded.username || null, 
-            exp: decoded.exp || null 
+          console.log(decoded)
+          set({
+            token,
+            user: {
+              id: decoded.sub,
+              email: decoded.email,
+              name: decoded.name,
+              picture: decoded.picture,
+            },
           });
         } catch (error) {
-          console.error("Failed to decode token:", error);
+          console.error("Invalid token format:", error);
+          set({ token: null, user: null });
         }
       },
 
-      logout: () => {
-        // We reset the auth data but keep isHydrated as true
-        set({ ...initialState });
-      },
-
-      setHasHydrated: (state: boolean) => {
-        set({ isHydrated: state });
-      },
+      logout: () => set({ token: null, user: null }),
+      
+      setHasHydrated: (state: boolean) => set({ isHydrated: state }),
     }),
     {
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
-      // This part ensures Next.js knows when the browser has finished loading the data
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

@@ -1,46 +1,60 @@
 'use client';
 
 import { useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { useAuthStore } from '@/app/store/authStore';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/app/store/authStore'; 
 
-// The main logic component using your variables
+// 1. The main logic component
 function AuthCallbackContent() {
   const router = useRouter();
-  const callbackParams = useSearchParams(); // getting the params
   const setAuth = useAuthStore((state) => state.setAuth); 
 
   useEffect(() => {
-    // reading the params for jwt
-    const jwt = callbackParams.get('jwt');
+    // Grab the hash from the URL (e.g., #token=eyJh...)
+    const hash = window.location.hash;
 
-    // validating jwt;
-    if (!jwt) {
-      console.error(`JWT not found in params jwt:${jwt}`);
-      router.push('/login');
+    // If there's no hash at all, kick them back to login
+    if (!hash) {
+      console.error("No URL fragment found.");
+      router.replace('/login');
       return;
     }
 
-    // saving jwt to local storage AND updating Zustand state
-    setAuth(jwt);
+    // Convert the hash into a readable format to extract 'token'
+    const params = new URLSearchParams(hash.replace('#', '?'));
+    const token = params.get('token');
 
-    // redirecting to homepage
+    // Validating the token
+    if (!token) {
+      console.error(`Token not found in hash: ${hash}`);
+      router.replace('/login');
+      return;
+    }
+
+    // Saving token to local storage AND updating Zustand state
+    setAuth(token);
+
+    // Redirecting to homepage securely
     router.replace('/');
 
-  }, [callbackParams, setAuth, router]);
+  }, [setAuth, router]);
 
-return (
-    <div className="flex flex-col items-center justify-center min-h-screen">
-      <h1>Finalizing Login...</h1>
-      <p>Please wait while we redirect you.</p>
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center">
+      <h1 className="mb-2 text-xl font-bold">Finalizing Login...</h1>
+      <p className="text-gray-500">Please wait while we sync your account.</p>
     </div>
   );
 }
 
-// 2. We export a default component that wraps the content in Suspense
+// 2. The Suspense wrapper (Great practice for Next.js!)
 export default function AuthCallbackPage() {
   return (
-    <Suspense fallback={<div>Loading authentication...</div>}>
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        Loading authentication...
+      </div>
+    }>
       <AuthCallbackContent />
     </Suspense>
   );

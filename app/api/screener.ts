@@ -1,5 +1,5 @@
-import { http } from "@/lib/http"; // Import our configured instance
-import { ScreenerPage } from "@/types/screener";
+import { http } from "@/app/lib/http"; // Import our configured instance
+import { ScreenerPage } from "@/app/types/screener";
 
 /**
  * Fetches the paginated screener rows.

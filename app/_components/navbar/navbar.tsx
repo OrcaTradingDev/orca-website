@@ -2,28 +2,28 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
+import { useAuthStore } from '@/app/store/authStore'
 import './navbar.css'
-
-// Temporary: Mock user type (replace with real auth later)
-type User = {
-  name: string
-  email: string
-} | null
-
-// Temporary: Toggle this to test logged-in/logged-out states
-const MOCK_USER: User = null // Change to { name: "John Doe", email: "john@example.com" } to test
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
-  // Use mock user for now
-  const user = MOCK_USER
+  // Zustand auth state
+  const { user, isHydrated, logout } = useAuthStore()
 
   // Close menu when clicking a link
   const handleLinkClick = () => {
     setIsMenuOpen(false)
     setIsDropdownOpen(false)
+  }
+
+  // Handle logout
+  const handleLogout = () => {
+    logout()
+    handleLinkClick()
+    // AuthGuard will automatically redirect to login
   }
 
   return (
@@ -38,6 +38,7 @@ export function Navbar() {
           {/* Desktop Navigation */}
           <div className="navbar__desktop">
             <div className="navbar__links">
+              <a href="#features" className="navbar__link">Features</a>
               <a href="#products" className="navbar__link">Products</a>
               <a href="#pricing" className="navbar__link">Pricing</a>
               {user && (
@@ -45,9 +46,21 @@ export function Navbar() {
               )}
             </div>
             
-            {user ? (
+            {/* Hydration check to prevent flickering */}
+            {!isHydrated ? (
+              // Loading skeleton
+              <div className="navbar__auth">
+                <div className="skeleton-loader" style={{ width: '80px', height: '36px', borderRadius: '999px' }} />
+                <div className="skeleton-loader" style={{ width: '100px', height: '36px', borderRadius: '999px' }} />
+              </div>
+            ) : user ? (
               // Logged in: Show user menu
-              <UserMenu user={user} isOpen={isDropdownOpen} setIsOpen={setIsDropdownOpen} />
+              <UserMenu 
+                user={user} 
+                isOpen={isDropdownOpen} 
+                setIsOpen={setIsDropdownOpen}
+                onLogout={handleLogout}
+              />
             ) : (
               // Logged out: Show auth buttons
               <div className="navbar__auth">
@@ -87,6 +100,9 @@ export function Navbar() {
         {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="navbar__mobile">
+            <a href="#features" className="navbar__mobile-link" onClick={handleLinkClick}>
+              Features
+            </a>
             <a href="#products" className="navbar__mobile-link" onClick={handleLinkClick}>
               Products
             </a>
@@ -101,16 +117,22 @@ export function Navbar() {
             
             <div className="navbar__mobile-divider" />
             
-            {user ? (
+            {!isHydrated ? (
+              // Loading state for mobile
+              <div className="skeleton-loader" style={{ width: '100%', height: '48px', borderRadius: '8px' }} />
+            ) : user ? (
               // Logged in: Mobile user menu
               <>
                 <div className="navbar__mobile-user">
-                  <Avatar name={user.name} />
+                  <Avatar user={user} />
                   <div>
                     <div className="navbar__mobile-user-name">{user.name}</div>
                     <div className="navbar__mobile-user-email">{user.email}</div>
                   </div>
                 </div>
+                <a href="/dashboard" className="navbar__mobile-link" onClick={handleLinkClick}>
+                  Dashboard
+                </a>
                 <a href="/profile" className="navbar__mobile-link" onClick={handleLinkClick}>
                   Profile
                 </a>
@@ -120,7 +142,11 @@ export function Navbar() {
                 <a href="/billing" className="navbar__mobile-link" onClick={handleLinkClick}>
                   Billing
                 </a>
-                <button className="btn btn--ghost" style={{ width: '100%', marginTop: '0.5rem' }}>
+                <button 
+                  className="btn btn--ghost" 
+                  style={{ width: '100%', marginTop: '0.5rem' }}
+                  onClick={handleLogout}
+                >
                   Logout
                 </button>
               </>
@@ -142,15 +168,30 @@ export function Navbar() {
   )
 }
 
-// Avatar Component
-function Avatar({ name }: { name: string }) {
-  const initials = name
+// Avatar Component - Enhanced with image support
+function Avatar({ user }: { user: { name: string; picture?: string } }) {
+  const [error, setError] = useState(false);
+
+  // Fallback to initials if profile picture not available.
+  const initials = user.name
     .split(' ')
     .map(n => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2)
 
+  if (user.picture && !error) {
+    return (
+      <Image
+        onError={() => setError(true) }
+        src={user.picture}
+        alt={`${user.name}'s profile`}
+        width={36}
+        height={36}
+        className="avatar avatar--image"
+      />
+    )
+  }
   return (
     <div className="avatar">
       {initials}
@@ -158,15 +199,17 @@ function Avatar({ name }: { name: string }) {
   )
 }
 
-// Desktop User Menu
+// Desktop User Menu - Enhanced with logout
 function UserMenu({ 
   user, 
   isOpen, 
-  setIsOpen 
+  setIsOpen,
+  onLogout
 }: { 
-  user: { name: string; email: string }
+  user: { name: string; email: string; picture?: string }
   isOpen: boolean
   setIsOpen: (open: boolean) => void
+  onLogout: () => void
 }) {
   return (
     <div className="user-menu">
@@ -175,7 +218,7 @@ function UserMenu({
         onClick={() => setIsOpen(!isOpen)}
         aria-label="User menu"
       >
-        <Avatar name={user.name} />
+        <Avatar user={user} />
         <span className="user-menu__name">{user.name}</span>
         <svg 
           width="16" 
@@ -245,7 +288,10 @@ function UserMenu({
             
             <div className="user-menu__divider" />
             
-            <button className="user-menu__item user-menu__item--danger">
+            <button 
+              className="user-menu__item user-menu__item--danger"
+              onClick={onLogout}
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
