@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # Third-party
 import os
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,12 @@ from app.core.config import settings
 from app.core.lifespan import lifespan
 from app.routers import screener, ops
 from app.routers.auth_google import router as auth_google_router
+from app.core.logging import setup_logging
+
+# call the function to setup logging.
+setup_logging()
+# create the logging instance
+logger = logging.getLogger(__name__);
 
 
 app = FastAPI(
@@ -30,15 +37,9 @@ app.add_middleware(
     https_only=True,    # required when same_site="none" (must be Secure)
 )
 
-# ---- Basic health / root endpoints (important for Render) ----
-@app.get("/", tags=["health"])
-def root() -> dict:
-    return {"status": "ok"}
-
-@app.get("/health", tags=["health"])
-def health() -> dict:
-    return {"status": "ok"}
-
+@app.get("/test-explosion")
+async def trigger_error():
+    return 1 / 0  # This will trigger ZeroDivisionError
 
 # ---- CORS ----
 origins = settings.ALLOWED_ORIGINS or []

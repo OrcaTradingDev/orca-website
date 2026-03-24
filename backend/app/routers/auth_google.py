@@ -3,26 +3,24 @@ from __future__ import annotations
 import os
 import time
 from typing import Optional
+import logging
 
 import jwt
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from app.common.responses import ErrorResponse
+from app.core.config import settings
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
-
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
-APP_JWT_SECRET = os.getenv("APP_JWT_SECRET", "")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+logger = logging.getLogger(__name__) # gets a child logger named "app.routers.auth_google"
 
 oauth = OAuth()
 oauth.register(
     name="google",
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_id=GOOGLE_CLIENT_ID,
-    client_secret=GOOGLE_CLIENT_SECRET,
+    client_id=settings.GOOGLE_CLIENT_ID,
+    client_secret=settings.GOOGLE_CLIENT_SECRET,
     client_kwargs={"scope": "openid email profile"},
 )
 
@@ -38,48 +36,55 @@ def _issue_app_jwt(*, sub: str, email: str, name: str, picture: Optional[str]) -
         "iat": now,
         "exp": now + 60 * 60 * 24 * 7,  # 7 days
     }
-    return jwt.encode(payload, APP_JWT_SECRET, algorithm="HS256")
+    return jwt.encode(payload, settings.APP_JWT_SECRET, algorithm="HS256")
 
-
+# Route that redirects to authorization server
 @router.get("/login")
 async def google_login(request: Request):
-    if not GOOGLE_REDIRECT_URI:
+    # Generate a random nonce to prevent replay attacks.
+    nonce = secret.token_urlsafe(32)
+    # Store it in the session so we can check it in callback
+    request.session["nonce"] = nonce
+    if not settings.GOOGLE_REDIRECT_URI:
         return JSONResponse({"error": "missing GOOGLE_REDIRECT_URI"}, status_code=500)
-    return await oauth.google.authorize_redirect(request, GOOGLE_REDIRECT_URI)
+    return await oauth.google.authorize_redirect(
+        request, 
+        settings.GOOGLE_REDIRECT_URI,
+        nonce=nonce # Didn't add state, as Authlib handles it automatically.
+    )
 
 
 @router.get("/callback")
 async def google_callback(request: Request):
     try:
-        token = await oauth.google.authorize_access_token(request)
-
-        # Bulletproof: don't rely on id_token being present.
-        # Use Google's UserInfo endpoint to get the profile.
+        nonce = request.session.pop("nonce", None)
+        token = await oauth.google.authorize_access_token(request, nonce=nonce)
         user = await oauth.google.userinfo(token=token)
-
     except OAuthError as e:
-        return JSONResponse({"error": "oauth_error", "detail": str(e)}, status_code=400)
-    except Exception as e:
-        # Show the true issue in-browser
-        safe_token_keys = []
-        try:
-            safe_token_keys = list(getattr(token, "keys", lambda: [])())
-        except Exception:
-            pass
-        return JSONResponse(
-            {"error": "callback_failed", "detail": repr(e), "token_keys": safe_token_keys},
-            status_code=500,
+        content = ErrorResponse(
+            message="Google authentication failed.",
+            error_code="OAUTH_HANDSHAKE_ERROR"
         )
+        return JSONResponse(status_code=400, content=content.model_dump(by_alias=True))
 
-    sub = user.get("sub")
     email = user.get("email")
-    name = user.get("name") or ""
-    picture = user.get("picture")
+    sub = user.get("sub")
 
     if not sub or not email:
-        return JSONResponse({"error": "missing_claims", "user": dict(user)}, status_code=400)
-    if not APP_JWT_SECRET:
-        return JSONResponse({"error": "missing APP_JWT_SECRET"}, status_code=500)
+        logger.warning(f"Google returned incomplete claims: {user}")
+        content = ErrorResponse(
+            message="Required user information missing from Google.",
+            error_code="INCOMPLETE_OAUTH_DATA"
+        )
+        return JSONResponse(status_code=400, content=content.model_dump(by_alias=True))
 
-    app_token = _issue_app_jwt(sub=sub, email=email, name=name, picture=picture)
-    return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback#token={app_token}")
+    logger.info(f"Successful Google login for: {email}")
+
+    app_token = _issue_app_jwt(
+        sub=sub, 
+        email=email, 
+        name=user.get("name") or "", 
+        picture=user.get("picture")
+    )
+    
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback#token={app_token}")

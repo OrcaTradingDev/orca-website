@@ -67,6 +67,23 @@ class Settings(BaseSettings):
     # Optional legacy aliases (if present in env, we’ll map them)
     TWELVE_RATE_LIMIT_SAFETY: float | None = None
     TWELVE_RATE_LIMIT_KEY: str | None = None
+# -------------------------
+    # Auth & OAuth (Google)
+    # -------------------------
+    # No defaults here = App won't start if these are missing in .env
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_REDIRECT_URI: str
+    APP_JWT_SECRET: str
+    
+    # Defaults are okay for things that have a "sane" local fallback
+    FRONTEND_URL: str = "http://localhost:3000"
+# -------------------------
+    # JWT Security
+    # -------------------------
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # Short-lived
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7     # Long-lived
+    JWT_ALGORITHM: str = "HS256"
 
     model_config = SettingsConfigDict(
         env_file=".env",
