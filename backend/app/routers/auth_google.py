@@ -1,19 +1,26 @@
 from __future__ import annotations
 
-import os
-import time
-from typing import Optional
 import logging
+import secrets
 
-import jwt
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.common.responses import ErrorResponse
 from app.core.config import settings
+from app.core.db import get_db
+from app.services.auth_service import (
+    generate_refresh_token,
+    issue_access_jwt,
+    persist_refresh_token,
+    set_refresh_cookie,
+    upsert_google_user,
+)
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
-logger = logging.getLogger(__name__) # gets a child logger named "app.routers.auth_google"
+logger = logging.getLogger(__name__)
 
 oauth = OAuth()
 oauth.register(
@@ -25,66 +32,70 @@ oauth.register(
 )
 
 
-def _issue_app_jwt(*, sub: str, email: str, name: str, picture: Optional[str]) -> str:
-    now = int(time.time())
-    payload = {
-        "iss": "orcatrading",
-        "sub": sub,
-        "email": email,
-        "name": name,
-        "picture": picture,
-        "iat": now,
-        "exp": now + 60 * 60 * 24 * 7,  # 7 days
-    }
-    return jwt.encode(payload, settings.APP_JWT_SECRET, algorithm="HS256")
-
-# Route that redirects to authorization server
 @router.get("/login")
 async def google_login(request: Request):
-    # Generate a random nonce to prevent replay attacks.
-    nonce = secret.token_urlsafe(32)
-    # Store it in the session so we can check it in callback
-    request.session["nonce"] = nonce
     if not settings.GOOGLE_REDIRECT_URI:
         return JSONResponse({"error": "missing GOOGLE_REDIRECT_URI"}, status_code=500)
+
+    nonce = secrets.token_urlsafe(32)
+    request.session["nonce"] = nonce
+
     return await oauth.google.authorize_redirect(
         request, 
-        settings.GOOGLE_REDIRECT_URI,
-        nonce=nonce # Didn't add state, as Authlib handles it automatically.
+        settings.GOOGLE_REDIRECT_URI, 
+        nonce=nonce
     )
 
 
 @router.get("/callback")
-async def google_callback(request: Request):
+async def google_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     try:
         nonce = request.session.pop("nonce", None)
         token = await oauth.google.authorize_access_token(request, nonce=nonce)
-        user = await oauth.google.userinfo(token=token)
-    except OAuthError as e:
+        userinfo = await oauth.google.userinfo(token=token)
+    except OAuthError:
         content = ErrorResponse(
             message="Google authentication failed.",
-            error_code="OAUTH_HANDSHAKE_ERROR"
+            error_code="OAUTH_HANDSHAKE_ERROR",
         )
         return JSONResponse(status_code=400, content=content.model_dump(by_alias=True))
 
-    email = user.get("email")
-    sub = user.get("sub")
-
+    email = userinfo.get("email")
+    sub = userinfo.get("sub")
     if not sub or not email:
-        logger.warning(f"Google returned incomplete claims: {user}")
+        logger.warning("Google returned incomplete claims: %s", userinfo)
         content = ErrorResponse(
             message="Required user information missing from Google.",
-            error_code="INCOMPLETE_OAUTH_DATA"
+            error_code="INCOMPLETE_OAUTH_DATA",
         )
         return JSONResponse(status_code=400, content=content.model_dump(by_alias=True))
 
-    logger.info(f"Successful Google login for: {email}")
-
-    app_token = _issue_app_jwt(
-        sub=sub, 
-        email=email, 
-        name=user.get("name") or "", 
-        picture=user.get("picture")
+    user = await upsert_google_user(
+        db,
+        email=email,
+        google_sub=sub,
+        full_name=userinfo.get("name"),
+        picture_url=userinfo.get("picture"),
     )
-    
-    return RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback#token={app_token}")
+
+    refresh_plain, refresh_hash = generate_refresh_token()
+    await persist_refresh_token(db, user, refresh_hash)
+    await db.commit()
+
+    access_token = issue_access_jwt(
+        sub=sub,
+        email=email,
+        name=userinfo.get("name") or "",
+        picture=userinfo.get("picture"),
+    )
+
+    logger.info("Successful Google login for: %s", email)
+
+    response = RedirectResponse(
+        url=f"{settings.FRONTEND_URL}/auth/callback#token={access_token}"
+    )
+    set_refresh_cookie(response, refresh_plain)
+    return response

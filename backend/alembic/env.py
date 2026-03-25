@@ -58,7 +58,7 @@ def get_database_url() -> str:
     1. DATABASE_URL environment variable (from .env or shell)
     2. sqlalchemy.url from alembic.ini
     """
-    env_url = os.getenv("DATABASE_URL")
+    env_url = os.getenv("database_url")
     if env_url:
         return env_url
 

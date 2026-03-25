@@ -14,6 +14,7 @@ from app.core.lifespan import lifespan
 from app.routers import screener, ops
 from app.routers.auth_google import router as auth_google_router
 from app.core.logging import setup_logging
+from app.routers import auth
 
 # call the function to setup logging.
 setup_logging()
@@ -32,7 +33,7 @@ app = FastAPI(
 # ---- Sessions (required for OAuth state/nonce) ----
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SESSION_SECRET", "dev-secret-change-me"),
+    secret_key=settings.SESSION_SECRET,
     same_site="none",   # allow cross-site redirect from Google
     https_only=True,    # required when same_site="none" (must be Secure)
 )
@@ -66,3 +67,4 @@ else:
 app.include_router(screener.router)
 app.include_router(ops.router)
 app.include_router(auth_google_router)
+app.include_router(auth.router)
