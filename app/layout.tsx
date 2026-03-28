@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import "./styles/globals.css";
 import "./styles/tokens.css";
 import { Navbar } from "./_components/navbar";
-import { Providers } from "./providers"; // <--- Import the new wrapper
+import { Providers } from "./providers"; // Tanstack Query Wrapper
+import AuthGuard from "@/app/_components/AuthGuard"; // Authentication Wrapper
 
 export const metadata: Metadata = {
   title: "OrcaTrading — Automate, Analyze, Trade Smarter",
@@ -21,7 +22,9 @@ export default function RootLayout({
         <Providers>
           <Navbar />
           <div className="site">
+          <AuthGuard>
             {children}
+          </AuthGuard>
           </div>
         </Providers>
       </body>

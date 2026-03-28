@@ -2,8 +2,8 @@
 "use client";
 
 import { useState } from "react";
-import { useScreener } from "@/hooks/useScreener";
-import { ScreenerRow } from "@/types/screener";
+import { useScreener } from "@/app/hooks/useScreener";
+import { ScreenerRow } from "@/app/types/screener";
 import {
   Search, RefreshCw, Download, Star, Bell,
   TrendingUp, TrendingDown, ArrowRight,

@@ -1,7 +1,7 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { fetchScreenerRows } from "@/api/screener";
-import { queryKeys } from "@/lib/query/keys";
-import { ScreenerPage } from "@/types/screener";
+import { fetchScreenerRows } from "@/app/api/screener";
+import { queryKeys } from "@/app/lib/query/keys";
+import { ScreenerPage } from "@/app/types/screener";
 
 export const useScreener = (page = 1, pageSize = 250) => {
   return useQuery<ScreenerPage, Error>({
