@@ -49,7 +49,7 @@ async def refresh_token(
     user, new_plain = result
 
     access_token = issue_access_jwt(
-        sub=user.google_sub,
+        sub=user.sub,
         email=user.email,
         name=user.full_name or "",
         picture=user.picture_url,

@@ -17,7 +17,9 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
 
     email = Column(String(255), unique=True, index=True, nullable=False)
-    google_sub = Column(String(255), unique=True, index=True, nullable=False)
+    # Later, if we add more than google as a provider, we may need user_identities Table: A many-to-one relationship with users, sub may not be unique then.
+    sub = Column(String(255), unique=True, index=True, nullable=False)
+    provider = Column(String(255), nullable=False)
 
     full_name = Column(String(255), nullable=True)
     picture_url = Column(String(512), nullable=True)

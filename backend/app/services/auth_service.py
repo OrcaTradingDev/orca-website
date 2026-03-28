@@ -53,7 +53,8 @@ def issue_access_jwt(
         "iat": now,
         "exp": now + ACCESS_TOKEN_TTL_SECONDS,
     }
-    return jwt.encode(payload, settings.APP_JWT_SECRET, algorithm="HS256")
+    encoded_jwt = jwt.encode(payload, settings.APP_JWT_SECRET, algorithm="HS256")
+    return encoded_jwt
 
 
 def set_refresh_cookie(
@@ -81,7 +82,7 @@ async def upsert_google_user(
     full_name: Optional[str] = None,
     picture_url: Optional[str] = None,
 ) -> User:
-    result = await session.execute(select(User).where(User.google_sub == google_sub))
+    result = await session.execute(select(User).where(User.sub == google_sub))
     user = result.scalars().first()
 
     if user:
@@ -90,7 +91,8 @@ async def upsert_google_user(
     else:
         user = User(
             email=email,
-            google_sub=google_sub,
+            sub=google_sub, # db uuid/sub and google_sub are same 
+            provider="google",
             full_name=full_name,
             picture_url=picture_url,
         )
