@@ -68,7 +68,7 @@ async def google_callback(
     await upsert_google_user(
         db,
         email=email,
-        sub=sub,
+        google_sub=sub,
         full_name=userinfo.get("name"),
         picture_url=userinfo.get("picture"),
     )

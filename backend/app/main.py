@@ -14,7 +14,6 @@ from app.core.lifespan import lifespan
 from app.routers import screener, ops
 from app.routers.auth_google import router as auth_google_router
 from app.core.logging import setup_logging
-from app.routers import auth
 
 # call the function to setup logging.
 setup_logging()

@@ -81,8 +81,7 @@ class Settings(BaseSettings):
 # -------------------------
     # JWT Security
     # -------------------------
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # Short-lived
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7     # Long-lived
+    ACCESS_TOKEN_TTL_SECONDS: int = 7  # Long-lived by default
     JWT_ALGORITHM: str = "HS256"
     SECURE_COOKIES: bool = True    # set False in .env for local HTTP dev
     SESSION_SECRET: str            # strong random string, unrelated to JWT secret
