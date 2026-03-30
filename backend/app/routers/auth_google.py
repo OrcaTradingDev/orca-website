@@ -11,13 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.responses import ErrorResponse
 from app.core.config import settings
 from app.core.db import get_db
-from app.services.auth_service import (
-    generate_refresh_token,
-    issue_access_jwt,
-    persist_refresh_token,
-    set_refresh_cookie,
-    upsert_google_user,
-)
+from app.services.auth_service import issue_access_jwt, upsert_google_user
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -41,9 +35,7 @@ async def google_login(request: Request):
     request.session["nonce"] = nonce
 
     return await oauth.google.authorize_redirect(
-        request, 
-        settings.GOOGLE_REDIRECT_URI, 
-        nonce=nonce
+        request, settings.GOOGLE_REDIRECT_URI, nonce=nonce
     )
 
 
@@ -73,17 +65,13 @@ async def google_callback(
         )
         return JSONResponse(status_code=400, content=content.model_dump(by_alias=True))
 
-    user = await upsert_google_user(
+    await upsert_google_user(
         db,
         email=email,
-        google_sub=sub,
+        sub=sub,
         full_name=userinfo.get("name"),
         picture_url=userinfo.get("picture"),
     )
-
-    refresh_plain, refresh_hash = generate_refresh_token()
-    await persist_refresh_token(db, user, refresh_hash)
-    await db.commit()
 
     access_token = issue_access_jwt(
         sub=sub,
@@ -93,9 +81,4 @@ async def google_callback(
     )
 
     logger.info("Successful Google login for: %s", email)
-
-    response = RedirectResponse(
-        url=f"{settings.FRONTEND_URL}/auth/callback#token={access_token}"
-    )
-    set_refresh_cookie(response, refresh_plain)
-    return response
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/auth/callback#token={access_token}")

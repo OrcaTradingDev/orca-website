@@ -17,18 +17,17 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
 
     email = Column(String(255), unique=True, index=True, nullable=False)
-    # Later, if we add more than google as a provider, we may need user_identities Table: A many-to-one relationship with users, sub may not be unique then.
+    # Note: sub is unique here because we only have one provider (Google).
+    # If multiple providers are added later, move to a separate user_identities
+    # table with a (sub, provider) composite unique constraint.
     sub = Column(String(255), unique=True, index=True, nullable=False)
-    provider = Column(String(255), nullable=False)
+    provider = Column(String(50), nullable=False)
 
     full_name = Column(String(255), nullable=True)
     picture_url = Column(String(512), nullable=True)
 
     is_active = Column(Boolean, default=True, nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
-
-    refresh_token_hash = Column(String(64), nullable=True)          # SHA-256 hex = always 64 chars
-    refresh_token_expires_at = Column(DateTime(timezone=True), nullable=True)  # ← NEW
 
     tier = Column(Enum(UserTier), default=UserTier.FREE, server_default=UserTier.FREE.value, nullable=False)
 

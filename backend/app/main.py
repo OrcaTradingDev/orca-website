@@ -38,9 +38,6 @@ app.add_middleware(
     https_only=True,    # required when same_site="none" (must be Secure)
 )
 
-@app.get("/test-explosion")
-async def trigger_error():
-    return 1 / 0  # This will trigger ZeroDivisionError
 
 # ---- CORS ----
 origins = settings.ALLOWED_ORIGINS or []
@@ -67,4 +64,3 @@ else:
 app.include_router(screener.router)
 app.include_router(ops.router)
 app.include_router(auth_google_router)
-app.include_router(auth.router)
