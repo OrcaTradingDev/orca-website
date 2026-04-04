@@ -25,12 +25,10 @@ export function Navbar() {
     <nav className="navbar">
       <div className="container">
         <div className="navbar__inner">
-          {/* Logo */}
           <a href="/" className="navbar__logo">
             OrcaTrading
           </a>
 
-          {/* Desktop Navigation */}
           <div className="navbar__desktop">
             <div className="navbar__links">
               <a href="#features" className="navbar__link">Features</a>
@@ -41,7 +39,6 @@ export function Navbar() {
               )}
             </div>
 
-            {/* Auth area */}
             {!isHydrated ? (
               <div className="navbar__auth">
                 <div
@@ -51,13 +48,16 @@ export function Navbar() {
               </div>
             ) : user ? (
               <UserMenu
-                user={user}
+                user={{
+                  name: user.name ?? "Account",
+                  email: user.email ?? "",
+                  picture: user.picture ?? undefined,
+                }}
                 isOpen={isDropdownOpen}
                 setIsOpen={setIsDropdownOpen}
                 onLogout={handleLogout}
               />
             ) : (
-              /* Single unified auth button */
               <div className="navbar__auth">
                 <a href="/login" className="btn btn--primary btn--sm">
                   Get Started
@@ -66,7 +66,6 @@ export function Navbar() {
             )}
           </div>
 
-          {/* Mobile Hamburger */}
           <button
             className="navbar__hamburger"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -87,7 +86,6 @@ export function Navbar() {
           </button>
         </div>
 
-        {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="navbar__mobile">
             <a href="#features" className="navbar__mobile-link" onClick={handleLinkClick}>Features</a>
@@ -104,10 +102,10 @@ export function Navbar() {
             ) : user ? (
               <>
                 <div className="navbar__mobile-user">
-                  <Avatar user={user} />
+                  <Avatar user={{ name: user.name ?? "Account", picture: user.picture ?? undefined }} />
                   <div>
-                    <div className="navbar__mobile-user-name">{user.name}</div>
-                    <div className="navbar__mobile-user-email">{user.email}</div>
+                    <div className="navbar__mobile-user-name">{user.name ?? "Account"}</div>
+                    <div className="navbar__mobile-user-email">{user.email ?? ""}</div>
                   </div>
                 </div>
                 <a href="/dashboard" className="navbar__mobile-link" onClick={handleLinkClick}>Dashboard</a>
@@ -123,7 +121,6 @@ export function Navbar() {
                 </button>
               </>
             ) : (
-              /* Single unified auth button — mobile */
               <a href="/login" className="btn btn--primary" style={{ width: '100%' }}>
                 Get Started
               </a>
@@ -135,7 +132,6 @@ export function Navbar() {
   )
 }
 
-// ─── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({ user }: { user: { name: string; picture?: string } }) {
   const [error, setError] = useState(false)
 
@@ -161,7 +157,6 @@ function Avatar({ user }: { user: { name: string; picture?: string } }) {
   return <div className="avatar">{initials}</div>
 }
 
-// ─── Desktop User Menu ──────────────────────────────────────────────────────────
 function UserMenu({
   user,
   isOpen,
@@ -182,20 +177,6 @@ function UserMenu({
       >
         <Avatar user={user} />
         <span className="user-menu__name">{user.name}</span>
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          style={{
-            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.2s',
-          }}
-        >
-          <polyline points="4,6 8,10 12,6" />
-        </svg>
       </button>
 
       {isOpen && (
@@ -210,46 +191,14 @@ function UserMenu({
 
             <div className="user-menu__divider" />
 
-            <a href="/dashboard" className="user-menu__item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-                <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-              </svg>
-              Dashboard
-            </a>
-
-            <a href="/profile" className="user-menu__item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              Profile
-            </a>
-
-            <a href="/settings" className="user-menu__item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 1v6m0 6v6m5.196-13.196l-4.242 4.242m-2.828 2.828l-4.242 4.242m15.556-2.828l-4.242-4.242m-2.828-2.828l-4.242-4.242" />
-              </svg>
-              Settings
-            </a>
-
-            <a href="/billing" className="user-menu__item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
-                <line x1="1" y1="10" x2="23" y2="10" />
-              </svg>
-              Billing
-            </a>
+            <a href="/dashboard" className="user-menu__item">Dashboard</a>
+            <a href="/profile" className="user-menu__item">Profile</a>
+            <a href="/settings" className="user-menu__item">Settings</a>
+            <a href="/billing" className="user-menu__item">Billing</a>
 
             <div className="user-menu__divider" />
 
             <button className="user-menu__item user-menu__item--danger" onClick={onLogout}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
               Logout
             </button>
           </div>
