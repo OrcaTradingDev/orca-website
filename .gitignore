@@ -12,6 +12,7 @@ env/
 .env
 .env.*
 *.env
+**/.env*
 
 # Byte-compiled / optimized / DLL files
 *.pyc

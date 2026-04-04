@@ -1,3 +1,6 @@
+// app/(app)/dashboard/dashboard-client.tsx
+"use client";
+
 import { useState } from "react";
 import Sidebar from "./components/Sidebar";
 import PremiumScreenerSection from "./components/PremiumScreenerSection";
@@ -12,6 +15,7 @@ import SubscriptionSection from "./components/SubscriptionSection";
 
 export default function DashboardClient() {
   const [activeSection, setActiveSection] = useState("screener");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const renderSection = () => {
     switch (activeSection) {
@@ -40,9 +44,17 @@ export default function DashboardClient() {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white pt-[64px]">
-      <Sidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+      <Sidebar 
+        activeSection={activeSection} 
+        onSectionChange={setActiveSection}
+      />
       
-      <main className="ml-[280px] p-12">
+      <main 
+        className="p-12 transition-all duration-300 ease-in-out"
+        style={{ 
+          marginLeft: isSidebarCollapsed ? '80px' : '280px' 
+        }}
+      >
         <div className="max-w-[1400px]">
           {renderSection()}
         </div>
