@@ -2,10 +2,12 @@ import { DefaultOptions } from "@tanstack/react-query";
 
 export const queryConfig: DefaultOptions = {
   queries: {
-    // Data is considered "fresh" for 10s. If a component asks for data 
+    // 1. Stale Time (30 seconds for general queries)
+    // Data is considered "fresh" for 30s. If a component asks for data
     // within this window, we return the cache immediately and DO NOT call the API.
     // Why? Prevents API spam if the user switches tabs/pages quickly.
-    staleTime: 10 * 1000,
+    // Note: Individual hooks can override this (like useScreener sets it to 0)
+    staleTime: 30 * 1000,
 
     // 2. Garbage Collection Time (10 minutes)
     // If data is unused (user left the page), keep it in memory for 10m.
