@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Avatar, AvatarFallback } from "./ui/avatar";
+import { useAuthStore } from "@/app/store/authStore"
 
 interface SidebarProps {
   activeSection: string;
@@ -17,7 +18,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeSection, onSectionChange, onCollapsedChange }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-
+  const user = useAuthStore((state) => state.user);
   useEffect(() => {
     if (onCollapsedChange) {
       onCollapsedChange(isCollapsed);
@@ -274,7 +275,8 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
                 fontWeight: 600,
               }}
             >
-              JD
+              {/* Dynamic Initials: Takes first letter of first two words */}
+              {user.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
             </AvatarFallback>
           </Avatar>
           <div style={{ 
@@ -292,7 +294,7 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
               overflow: 'hidden',
               textOverflow: 'ellipsis',
             }}>
-              John Doe
+              {user.name}
             </div>
             <Badge 
               style={{
