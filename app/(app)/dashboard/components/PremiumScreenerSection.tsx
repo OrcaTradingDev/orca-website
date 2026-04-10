@@ -1,18 +1,37 @@
-// /components/PremiumScreenerSection.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useScreener } from "@/app/hooks/useScreener";
 import { ScreenerRow } from "@/app/types/screener";
+import { queryKeys } from "@/app/lib/query/keys";
 import {
-  Search, RefreshCw, Download, Star, Bell,
-  TrendingUp, TrendingDown, ArrowRight,
+  Search,
+  RefreshCw,
+  Download,
+  Star,
+  Bell,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
 import { Badge } from "./ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "./ui/dialog";
 import { Skeleton } from "./ui/skeleton";
 
 // UI Types - extends API types with UI-only fields
@@ -27,6 +46,8 @@ interface Asset extends Omit<ScreenerRow, "advanced"> {
 }
 
 export default function PremiumScreenerSection() {
+  const queryClient = useQueryClient();
+
   // UI State
   const [page, setPage] = useState(1);
   const [assetClassFilter, setAssetClassFilter] = useState("All");
@@ -40,92 +61,140 @@ export default function PremiumScreenerSection() {
   const [alertSymbols, setAlertSymbols] = useState<string[]>([]);
 
   // Data fetching hook
-  const { data, isLoading, isError, refetch } = useScreener(page, 50);
+  const { data, isLoading, isFetching, isError, refetch } = useScreener(page, 50);
 
-  // Transform API data to UI format
-  const assets: Asset[] = (data?.rows || []).map((row) => {
+  // Debug logging (uncomment to debug refresh issues)
+  // useEffect(() => {
+  //   console.log('🔄 Data updated:', data?.lastUpdated);
+  //   console.log('📊 Row count:', data?.rows.length);
+  // }, [data]);
+
+  // Memoized asset transformation
+  const assets: Asset[] = useMemo(() => {
     const inferAssetClass = (s: string) => {
-      if (s.includes("XAU") || s.includes("XAG") || s.includes("OIL")) return "Commodities";
+      if (s.includes("XAU") || s.includes("XAG") || s.includes("OIL"))
+        return "Commodities";
       if (s.includes("/")) return "Forex";
       if (s === "US500" || s === "US100" || s === "US30") return "Indices";
-      if (s.includes("BTC") || s.includes("ETH") || s.includes("USDT")) return "Crypto";
+      if (s.includes("BTC") || s.includes("ETH") || s.includes("USDT"))
+        return "Crypto";
       return "Stocks";
     };
 
-    return {
+    return (data?.rows || []).map((row) => ({
       ...row,
       assetClass: inferAssetClass(row.symbol),
       inWatchlist: watchedSymbols.includes(row.symbol),
       advanced: {
         ...row.advanced,
-        adxTrend: row.advanced.adx_dir === "flat" ? "neutral" : row.advanced.adx_dir,
+        adxTrend:
+          row.advanced.adx_dir === "flat" ? "neutral" : row.advanced.adx_dir,
         emaStatus: row.advanced.ema === "aligned" ? "aligned" : "crossed",
         hasAlert: alertSymbols.includes(row.symbol),
       },
-    };
-  });
+    }));
+  }, [data?.rows, watchedSymbols, alertSymbols]);
 
-  // Format timestamp
-  const lastUpdatedLabel = data?.lastUpdated 
-    ? (() => {
-        const date = new Date(data.lastUpdated);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffMins = Math.floor(diffMs / 60000);
-        
-        if (diffMins < 1) return "Just now";
-        if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
-        const diffHours = Math.floor(diffMins / 60);
-        return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-      })()
-    : "Loading...";
+  // Memoized timestamp formatting
+  const lastUpdatedLabel = useMemo(() => {
+    if (!data?.lastUpdated) return "Loading...";
 
-  // Client-side filtering
-  const filteredAssets = assets.filter((asset) => {
-    const matchesSearch =
-      asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      asset.name.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesAssetClass = assetClassFilter === "All" || asset.assetClass === assetClassFilter;
+    const date = new Date(data.lastUpdated);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
 
-    let matchesTrend = true;
-    if (trendFilter !== "All") {
-      const bull = asset.daily.bull;
-      if (trendFilter === "Strong Bullish") matchesTrend = bull >= 70;
-      else if (trendFilter === "Bullish") matchesTrend = bull >= 55 && bull < 70;
-      else if (trendFilter === "Neutral") matchesTrend = bull >= 45 && bull < 55;
-      else if (trendFilter === "Bearish") matchesTrend = bull >= 30 && bull < 45;
-      else if (trendFilter === "Strong Bearish") matchesTrend = bull < 30;
-    }
-    return matchesSearch && matchesAssetClass && matchesTrend;
-  });
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60)
+      return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+  }, [data?.lastUpdated]);
 
-  // Handlers
-  const toggleWatchlist = (symbol: string) => {
-    setWatchedSymbols(prev => 
-      prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]
-    );
-    if (selectedAsset && selectedAsset.symbol === symbol) {
-      setSelectedAsset({ ...selectedAsset, inWatchlist: !selectedAsset.inWatchlist });
-    }
-  };
+  // Memoized filtering
+  const filteredAssets = useMemo(() => {
+    return assets.filter((asset) => {
+      const matchesSearch =
+        asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        asset.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const toggleAlert = (symbol: string) => {
-    setAlertSymbols(prev => 
-      prev.includes(symbol) ? prev.filter(s => s !== symbol) : [...prev, symbol]
-    );
-    if (selectedAsset && selectedAsset.symbol === symbol) {
-      setSelectedAsset({
-        ...selectedAsset,
-        advanced: { ...selectedAsset.advanced, hasAlert: !selectedAsset.advanced.hasAlert },
-      });
-    }
-  };
+      const matchesAssetClass =
+        assetClassFilter === "All" || asset.assetClass === assetClassFilter;
 
-  const handleExport = () => {
+      let matchesTrend = true;
+      if (trendFilter !== "All") {
+        const bull = asset.daily.bull;
+        if (trendFilter === "Strong Bullish") matchesTrend = bull >= 70;
+        else if (trendFilter === "Bullish")
+          matchesTrend = bull >= 55 && bull < 70;
+        else if (trendFilter === "Neutral")
+          matchesTrend = bull >= 45 && bull < 55;
+        else if (trendFilter === "Bearish")
+          matchesTrend = bull >= 30 && bull < 45;
+        else if (trendFilter === "Strong Bearish") matchesTrend = bull < 30;
+      }
+      return matchesSearch && matchesAssetClass && matchesTrend;
+    });
+  }, [assets, searchQuery, assetClassFilter, trendFilter]);
+
+  // Handlers with useCallback
+  const toggleWatchlist = useCallback(
+    (symbol: string) => {
+      setWatchedSymbols((prev) =>
+        prev.includes(symbol)
+          ? prev.filter((s) => s !== symbol)
+          : [...prev, symbol]
+      );
+      if (selectedAsset && selectedAsset.symbol === symbol) {
+        setSelectedAsset({
+          ...selectedAsset,
+          inWatchlist: !selectedAsset.inWatchlist,
+        });
+      }
+    },
+    [selectedAsset]
+  );
+
+  const toggleAlert = useCallback(
+    (symbol: string) => {
+      setAlertSymbols((prev) =>
+        prev.includes(symbol)
+          ? prev.filter((s) => s !== symbol)
+          : [...prev, symbol]
+      );
+      if (selectedAsset && selectedAsset.symbol === symbol) {
+        setSelectedAsset({
+          ...selectedAsset,
+          advanced: {
+            ...selectedAsset.advanced,
+            hasAlert: !selectedAsset.advanced.hasAlert,
+          },
+        });
+      }
+    },
+    [selectedAsset]
+  );
+
+  const handleRefresh = useCallback(() => {
+    // Invalidate the entire screener cache to force a fresh fetch
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.screener.all,
+    });
+  }, [queryClient]);
+
+  const handleExport = useCallback(() => {
     if (!filteredAssets.length) return;
-    const headers = ["Symbol", "Name", "Asset Class", "Intraday Bullish %", "Daily Bullish %", "ADX", "EMA Status", "Volume"];
-    const rows = filteredAssets.map(asset => [
+    const headers = [
+      "Symbol",
+      "Name",
+      "Asset Class",
+      "Intraday Bullish %",
+      "Daily Bullish %",
+      "ADX",
+      "EMA Status",
+      "Volume",
+    ];
+    const rows = filteredAssets.map((asset) => [
       asset.symbol,
       asset.name,
       asset.assetClass,
@@ -138,17 +207,17 @@ export default function PremiumScreenerSection() {
 
     const csvContent = [
       headers.join(","),
-      ...rows.map(row => row.join(","))
+      ...rows.map((row) => row.join(",")),
     ].join("\n");
 
     const blob = new Blob([csvContent], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `screener-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `screener-export-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
+  }, [filteredAssets]);
 
   // Stacked Bar Component with Original Gradients
   const StackedBar = ({ bear, bull }: { bear: number; bull: number }) => (
@@ -158,7 +227,11 @@ export default function PremiumScreenerSection() {
         className="h-full bg-gradient-to-r from-[#DC2626] via-[#EF4444] to-[#DC2626] flex items-center justify-center relative"
         style={{ width: `${bear}%` }}
       >
-        {bear > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bear}%</span>}
+        {bear > 15 && (
+          <span className="text-white text-sm z-10 drop-shadow-lg">
+            {bear}%
+          </span>
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
       </div>
 
@@ -167,7 +240,11 @@ export default function PremiumScreenerSection() {
         className="h-full bg-gradient-to-r from-[#059669] via-[#10B981] to-[#059669] flex items-center justify-center relative"
         style={{ width: `${bull}%` }}
       >
-        {bull > 15 && <span className="text-white text-sm z-10 drop-shadow-lg">{bull}%</span>}
+        {bull > 15 && (
+          <span className="text-white text-sm z-10 drop-shadow-lg">
+            {bull}%
+          </span>
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50"></div>
       </div>
     </div>
@@ -205,7 +282,9 @@ export default function PremiumScreenerSection() {
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-white text-[32px]">Premium Screener</h1>
-        <p className="text-[#94A3B8]">Real-time multi-timeframe trend analysis</p>
+        <p className="text-[#94A3B8]">
+          Real-time multi-timeframe trend analysis
+        </p>
       </div>
 
       {/* Top Controls Bar */}
@@ -256,11 +335,13 @@ export default function PremiumScreenerSection() {
 
           <Button
             variant="outline"
-            onClick={() => refetch()}
-            disabled={isLoading}
+            onClick={handleRefresh}
+            disabled={isFetching}
             className="bg-[#14181F] border-[#1E293B] text-[#94A3B8] hover:text-white hover:bg-[#1A1F2E]"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+            />
             <span className="text-sm">{lastUpdatedLabel}</span>
           </Button>
 
@@ -287,7 +368,9 @@ export default function PremiumScreenerSection() {
                 </th>
                 <th className="py-4 px-4 text-center text-white">
                   <div className="mb-1">INTRADAY</div>
-                  <div className="text-xs text-[#94A3B8]">1M | 5M | 15M | 1H</div>
+                  <div className="text-xs text-[#94A3B8]">
+                    1M | 5M | 15M | 1H
+                  </div>
                 </th>
                 <th className="py-4 px-4 text-center text-white">
                   <div className="mb-1">DAILY</div>
@@ -296,9 +379,13 @@ export default function PremiumScreenerSection() {
                 <th className="py-4 px-4 text-center text-white w-[280px]">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <span>ADVANCED</span>
-                    <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">PRO</Badge>
+                    <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">
+                      PRO
+                    </Badge>
                   </div>
-                  <div className="text-xs text-[#94A3B8]">ADX | EMA | VOL | ALERTS</div>
+                  <div className="text-xs text-[#94A3B8]">
+                    ADX | EMA | VOL | ALERTS
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -308,14 +395,18 @@ export default function PremiumScreenerSection() {
               ) : isError ? (
                 <tr>
                   <td colSpan={4} className="py-12 text-center">
-                    <div className="text-red-400">Failed to load market data. Please check your connection.</div>
+                    <div className="text-red-400">
+                      Failed to load market data. Please check your connection.
+                    </div>
                   </td>
                 </tr>
               ) : filteredAssets.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="py-12 text-center">
                     <div className="text-[#94A3B8]">
-                      {assets.length === 0 ? "No data available. Data may be warming up..." : "No assets found. Try adjusting your filters."}
+                      {assets.length === 0
+                        ? "No data available. Data may be warming up..."
+                        : "No assets found. Try adjusting your filters."}
                     </div>
                   </td>
                 </tr>
@@ -339,23 +430,37 @@ export default function PremiumScreenerSection() {
                           }}
                           className="transition-colors duration-200"
                         >
-                          <Star className={`w-5 h-5 ${asset.inWatchlist ? "fill-[#00D4FF] text-[#00D4FF]" : "text-[#64748B]"}`} />
+                          <Star
+                            className={`w-5 h-5 ${
+                              asset.inWatchlist
+                                ? "fill-[#00D4FF] text-[#00D4FF]"
+                                : "text-[#64748B]"
+                            }`}
+                          />
                         </button>
                         <div>
                           <div className="text-white">{asset.symbol}</div>
-                          <div className="text-[#94A3B8] text-sm">{asset.name}</div>
+                          <div className="text-[#94A3B8] text-sm">
+                            {asset.name}
+                          </div>
                         </div>
                       </div>
                     </td>
 
                     {/* INTRADAY */}
                     <td className="py-4 px-4">
-                      <StackedBar bear={asset.intraday.bear} bull={asset.intraday.bull} />
+                      <StackedBar
+                        bear={asset.intraday.bear}
+                        bull={asset.intraday.bull}
+                      />
                     </td>
 
                     {/* DAILY */}
                     <td className="py-4 px-4">
-                      <StackedBar bear={asset.daily.bear} bull={asset.daily.bull} />
+                      <StackedBar
+                        bear={asset.daily.bear}
+                        bull={asset.daily.bull}
+                      />
                     </td>
 
                     {/* ADVANCED */}
@@ -363,27 +468,49 @@ export default function PremiumScreenerSection() {
                       <div className="flex items-center gap-4 text-sm">
                         {/* ADX */}
                         <div className="flex items-center gap-1">
-                          <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>{asset.advanced.adx}</span>
-                          {asset.advanced.adxTrend === "up" && <TrendingUp className="w-4 h-4 text-[#10B981]" />}
-                          {asset.advanced.adxTrend === "down" && <TrendingDown className="w-4 h-4 text-[#EF4444]" />}
-                          {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-4 h-4 text-[#94A3B8]" />}
+                          <span
+                            className={
+                              asset.advanced.adx >= 25
+                                ? "text-[#10B981]"
+                                : "text-[#94A3B8]"
+                            }
+                          >
+                            {asset.advanced.adx}
+                          </span>
+                          {asset.advanced.adxTrend === "up" && (
+                            <TrendingUp className="w-4 h-4 text-[#10B981]" />
+                          )}
+                          {asset.advanced.adxTrend === "down" && (
+                            <TrendingDown className="w-4 h-4 text-[#EF4444]" />
+                          )}
+                          {asset.advanced.adxTrend === "neutral" && (
+                            <ArrowRight className="w-4 h-4 text-[#94A3B8]" />
+                          )}
                         </div>
 
                         {/* EMA */}
                         <Badge
                           className={`${
-                            asset.advanced.emaStatus === "aligned" ? "bg-[#10B981]/20 text-[#10B981]" : "bg-[#EF4444]/20 text-[#EF4444]"
+                            asset.advanced.emaStatus === "aligned"
+                              ? "bg-[#10B981]/20 text-[#10B981]"
+                              : "bg-[#EF4444]/20 text-[#EF4444]"
                           } border-0`}
                         >
-                          EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
+                          EMA{" "}
+                          {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
                         </Badge>
 
                         {/* VOLUME */}
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-2 bg-[#1E293B] rounded-full overflow-hidden">
-                            <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.vol}%` }} />
+                            <div
+                              className="h-full bg-[#00D4FF]"
+                              style={{ width: `${asset.advanced.vol}%` }}
+                            />
                           </div>
-                          <span className="text-[#94A3B8] text-xs">{asset.advanced.vol}</span>
+                          <span className="text-[#94A3B8] text-xs">
+                            {asset.advanced.vol}
+                          </span>
                         </div>
 
                         {/* ALERT */}
@@ -394,7 +521,13 @@ export default function PremiumScreenerSection() {
                           }}
                           className="transition-colors duration-200"
                         >
-                          <Bell className={`w-4 h-4 ${asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"}`} />
+                          <Bell
+                            className={`w-4 h-4 ${
+                              asset.advanced.hasAlert
+                                ? "text-[#FFD700]"
+                                : "text-[#64748B]"
+                            }`}
+                          />
                         </button>
                       </div>
                     </td>
@@ -409,13 +542,15 @@ export default function PremiumScreenerSection() {
         {!isLoading && filteredAssets.length > 0 && (
           <div className="border-t border-[#1E293B] py-4 px-6 flex items-center justify-between">
             <div className="text-[#94A3B8] text-sm">
-              Showing {(page - 1) * 50 + 1}-{Math.min(page * 50, (data?.total || 0))} of {data?.total || 0} assets
+              Showing {(page - 1) * 50 + 1}-
+              {Math.min(page * 50, data?.total || 0)} of {data?.total || 0}{" "}
+              assets
             </div>
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className="bg-transparent border-[#1E293B] text-[#94A3B8] hover:bg-[#1E293B] hover:text-white disabled:opacity-50"
               >
@@ -424,7 +559,7 @@ export default function PremiumScreenerSection() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => setPage((p) => p + 1)}
                 disabled={!data || data.rows.length < 50}
                 className="bg-transparent border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white disabled:opacity-50"
               >
@@ -442,7 +577,9 @@ export default function PremiumScreenerSection() {
             <DialogTitle className="text-2xl">
               {selectedAsset?.symbol} - {selectedAsset?.name}
             </DialogTitle>
-            <DialogDescription className="text-[#94A3B8]">Detailed multi-timeframe analysis</DialogDescription>
+            <DialogDescription className="text-[#94A3B8]">
+              Detailed multi-timeframe analysis
+            </DialogDescription>
           </DialogHeader>
 
           {selectedAsset && (
@@ -452,47 +589,83 @@ export default function PremiumScreenerSection() {
                 <div className="text-center text-[#94A3B8]">
                   <TrendingUp className="w-12 h-12 mx-auto mb-2 text-[#00D4FF]" />
                   <p>Interactive chart would appear here</p>
-                  <p className="text-sm mt-1">Showing price action and indicators</p>
+                  <p className="text-sm mt-1">
+                    Showing price action and indicators
+                  </p>
                 </div>
               </div>
 
               {/* Analysis Grid */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
-                  <div className="text-[#94A3B8] text-sm mb-2">Intraday Trend</div>
-                  <StackedBar bear={selectedAsset.intraday.bear} bull={selectedAsset.intraday.bull} />
-                  <div className="text-xs text-[#64748B] mt-2">Based on 1M, 5M, 15M, 1H timeframes</div>
+                  <div className="text-[#94A3B8] text-sm mb-2">
+                    Intraday Trend
+                  </div>
+                  <StackedBar
+                    bear={selectedAsset.intraday.bear}
+                    bull={selectedAsset.intraday.bull}
+                  />
+                  <div className="text-xs text-[#64748B] mt-2">
+                    Based on 1M, 5M, 15M, 1H timeframes
+                  </div>
                 </div>
 
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm mb-2">Daily Trend</div>
-                  <StackedBar bear={selectedAsset.daily.bear} bull={selectedAsset.daily.bull} />
-                  <div className="text-xs text-[#64748B] mt-2">Based on 4H, 1D, 1W timeframes</div>
-                </div>
-
-                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
-                  <div className="text-[#94A3B8] text-sm mb-2">ADX Trend Strength</div>
-                  <div className="text-2xl text-white">{selectedAsset.advanced.adx}</div>
-                  <div className="text-sm text-[#10B981] mt-1">{selectedAsset.advanced.adx >= 25 ? "Strong Trend" : "Weak Trend"}</div>
-                </div>
-
-                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
-                  <div className="text-[#94A3B8] text-sm mb-2">EMA Alignment</div>
-                  <div className={`text-2xl ${selectedAsset.advanced.emaStatus === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
-                    {selectedAsset.advanced.emaStatus === "aligned" ? "✓ Aligned" : "✗ Crossed"}
+                  <StackedBar
+                    bear={selectedAsset.daily.bear}
+                    bull={selectedAsset.daily.bull}
+                  />
+                  <div className="text-xs text-[#64748B] mt-2">
+                    Based on 4H, 1D, 1W timeframes
                   </div>
-                  <div className="text-sm text-[#64748B] mt-1">EMA 9, 21, 50, 200 alignment</div>
+                </div>
+
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">
+                    ADX Trend Strength
+                  </div>
+                  <div className="text-2xl text-white">
+                    {selectedAsset.advanced.adx}
+                  </div>
+                  <div className="text-sm text-[#10B981] mt-1">
+                    {selectedAsset.advanced.adx >= 25
+                      ? "Strong Trend"
+                      : "Weak Trend"}
+                  </div>
+                </div>
+
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">
+                    EMA Alignment
+                  </div>
+                  <div
+                    className={`text-2xl ${
+                      selectedAsset.advanced.emaStatus === "aligned"
+                        ? "text-[#10B981]"
+                        : "text-[#EF4444]"
+                    }`}
+                  >
+                    {selectedAsset.advanced.emaStatus === "aligned"
+                      ? "✓ Aligned"
+                      : "✗ Crossed"}
+                  </div>
+                  <div className="text-sm text-[#64748B] mt-1">
+                    EMA 9, 21, 50, 200 alignment
+                  </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-3">
-                <Button 
+                <Button
                   className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
                   onClick={() => toggleAlert(selectedAsset.symbol)}
                 >
                   <Bell className="w-4 h-4 mr-2" />
-                  {selectedAsset.advanced.hasAlert ? "Remove Alert" : "Add Alert"}
+                  {selectedAsset.advanced.hasAlert
+                    ? "Remove Alert"
+                    : "Add Alert"}
                 </Button>
 
                 <Button
@@ -505,7 +678,8 @@ export default function PremiumScreenerSection() {
                     stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
                     fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
                   />
-                  {selectedAsset.inWatchlist ? "Remove from" : "Add to"} Watchlist
+                  {selectedAsset.inWatchlist ? "Remove from" : "Add to"}{" "}
+                  Watchlist
                 </Button>
               </div>
             </div>
