@@ -8,10 +8,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const authPath = ['/login', '/auth/callback'];
-  const publicPath = ['/', ...authPath];
-
-  const isPublicPath = publicPath.includes(pathname);
+  // Identifying if the path is public/auth, private. 
+  const authPath = ['/login', '/auth/callback']; // paths used for auth, also public paths.
+  const publicPath = ['/','/orcabot', ...authPath]; // all the publicly accesible paths. 
+  
+  const isPublicPath = publicPath.includes(pathname); 
   const isAuthPath = authPath.includes(pathname);
 
   useEffect(() => {
