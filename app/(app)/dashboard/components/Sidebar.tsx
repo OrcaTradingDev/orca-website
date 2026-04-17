@@ -26,11 +26,9 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
 
   const handleToggle = () => {
     if (!isCollapsed) {
-      // Collapsing: fade out expanded header first, then swap
       setHeaderVisible(false);
       setTimeout(() => setIsCollapsed(true), 180);
     } else {
-      // Expanding: swap first, then fade in
       setIsCollapsed(false);
       setTimeout(() => setHeaderVisible(true), 50);
     }
@@ -50,7 +48,6 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
 
   return (
     <>
-      {/* Tooltip styles injected globally */}
       <style>{`
         .sidebar-nav-btn { position: relative; }
         .sidebar-tooltip {
@@ -104,14 +101,14 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
         {/* ── HEADER ── */}
         <div style={{ borderBottom: '1px solid #1E293B', flexShrink: 0 }}>
 
-          {/* EXPANDED: logo + subtle inline toggle */}
+          {/* EXPANDED */}
           {!isCollapsed && (
             <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '18px 14px 18px 18px',
+                padding: '20px 14px 20px 18px', // ← increased vertical padding
                 opacity: headerVisible ? 1 : 0,
                 transition: 'opacity 0.18s',
               }}
@@ -133,7 +130,6 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
                 </div>
               </div>
 
-              {/* Subtle toggle — no aggressive cyan fill on hover */}
               <button
                 onClick={handleToggle}
                 style={{
@@ -160,9 +156,9 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
             </div>
           )}
 
-          {/* COLLAPSED: toggle IS the icon — same size/shape as logo box */}
+          {/* COLLAPSED */}
           {isCollapsed && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px 0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 0' }}>
               <button
                 onClick={handleToggle}
                 style={{
@@ -201,8 +197,8 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
                 onClick={() => onSectionChange(item.id)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center',
-                  gap: '11px',
-                  padding: isCollapsed ? '10px 0' : '10px 16px',
+                  gap: '12px',
+                  padding: isCollapsed ? '12px 0' : '12px 18px', // ← increased padding
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                   backgroundColor: isActive ? 'rgba(0, 196, 238, 0.08)' : 'transparent',
                   color: isActive ? '#00C4EE' : '#64748B',
@@ -210,7 +206,7 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
                   borderLeft: `3px solid ${isActive ? '#00C4EE' : 'transparent'}`,
                   cursor: 'pointer',
                   transition: 'all 0.15s',
-                  fontFamily: 'inherit', fontSize: '13px',
+                  fontFamily: 'inherit', fontSize: '14px', // ← increased from 13px
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -225,7 +221,7 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
                   }
                 }}
               >
-                <Icon style={{ width: '18px', height: '18px', flexShrink: 0 }} />
+                <Icon style={{ width: '20px', height: '20px', flexShrink: 0 }} /> {/* ← increased from 18px */}
 
                 {!isCollapsed && (
                   <>
@@ -248,7 +244,6 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
                   </>
                 )}
 
-                {/* Custom tooltip for collapsed state */}
                 {isCollapsed && (
                   <div className="sidebar-tooltip">
                     {item.label}{item.badge ? ` · ${item.badge}` : ''}
@@ -267,12 +262,12 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
           gap: '10px', flexShrink: 0, overflow: 'hidden',
         }}>
           <Avatar style={{
-            width: '34px', height: '34px', flexShrink: 0,
+            width: '36px', height: '36px', flexShrink: 0, // ← increased from 34px
             border: '2px solid #2D3748',
           }}>
             <AvatarFallback style={{
               background: 'linear-gradient(135deg, #0EA5E9, #00C4EE)',
-              color: 'white', fontWeight: 600, fontSize: '13px',
+              color: 'white', fontWeight: 600, fontSize: '14px', // ← increased from 13px
             }}>
               {user.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
             </AvatarFallback>
@@ -285,7 +280,7 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
             transition: 'opacity 0.2s, max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
           }}>
             <div style={{
-              color: 'white', fontSize: '13px', fontWeight: 500,
+              color: 'white', fontSize: '14px', fontWeight: 500, // ← increased from 13px
               whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             }}>
               {user.name}

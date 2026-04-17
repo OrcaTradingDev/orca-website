@@ -645,16 +645,17 @@ export default function OrcaBotPage() {
                   </div>
                 </div>
               </div>
-
+                            
               {/* Discord CTA — embedded in the box */}
               <div className="ob-beginner__discord">
                 <div className="ob-beginner__discord-text">
-                  <h4>Everything happens on Discord — and it's free to join.</h4>
+                  <h4>Join our Discord — to learn about us.</h4>
                   <p>
-                    All guides, strategy documents, support, live updates, and client communication
-                    live inside our Discord server. Whether you're an existing client or just
-                    starting to explore, this is where you'll find everything — and everyone —
-                    you need. Come say hello. We're in there every single day.
+                    Our public Discord is the best place to learn more about OrcaTrading, follow
+                    our journey, and ask any questions before you decide. General guides and
+                    educational resources are shared there too. Once you become a client, you'll
+                    receive access to our private hub — where all live updates, strategy documents,
+                    direct support, and client communication take place.
                   </p>
                 </div>
                 <a
