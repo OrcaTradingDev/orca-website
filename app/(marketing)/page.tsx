@@ -782,10 +782,10 @@ export default function Page() {
           <div className="hp-trust-inner hp-wrap">
             {[
               'Rules-based algorithms',
-              'No black boxes',
               'Multi-asset coverage',
               'Personal onboarding',
               'Private Discord community',
+              'Supportive Eco-System'
             ].map(t => (
               <div key={t} className="hp-trust-item">
                 <span className="hp-trust-dot" /> {t}
