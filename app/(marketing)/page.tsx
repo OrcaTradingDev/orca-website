@@ -20,6 +20,7 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
+  const DISCORD_URI = process.env.NEXT_PUBLIC_DISCORD_URI || "https://discord.gg/your-invite-code"; 
   return (
     <>
       <style>{`
@@ -781,10 +782,10 @@ export default function Page() {
           <div className="hp-trust-inner hp-wrap">
             {[
               'Rules-based algorithms',
-              'No black boxes',
               'Multi-asset coverage',
               'Personal onboarding',
               'Private Discord community',
+              'Supportive Eco-System'
             ].map(t => (
               <div key={t} className="hp-trust-item">
                 <span className="hp-trust-dot" /> {t}
@@ -1062,7 +1063,7 @@ export default function Page() {
                   </div>
                 ))}
               </div>
-              <a className="btn btn-discord btn-lg" href="https://discord.gg/your-invite-code" target="_blank" rel="noopener noreferrer">
+              <a className="btn btn-discord btn-lg" href= {DISCORD_URI} target="_blank" rel="noopener noreferrer">
                 <MessageCircle size={20} /> Join Discord Community
               </a>
               <p style={{ marginTop: '1.25rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
