@@ -747,7 +747,7 @@ export default function OrcaBotPage() {
               <div className="ob-price-hero">
                 <div className="ob-price-hero__label">Current Phase — Early Access</div>
                 <div className="ob-price-hero__amount">€500</div>
-                <div className="ob-price-hero__note">One-time · Limited availability · Tax excluded</div>
+                <div className="ob-price-hero__note">One-time · Limited availability</div>
                 <p className="ob-price-hero__desc">
                   The lowest available entry point while the system transitions from final testing
                   into broader use. Your price is locked in — later phases will only increase.
