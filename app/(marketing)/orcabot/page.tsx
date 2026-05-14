@@ -1,6 +1,6 @@
 // app/(marketing)/orcabot/page.tsx
 import { Metadata } from 'next'
-import { ArrowRight, Check, X, Shield, Zap, Clock, Users, MessageCircle, BookOpen, FileText, Headphones, Monitor } from 'lucide-react'
+import { ArrowRight, Check, X, Shield, Zap, Clock, Users, MessageCircle, BookOpen, FileText, Headphones, Monitor, Star, Quote } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'OrcaBot 2.0 — The Hybrid Automated Trading System | OrcaTrading',
@@ -176,6 +176,125 @@ export default function OrcaBotPage() {
         .ob-receive-card__num { font-size: 1.5rem; font-weight: 900; color: var(--ob-cyan); margin-bottom: 0.6rem; line-height: 1; }
         .ob-receive-card h4 { font-size: 0.95rem; font-weight: 700; margin: 0 0 0.4rem; }
         .ob-receive-card p  { font-size: 0.83rem; color: var(--ob-muted); margin: 0; line-height: 1.65; }
+
+        /* ══ TESTIMONIAL — REDESIGNED ══ */
+        .ob-testi-section { position: relative; }
+
+        .ob-testi-badge {
+          display: inline-flex; align-items: center; gap: 0.4rem;
+          padding: 0.35rem 0.85rem;
+          background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25);
+          border-radius: 999px; font-size: 0.72rem; font-weight: 700;
+          letter-spacing: 0.1em; text-transform: uppercase; color: var(--ob-green);
+          margin-bottom: 2rem;
+        }
+        .ob-testi-badge span { width: 5px; height: 5px; border-radius: 50%; background: var(--ob-green); }
+
+        .ob-testi-pullquote {
+          position: relative; margin: 2rem 0;
+          padding: 2rem 2.5rem; border-radius: 20px;
+          background: linear-gradient(145deg, rgba(0,212,255,0.09) 0%, rgba(16,185,129,0.04) 100%);
+          border: 1px solid rgba(0,212,255,0.2); text-align: center;
+        }
+        .ob-testi-pullquote::before {
+          content: ''; position: absolute; top: 0; left: 4rem; right: 4rem; height: 1px;
+          background: linear-gradient(90deg, transparent, rgba(0,212,255,0.5), transparent);
+        }
+        .ob-testi-pullquote__mark {
+          font-family: Georgia, 'Times New Roman', serif; font-size: 4rem;
+          line-height: 0.6; color: rgba(0,212,255,0.2); display: block; margin-bottom: 0.85rem;
+        }
+        .ob-testi-pullquote__text {
+          font-size: clamp(0.97rem, 1.8vw, 1.15rem); font-style: italic; font-weight: 400;
+          color: var(--ob-text); line-height: 1.75; max-width: 680px; margin: 0 auto;
+        }
+        .ob-testi-pullquote__text strong { font-style: normal; color: var(--ob-cyan); font-weight: 700; }
+        @media (max-width: 580px) { .ob-testi-pullquote { padding: 1.5rem 1.25rem; } }
+
+        .ob-testi-main {
+          background: var(--ob-card); border: 1px solid var(--ob-border); border-radius: 20px;
+          overflow: hidden;
+        }
+
+        /* Timeline strip */
+        .ob-testi-timeline {
+          display: flex; border-bottom: 1px solid var(--ob-border);
+          background: var(--ob-surface);
+        }
+        .ob-testi-tl-step {
+          flex: 1; padding: 0.85rem 1.25rem; border-right: 1px solid var(--ob-border);
+        }
+        .ob-testi-tl-step:last-child { border-right: none; }
+        .ob-testi-tl-step__date {
+          font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em;
+          color: var(--ob-cyan); margin-bottom: 0.15rem;
+        }
+        .ob-testi-tl-step__label { font-size: 0.78rem; color: var(--ob-muted); line-height: 1.35; }
+        @media (max-width: 580px) {
+          .ob-testi-timeline { flex-direction: column; }
+          .ob-testi-tl-step { border-right: none; border-bottom: 1px solid var(--ob-border); }
+          .ob-testi-tl-step:last-child { border-bottom: none; }
+        }
+
+        /* Review body — full width, no sidebar */
+        .ob-testi-review { padding: 1.75rem 2rem; }
+        .ob-testi-review__stars { display: flex; gap: 0.2rem; margin-bottom: 1.25rem; }
+
+        .ob-testi-para { font-size: 0.9rem; color: var(--ob-muted); line-height: 1.8; margin: 0 0 0.85rem; }
+        .ob-testi-para strong { color: var(--ob-text); font-weight: 600; }
+
+        .ob-testi-highlight {
+          display: flex; align-items: flex-start; gap: 0.7rem;
+          margin: 1rem 0; padding: 0.9rem 1.1rem;
+          background: rgba(0,212,255,0.05); border-left: 3px solid var(--ob-cyan); border-radius: 0 10px 10px 0;
+          font-size: 0.88rem; font-style: italic; color: var(--ob-text); line-height: 1.65;
+        }
+        .ob-testi-highlight--green { background: rgba(16,185,129,0.06); border-left-color: var(--ob-green); }
+        .ob-testi-highlight svg { flex-shrink: 0; margin-top: 2px; }
+
+        /* Author row */
+        .ob-testi-author {
+          display: flex; align-items: center; gap: 0.8rem;
+          margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--ob-border);
+        }
+        .ob-testi-avatar {
+          width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+          background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(16,185,129,0.2));
+          border: 1.5px solid rgba(0,212,255,0.3);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 1.05rem; font-weight: 900; color: var(--ob-cyan);
+        }
+        .ob-testi-author__name { font-size: 0.9rem; font-weight: 700; }
+        .ob-testi-author__role { font-size: 0.75rem; color: var(--ob-muted); }
+
+        /* Stats — horizontal strip at bottom */
+        .ob-testi-stats {
+          display: flex; border-top: 1px solid var(--ob-border);
+          background: var(--ob-surface);
+        }
+        .ob-testi-stat {
+          flex: 1; padding: 1.1rem 1.25rem; text-align: center;
+          border-right: 1px solid var(--ob-border);
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .ob-testi-stats .ob-testi-stat:last-child { border-right: none; }
+        @media (max-width: 480px) {
+          .ob-testi-stats { flex-direction: column; }
+          .ob-testi-stat { border-right: none; border-bottom: 1px solid var(--ob-border); }
+          .ob-testi-stats .ob-testi-stat:last-child { border-bottom: none; }
+        }
+        .ob-testi-stat__sup {
+          font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+          color: rgba(0,212,255,0.45); margin-bottom: 0.2rem;
+        }
+        .ob-testi-stat__val {
+          font-size: 1.8rem; font-weight: 900; color: var(--ob-cyan);
+          letter-spacing: -0.04em; line-height: 1; margin-bottom: 0.3rem;
+        }
+        .ob-testi-stat__val--green { color: var(--ob-green); }
+        .ob-testi-stat__label { font-size: 0.72rem; color: var(--ob-muted); line-height: 1.4; }
+
+        .ob-testi-footer { margin-top: 1.1rem; font-size: 0.78rem; color: var(--ob-muted); font-style: italic; text-align: center; }
 
         /* ══ BEGINNER SUPPORT SECTION ══ */
         .ob-beginner {
@@ -531,9 +650,138 @@ export default function OrcaBotPage() {
 
         <hr className="ob-divider" />
 
-        {/* ════════════════════════════════════════
-            NEW — ZERO EXPERIENCE? RIGHT PLACE.
-        ════════════════════════════════════════ */}
+        {/* ── CLIENT TESTIMONIAL ── */}
+        <section className="ob-section ob-testi-section">
+          <div className="ob-container">
+            <p className="ob-section-label">Client Results</p>
+            <h2 className="ob-section-title">
+              Real People.<br /><em>Real Outcomes.</em>
+            </h2>
+            <p className="ob-body">
+              OrcaBot is early-stage, and we're not going to plaster fake numbers across this page.
+              Here's what our first client had to say — unedited, in their own words.
+            </p>
+
+            {/* Pull-quote */}
+            <div className="ob-testi-pullquote">
+              <span className="ob-testi-pullquote__mark">"</span>
+              <p className="ob-testi-pullquote__text">
+                My role is quite simple: I determine the daily bias,
+                and the bot takes care of executing the trades.{' '}
+                <strong>An ideal way to participate in the markets
+                without needing to be behind my screen all day.</strong>
+              </p>
+            </div>
+
+            <div className="ob-testi-badge">
+              <span /> Verified Client — Phase 1 Early Access
+            </div>
+
+            <div className="ob-testi-main">
+
+              {/* Timeline strip */}
+              <div className="ob-testi-timeline">
+                <div className="ob-testi-tl-step">
+                  <div className="ob-testi-tl-step__date">March 26</div>
+                  <div className="ob-testi-tl-step__label">First contact — Zoom walkthrough scheduled</div>
+                </div>
+                <div className="ob-testi-tl-step">
+                  <div className="ob-testi-tl-step__date">April</div>
+                  <div className="ob-testi-tl-step__label">Testing phase — regular check-ins with Bennie</div>
+                </div>
+                <div className="ob-testi-tl-step">
+                  <div className="ob-testi-tl-step__date">May — Live</div>
+                  <div className="ob-testi-tl-step__label">Running on demo — ~10% in first 10 trading days</div>
+                </div>
+              </div>
+
+              {/* Review — full width, single column */}
+              <div className="ob-testi-review">
+                <div className="ob-testi-review__stars">
+                  {[1,2,3,4,5].map(i => (
+                    <Star key={i} size={16} fill="var(--ob-gold)" strokeWidth={0} />
+                  ))}
+                </div>
+
+                <p className="ob-testi-para">
+                  On March 26th, I was contacted by Bennie through social media after he saw a video
+                  I made about trading. He reached out to explore the possibility of starting a
+                  collaboration with his company, Orca Bot. Shortly after, we scheduled a Zoom call
+                  via Discord where he walked me through the trading bot and the overall concept in
+                  detail. He clearly explained how the bot works, the strategy behind it, and what
+                  is expected from the user.
+                </p>
+
+                <div className="ob-testi-highlight">
+                  <Quote size={15} color="var(--ob-cyan)" />
+                  <strong>That level of transparency gave me confidence.</strong>
+                </div>
+
+                <p className="ob-testi-para">
+                  After taking a few days to think it over, I decided to move forward and became
+                  one of the first customers of Orca Bot. During April, the bot was still in its
+                  testing phase, but since the beginning of May it has been running live.
+                  Throughout that period, Bennie and I stayed in touch regularly via Zoom, where
+                  I was able to ask questions and gain a deeper understanding of how everything
+                  works. I really appreciate that level of personal support.
+                </p>
+
+                <p className="ob-testi-para">
+                  Since the bot went live, I started using it on a demo account. In the first
+                  10 trading days, it generated approximately 10% return. My role is quite simple:
+                  I determine the daily bias, and the bot takes care of executing the trades.
+                </p>
+
+                <div className="ob-testi-highlight ob-testi-highlight--green">
+                  <Quote size={15} color="var(--ob-green)" />
+                  As a beginner trader, this is currently an ideal way for me to participate in
+                  the markets <strong>without needing to be behind my screen all day.</strong>
+                </div>
+
+                <p className="ob-testi-para">
+                  I'm excited to see how things develop further as I gain more experience and
+                  continue learning how to work with the bot.
+                </p>
+
+                <div className="ob-testi-author">
+                  <div className="ob-testi-avatar">H</div>
+                  <div>
+                    <div className="ob-testi-author__name">Hans</div>
+                    <div className="ob-testi-author__role">Phase 1 Client · Beginner Trader</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats — horizontal strip at bottom */}
+              <div className="ob-testi-stats">
+                <div className="ob-testi-stat">
+                  <span className="ob-testi-stat__sup">Return</span>
+                  <div className="ob-testi-stat__val ob-testi-stat__val--green">~10%</div>
+                  <div className="ob-testi-stat__label">First 10 trading days on demo</div>
+                </div>
+                <div className="ob-testi-stat">
+                  <span className="ob-testi-stat__sup">Active</span>
+                  <div className="ob-testi-stat__val">10+</div>
+                  <div className="ob-testi-stat__label">Trading days running live</div>
+                </div>
+                <div className="ob-testi-stat">
+                  <span className="ob-testi-stat__sup">Daily input</span>
+                  <div className="ob-testi-stat__val">Mins</div>
+                  <div className="ob-testi-stat__label">No screen-watching required</div>
+                </div>
+              </div>
+
+            </div>
+
+            <p className="ob-testi-footer">
+              Early access is live. More client results will be shared as they come in.
+            </p>
+          </div>
+        </section>
+
+        <hr className="ob-divider" />
+
+        {/* ── ZERO EXPERIENCE? RIGHT PLACE. ── */}
         <section className="ob-section">
           <div className="ob-container">
             <p className="ob-section-label">New to Trading?</p>
@@ -549,7 +797,6 @@ export default function OrcaBotPage() {
 
             <div className="ob-beginner">
 
-              {/* Header block */}
               <div className="ob-beginner__header">
                 <div className="ob-beginner__icon">
                   <Users size={28} color="var(--ob-cyan)" />
@@ -569,7 +816,6 @@ export default function OrcaBotPage() {
                 </div>
               </div>
 
-              {/* Demo account recommendation banner */}
               <div className="ob-demo-banner">
                 <div className="ob-demo-banner__icon">
                   <Monitor size={22} color="#f59e0b" />
@@ -590,7 +836,6 @@ export default function OrcaBotPage() {
                 </div>
               </div>
 
-              {/* Four support pillars */}
               <div className="ob-support-grid">
                 <div className="ob-support-item">
                   <div className="ob-support-item__icon" style={{ background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)' }}>
@@ -645,8 +890,7 @@ export default function OrcaBotPage() {
                   </div>
                 </div>
               </div>
-                            
-              {/* Discord CTA — embedded in the box */}
+
               <div className="ob-beginner__discord">
                 <div className="ob-beginner__discord-text">
                   <h4>Join our Discord — to learn about us.</h4>
