@@ -1,0 +1,16 @@
+export {
+  OrcabotHero,
+  ProblemSection,
+  SolutionSection,
+  HowItWorksSection,
+  DifferencesSection,
+  ReceiveSection,
+  TestimonialSection,
+  BeginnerSection,
+  ExpectationsSection,
+  WhoItIsForSection,
+  OrcabotPricingSection,
+  FaqSection,
+  OrcabotCtaSection,
+  DisclaimerSection,
+} from './components/OrcabotSections';

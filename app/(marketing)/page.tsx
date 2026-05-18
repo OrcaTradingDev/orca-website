@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 }
 
 export default function Page() {
-  const DISCORD_URI = process.env.NEXT_PUBLIC_DISCORD_URI || "https://discord.gg/your-invite-code"; 
+  const DISCORD_URI = process.env.NEXT_PUBLIC_DISCORD_URI || "https://discord.gg/your-invite-code";
   return (
     <>
       <style>{`
@@ -763,10 +763,10 @@ export default function Page() {
 
             <div className="hp-stats">
               {[
-                { val: '35ms',  lbl: 'Avg. latency' },
-                { val: '24/7',  lbl: 'Live monitoring' },
-                { val: 'Free',  lbl: 'During beta' },
-                { val: '12mo',  lbl: 'Live test data' },
+                { val: '35ms', lbl: 'Avg. latency' },
+                { val: '24/7', lbl: 'Live monitoring' },
+                { val: 'Free', lbl: 'During beta' },
+                { val: '12mo', lbl: 'Live test data' },
               ].map(s => (
                 <div key={s.val} className="hp-stat">
                   <div className="hp-stat-val">{s.val}</div>
@@ -841,7 +841,7 @@ export default function Page() {
             <div className="hp-orca">
               <div className="hp-orca-left">
                 <div className="hp-orca-badge">
-                  <span style={{ width:6,height:6,borderRadius:'50%',background:'var(--cyan)',display:'inline-block',boxShadow:'0 0 6px var(--cyan)' }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cyan)', display: 'inline-block', boxShadow: '0 0 6px var(--cyan)' }} />
                   Early Access · Limited Spots
                 </div>
                 <h2 className="hp-orca-title">
@@ -1063,7 +1063,7 @@ export default function Page() {
                   </div>
                 ))}
               </div>
-              <a className="btn btn-discord btn-lg" href= {DISCORD_URI} target="_blank" rel="noopener noreferrer">
+              <a className="btn btn-discord btn-lg" href={DISCORD_URI} target="_blank" rel="noopener noreferrer">
                 <MessageCircle size={20} /> Join Discord Community
               </a>
               <p style={{ marginTop: '1.25rem', fontSize: '0.9rem', color: 'var(--muted)' }}>

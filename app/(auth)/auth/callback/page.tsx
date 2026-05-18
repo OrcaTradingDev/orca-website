@@ -2,7 +2,7 @@
 
 import { useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/app/store/authStore'; 
+import { useAuthStore } from '@/store/auth-store';
 
 // 1. The main logic component
 function AuthCallbackContent() {
