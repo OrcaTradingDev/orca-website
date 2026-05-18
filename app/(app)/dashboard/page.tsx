@@ -1,7 +1,4 @@
-"use client";
-
-import DashboardClient from "./dashboard-client";
-import "./dashboard.css";
+import DashboardClient from "@/features/dashboard/components/DashboardClient";
 
 export default function DashboardPage() {
   return <DashboardClient />;

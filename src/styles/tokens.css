@@ -1,0 +1,121 @@
+/* ============================================================
+   styles/tokens.css — Single source of truth for all design tokens
+   Import order: tokens.css → globals.css
+   ============================================================ */
+
+:root {
+  /* ── Color: Background scale ── */
+  --color-bg:           #060d18;
+  --color-bg-alt:       #090f1c;
+  --color-surface:      #0c1624;
+  --color-card:         #0e1b2b;
+  --color-card-alt:     #111f30;
+  --color-card-raised:  #14202f;
+
+  /* ── Color: Borders ── */
+  --color-border:       #172233;
+  --color-border-alt:   #1d2d42;
+  --color-border-hover: #243550;
+
+  /* ── Color: Brand / Primary ── */
+  --color-primary:       #00d4ff;
+  --color-primary-dark:  #00b8e6;
+  --color-primary-fg:    #04111e;
+  --color-primary-20:    rgba(0, 212, 255, 0.20);
+  --color-primary-15:    rgba(0, 212, 255, 0.15);
+  --color-primary-10:    rgba(0, 212, 255, 0.10);
+  --color-primary-05:    rgba(0, 212, 255, 0.05);
+
+  /* ── Color: Semantic ── */
+  --color-success:      #10b981;
+  --color-success-15:   rgba(16, 185, 129, 0.15);
+  --color-danger:       #ef4444;
+  --color-danger-15:    rgba(239, 68, 68, 0.15);
+  --color-warning:      #f59e0b;
+  --color-warning-15:   rgba(245, 158, 11, 0.15);
+  --color-discord:      #5865f2;
+
+  /* ── Color: Text ── */
+  --color-text:           #e8eef8;
+  --color-text-secondary: #c4d0df;
+  --color-muted:          #6b8aaa;
+  --color-muted-alt:      #4d6880;
+
+  /* ── Spacing ── */
+  --space-1:   0.25rem;   /*  4px */
+  --space-2:   0.5rem;    /*  8px */
+  --space-3:   0.75rem;   /* 12px */
+  --space-4:   1rem;      /* 16px */
+  --space-5:   1.25rem;   /* 20px */
+  --space-6:   1.5rem;    /* 24px */
+  --space-8:   2rem;      /* 32px */
+  --space-10:  2.5rem;    /* 40px */
+  --space-12:  3rem;      /* 48px */
+  --space-16:  4rem;      /* 64px */
+
+  /* ── Border radius ── */
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
+  --radius-2xl:  24px;
+  --radius-full: 999px;
+
+  /* ── Shadows ── */
+  --shadow-sm:    0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-card:  0 16px 48px rgba(0, 0, 0, 0.25);
+  --shadow-glow:  0 0 0 6px rgba(0, 212, 255, 0.15);
+  --shadow-glow-sm: 0 0 20px rgba(0, 212, 255, 0.3);
+
+  /* ── Z-index scale ── */
+  --z-base:      1;
+  --z-dropdown:  40;
+  --z-navbar:    50;
+  --z-modal:     60;
+  --z-toast:     70;
+
+  /* ── Typography ── */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* ── Animation ── */
+  --duration-fast:   0.12s;
+  --duration-base:   0.2s;
+  --duration-slow:   0.35s;
+  --ease-out:        cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ── Layout ── */
+  --container-max:     1140px;
+  --container-padding: clamp(1rem, 4vw, 3rem);
+  --navbar-height:     64px;
+  --sidebar-width:     260px;
+  --sidebar-collapsed: 64px;
+
+  /* ────────────────────────────────────────────────────────────
+     shadcn / Tailwind bridge variables
+     These map tokens → the names Tailwind config expects via
+     css variables so shadcn components work out of the box.
+     ──────────────────────────────────────────────────────────── */
+  --background:             var(--color-bg);
+  --foreground:             var(--color-text);
+  --primary:                var(--color-primary);
+  --primary-foreground:     var(--color-primary-fg);
+  --secondary:              var(--color-surface);
+  --secondary-foreground:   var(--color-text);
+  --destructive:            var(--color-danger);
+  --destructive-foreground: #ffffff;
+  --muted:                  var(--color-muted);
+  --muted-foreground:       var(--color-muted-alt);
+  --accent-bg:              var(--color-card);
+  --accent-foreground:      var(--color-text);
+  --popover:                var(--color-card);
+  --popover-foreground:     var(--color-text);
+  --card:                   var(--color-card);
+  --card-foreground:        var(--color-text);
+  --border:                 var(--color-border);
+  --input:                  var(--color-border);
+  --ring:                   var(--color-primary-20);
+  --radius:                 var(--radius-md);
+}
