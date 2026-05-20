@@ -3,6 +3,9 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: [
+    // NOTE: Tailwind v4 (@tailwindcss/postcss) ignores this array.
+    // File detection is automatic. This config is kept for v3 plugin
+    // compatibility (tailwindcss-animate) only.
     "./app/**/*.{ts,tsx,jsx,js}",
     "./src/**/*.{ts,tsx,jsx,js}",
     "./components/**/*.{ts,tsx,jsx,js}",
