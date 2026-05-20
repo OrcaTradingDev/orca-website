@@ -36,6 +36,7 @@ a {
   color: var(--color-primary);
   text-decoration: none;
 }
+
 a:hover {
   color: var(--color-primary-dark);
 }
@@ -69,11 +70,15 @@ a:hover {
   display: grid;
   gap: clamp(0.75rem, 2vw, 1rem);
 }
+
 .grid--3 {
   grid-template-columns: repeat(3, 1fr);
 }
+
 @media (max-width: 1024px) {
-  .grid--3 { grid-template-columns: 1fr; }
+  .grid--3 {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Card primitives ── */
@@ -106,28 +111,34 @@ a:hover {
   padding: 0.9rem 1.15rem;
   transition: all var(--duration-base) var(--ease-out);
 }
+
 .btn--primary {
   background: var(--color-primary);
   color: var(--color-primary-fg);
   box-shadow: var(--shadow-glow);
 }
+
 .btn--primary:hover {
   background: var(--color-primary-dark);
   box-shadow: 0 0 0 6px var(--color-primary-20);
 }
+
 .btn--ghost {
   background: transparent;
   color: var(--color-text);
   border: 1px solid var(--color-border-alt);
 }
+
 .btn--ghost:hover {
   background: var(--color-primary-05);
   border-color: var(--color-border-hover);
 }
+
 .btn--sm {
   padding: 0.65rem 1.25rem;
   font-size: 0.9rem;
 }
+
 .btn--gradient-blue {
   background: linear-gradient(90deg, #2563eb 0%, #4f46e5 100%);
   color: #ffffff;
@@ -139,13 +150,17 @@ a:hover {
   margin: var(--space-2) 0 var(--space-4);
   padding-left: var(--space-4);
 }
-.ul li { margin: var(--space-1) 0; }
+
+.ul li {
+  margin: var(--space-1) 0;
+}
 
 /* ── Pricing components ── */
 .pricing {
   display: grid;
   gap: clamp(0.75rem, 2vw, 1rem);
 }
+
 .pricing__beta {
   padding: clamp(1rem, 2.5vw, 1.25rem);
   border-radius: var(--radius-xl);
@@ -154,40 +169,56 @@ a:hover {
     var(--color-card);
   border: 1px solid rgba(0, 212, 255, 0.25);
 }
+
 .pricing__beta h3 {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
 }
+
 .pricing__beta .price {
   color: var(--color-primary);
   font-weight: 800;
 }
+
 .pricing__plans {
   display: grid;
   gap: clamp(0.75rem, 2vw, 1rem);
   grid-template-columns: repeat(3, 1fr);
 }
+
 @media (max-width: 1024px) {
-  .pricing__plans { grid-template-columns: 1fr 1fr; }
+  .pricing__plans {
+    grid-template-columns: 1fr 1fr;
+  }
 }
+
 @media (max-width: 640px) {
-  .pricing__plans { grid-template-columns: 1fr; }
+  .pricing__plans {
+    grid-template-columns: 1fr;
+  }
 }
+
 .plan {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   padding: clamp(1rem, 2.5vw, 1.25rem);
 }
+
 .plan__price {
   color: var(--color-primary);
   font-weight: 800;
 }
 
 /* ── Utilities ── */
-.page-bottom-safe { height: env(safe-area-inset-bottom, 20px); }
-.no-x-scroll { overflow-x: clip; }
+.page-bottom-safe {
+  height: env(safe-area-inset-bottom, 20px);
+}
+
+.no-x-scroll {
+  overflow-x: clip;
+}
 
 /* Skeleton loader used while auth hydrates in Navbar */
 .skeleton-loader {
@@ -196,9 +227,15 @@ a:hover {
   animation: skeleton-shimmer 1.5s infinite;
   display: block;
 }
+
 @keyframes skeleton-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* ── shadcn/ui component overrides ── */
@@ -207,9 +244,11 @@ a:hover {
   border-color: var(--color-border) !important;
   color: var(--color-text) !important;
 }
+
 [data-slot="select-item"] {
   color: var(--color-text) !important;
 }
+
 [data-slot="select-item"]:hover,
 [data-slot="select-item"][data-highlighted] {
   background: var(--color-card-alt) !important;

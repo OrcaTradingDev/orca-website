@@ -1,0 +1,99 @@
+/* ============================================================
+   src/features/dashboard/components/dashboard.css
+   ============================================================
+   PURPOSE
+   -------
+   Non-module global utilities that the dashboard feature needs.
+   Imported once by DashboardClient.tsx.
+
+   WHY NOT A CSS MODULE?
+   ----------------------
+   CSS Modules scope class names at build time, which breaks
+   string-interpolated Tailwind-style class names (e.g.
+   `className="db-scrollbar-thin"`). These classes are
+   intentionally global — they are namespaced with `db-` to
+   prevent collisions with the rest of the app.
+
+   WHAT BELONGS HERE
+   ------------------
+   ✅ Dashboard-specific utility classes (namespaced `db-`)
+   ✅ @keyframe animations tied to those utilities
+   ❌ Layout/spacing/color tokens  → tokens.css
+   ❌ Global resets/typography     → globals.css
+   ❌ Component-specific styles    → *.module.css
+   ============================================================ */
+
+/* ── Thin scrollbar (sidebar nav, data tables) ─────────────── */
+/* Usage: className="db-scrollbar-thin"                         */
+.db-scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #2D3748 transparent;
+}
+.db-scrollbar-thin::-webkit-scrollbar { width: 6px; }
+.db-scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.db-scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #2D3748;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+.db-scrollbar-thin::-webkit-scrollbar-thumb:hover { background-color: #3D4758; }
+
+/* ── Skeleton loading shimmer ───────────────────────────────── */
+/* Usage: className="db-skeleton"                               */
+/* Note: shadcn <Skeleton> component is preferred; use this     */
+/* only for raw div placeholders that can't use the component.  */
+@keyframes db-skeleton-loading {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+.db-skeleton {
+  background: linear-gradient(90deg, #1A1F2E 0%, #2D3748 50%, #1A1F2E 100%);
+  background-size: 200% 100%;
+  animation: db-skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* ── Premium badge shimmer ─────────────────────────────────── */
+/* Usage: className="db-badge-premium"                          */
+/* Applied to the "Premium" subscription badge in the sidebar.  */
+@keyframes db-badge-shimmer {
+  0%   { background-position: -100% 0; }
+  100% { background-position:  200% 0; }
+}
+.db-badge-premium {
+  background: linear-gradient(90deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+  background-size: 200% 100%;
+  animation: db-badge-shimmer 3s linear infinite;
+}
+
+/* ── Glow pulse keyframe ───────────────────────────────────── */
+/* Usage: apply via inline style or Tailwind animation utility. */
+/* Example: style={{ animation: 'db-pulse-glow 2s infinite' }} */
+@keyframes db-pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px  rgba(0, 212, 255, 0.5); }
+  50%       { box-shadow: 0 0 20px rgba(0, 212, 255, 0.8); }
+}
+
+/* ── Tooltip (data-tooltip attr pattern) ───────────────────── */
+/* Usage: <div className="db-tooltip" data-tooltip="Label">    */
+/* Prefer accessible <Tooltip> from shadcn where possible.     */
+.db-tooltip { position: relative; }
+.db-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 8px;
+  padding: 8px 12px;
+  background-color: #1E293B;
+  color: white;
+  border-radius: 6px;
+  font-size: 14px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  pointer-events: none;
+  z-index: 1000;
+}
+.db-tooltip:hover::after { opacity: 1; visibility: visible; }

@@ -6,7 +6,7 @@ import s from './marketing.module.css';
 
 const DISCORD_URI = process.env.NEXT_PUBLIC_DISCORD_URI ?? 'https://discord.gg/your-invite-code';
 
-const STATS   = [
+const STATS = [
   { val: '35ms', lbl: 'Avg. latency' },
   { val: '24/7', lbl: 'Live monitoring' },
   { val: 'Free', lbl: 'During beta' },
@@ -20,8 +20,8 @@ const TRUST_ITEMS = [
 
 const FEATURES = [
   { icon: Shield, color: 'var(--color-primary)', bg: 'linear-gradient(135deg,rgba(0,212,255,.13),rgba(0,212,255,.05))', border: 'rgba(0,212,255,0.18)', title: 'Transparent & Verified', desc: 'Rules-based algorithms backed by 12 months of live data. No black boxes, no hidden risks — just clear, accountable logic.' },
-  { icon: Zap,    color: 'var(--color-success)', bg: 'linear-gradient(135deg,rgba(15,186,126,.13),rgba(15,186,126,.05))', border: 'rgba(15,186,126,0.18)', title: 'Real-Time Insights',   desc: 'Multi-timeframe trend analysis in seconds. Spot opportunities across forex, crypto, stocks, and indices before the crowd.' },
-  { icon: Users,  color: '#818cf8',              bg: 'linear-gradient(135deg,rgba(129,140,248,.13),rgba(129,140,248,.05))', border: 'rgba(129,140,248,0.18)', title: 'Community-Driven', desc: 'Built alongside active traders. Join our Discord to shape features, share strategies, and get direct daily access to the team.' },
+  { icon: Zap, color: 'var(--color-success)', bg: 'linear-gradient(135deg,rgba(15,186,126,.13),rgba(15,186,126,.05))', border: 'rgba(15,186,126,0.18)', title: 'Real-Time Insights', desc: 'Multi-timeframe trend analysis in seconds. Spot opportunities across forex, crypto, stocks, and indices before the crowd.' },
+  { icon: Users, color: '#818cf8', bg: 'linear-gradient(135deg,rgba(129,140,248,.13),rgba(129,140,248,.05))', border: 'rgba(129,140,248,0.18)', title: 'Community-Driven', desc: 'Built alongside active traders. Join our Discord to shape features, share strategies, and get direct daily access to the team.' },
 ] as const;
 
 const ORCA_CHECKS = [
@@ -32,14 +32,14 @@ const ORCA_CHECKS = [
 ] as const;
 
 const TRADE_CARDS = [
-  { bg: 'rgba(15,186,126,0.12)', Icon: TrendingUp, color: 'var(--color-success)', pair: 'EURUSD · Long Entry',  sub: 'All 5 layers confirmed · Risk 1%',     badge: 'Executed', badgeCls: 'tradeBadgeGreen' },
-  { bg: 'var(--color-primary-10)',  Icon: Shield,     color: 'var(--color-primary)', pair: 'GBPJPY · Filter Active',  sub: 'Momentum layer pending',              badge: 'Waiting',  badgeCls: 'tradeBadgeCyan'  },
-  { bg: 'rgba(255,255,255,0.04)',   Icon: BarChart3,  color: 'var(--color-muted)',   pair: 'XAUUSD · Setup Skipped', sub: 'Conditions not met · Protected',      badge: 'Skipped',  badgeCls: 'tradeBadgeDim'   },
+  { bg: 'rgba(15,186,126,0.12)', Icon: TrendingUp, color: 'var(--color-success)', pair: 'EURUSD · Long Entry', sub: 'All 5 layers confirmed · Risk 1%', badge: 'Executed', badgeCls: 'tradeBadgeGreen' },
+  { bg: 'var(--color-primary-10)', Icon: Shield, color: 'var(--color-primary)', pair: 'GBPJPY · Filter Active', sub: 'Momentum layer pending', badge: 'Waiting', badgeCls: 'tradeBadgeCyan' },
+  { bg: 'rgba(255,255,255,0.04)', Icon: BarChart3, color: 'var(--color-muted)', pair: 'XAUUSD · Setup Skipped', sub: 'Conditions not met · Protected', badge: 'Skipped', badgeCls: 'tradeBadgeDim' },
 ] as const;
 
 const PRODUCTS = [
   { href: '/dashboard', icon: BarChart3, iconBg: 'var(--color-primary-10)', iconBorder: 'rgba(0,212,255,0.22)', iconColor: 'var(--color-primary)', tag: 'Live · Free', tagCls: 'productTagLive', title: 'Premium Screener', desc: 'Multi-timeframe trend analysis with intraday, daily, and advanced indicators. Spot opportunities across forex, crypto, stocks, and indices.', linkLabel: 'Try now (Free)', dim: false },
-  { href: '/orcabot',   icon: Bot,       iconBg: 'var(--color-primary-10)', iconBorder: 'rgba(0,212,255,0.20)', iconColor: 'var(--color-primary)', tag: 'Early Access', tagCls: 'productTagEarly', title: 'OrcaBot 2.0',       desc: 'Hybrid automated trading. You set the direction. The system handles execution, risk, and trade management. One decision per day.', linkLabel: 'Learn more', dim: false },
+  { href: '/orcabot', icon: Bot, iconBg: 'var(--color-primary-10)', iconBorder: 'rgba(0,212,255,0.20)', iconColor: 'var(--color-primary)', tag: 'Early Access', tagCls: 'productTagEarly', title: 'OrcaBot 2.0', desc: 'Hybrid automated trading. You set the direction. The system handles execution, risk, and trade management. One decision per day.', linkLabel: 'Learn more', dim: false },
   { href: '#', icon: Star, iconBg: 'rgba(129,140,248,0.1)', iconBorder: 'rgba(129,140,248,0.15)', iconColor: '#818cf8', tag: 'Coming Soon', tagCls: 'productTagSoon', title: 'OrcaJournal', desc: 'Track performance metrics, analyze expectancy, and get AI-powered insights for continuous improvement in your trading.', linkLabel: 'In development', dim: true },
 ] as const;
 
@@ -50,15 +50,15 @@ const BETA_FEATURES = [
 ] as const;
 
 const PLANS = [
-  { name: 'Starter',       price: 'Free',  priceSub: 'forever',  pop: false, feats: ['Daily regime overview', 'Basic trend indicators', 'Email support'] },
-  { name: 'Premium',       price: '€8.99', priceSub: '/ mo',     pop: true,  feats: ['Everything in Free', 'Advanced alerts & filters', 'API access', 'Priority support'] },
-  { name: 'Institutional', price: 'Custom', priceSub: '',         pop: false, feats: ['White-label solutions', 'Dedicated infrastructure', 'SLA guarantees', 'Onboarding & training'] },
+  { name: 'Starter', price: 'Free', priceSub: 'forever', pop: false, feats: ['Daily regime overview', 'Basic trend indicators', 'Email support'] },
+  { name: 'Premium', price: '€8.99', priceSub: '/ mo', pop: true, feats: ['Everything in Free', 'Advanced alerts & filters', 'API access', 'Priority support'] },
+  { name: 'Institutional', price: 'Custom', priceSub: '', pop: false, feats: ['White-label solutions', 'Dedicated infrastructure', 'SLA guarantees', 'Onboarding & training'] },
 ] as const;
 
 const DISCORD_STATS = [
-  { val: '24/7',   lbl: 'Community Support' },
+  { val: '24/7', lbl: 'Community Support' },
   { val: 'Active', lbl: 'Daily Updates' },
-  { val: 'Free',   lbl: 'Always & Forever' },
+  { val: 'Free', lbl: 'Always & Forever' },
 ] as const;
 
 // ─────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ export function OrcaBotFeatureSection() {
         <div className={s.orca}>
           <div className={s.orcaLeft}>
             <div className={s.orcaBadge}>
-              <span style={{ width:6,height:6,borderRadius:'50%',background:'var(--color-primary)',display:'inline-block',boxShadow:'0 0 6px var(--color-primary)' }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--color-primary)', display: 'inline-block', boxShadow: '0 0 6px var(--color-primary)' }} />
               Early Access · Limited Spots
             </div>
             <h2 className={s.orcaTitle}>OrcaBot 2.0<br /><em>One Decision.<br />Precision Execution.</em></h2>
