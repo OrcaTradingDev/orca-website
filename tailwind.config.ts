@@ -4,6 +4,7 @@ import type { Config } from "tailwindcss";
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx,jsx,js}",
+    "./src/**/*.{ts,tsx,jsx,js}",
     "./components/**/*.{ts,tsx,jsx,js}",
     "./pages/**/*.{ts,tsx,jsx,js}",
   ],

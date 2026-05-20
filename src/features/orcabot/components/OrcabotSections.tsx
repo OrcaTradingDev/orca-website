@@ -37,11 +37,11 @@ const RECEIVE_ITEMS = [
 ];
 
 const PHASES = [
-  { phase: 'Phase 1 — Early Access', price: '€500',   current: true  },
-  { phase: 'Phase 2 — Validated',    price: '€1,000', current: false },
-  { phase: 'Phase 3 — Expansion',    price: '€1,500', current: false },
-  { phase: 'Phase 4 — Established',  price: '€2,500', current: false },
-  { phase: 'Phase 5 — Exclusive',    price: '€3,500', current: false },
+  { phase: 'Phase 1 — Early Access', price: '€500', current: true },
+  { phase: 'Phase 2 — Validated', price: '€1,000', current: false },
+  { phase: 'Phase 3 — Expansion', price: '€1,500', current: false },
+  { phase: 'Phase 4 — Established', price: '€2,500', current: false },
+  { phase: 'Phase 5 — Exclusive', price: '€3,500', current: false },
 ];
 
 const FAQS = [
@@ -194,13 +194,13 @@ export function DifferencesSection() {
         <div className={s.compare}>
           <div className={`${s.compareCol} ${s.compareColBad}`}>
             <h3><X size={16} /> Traditional Bots</h3>
-            {['No market context awareness','Over-trade in bad conditions','Break down during volatility','Require constant monitoring'].map(t => (
+            {['No market context awareness', 'Over-trade in bad conditions', 'Break down during volatility', 'Require constant monitoring'].map(t => (
               <div key={t} className={s.compareItem}><X size={15} color="var(--ob-red)" />{t}</div>
             ))}
           </div>
           <div className={`${s.compareCol} ${s.compareColGood}`}>
             <h3><Check size={16} /> OrcaBot 2.0</h3>
-            {['Human context + system execution','Filters out low-quality setups','Waits for full alignment','Set it and walk away'].map(t => (
+            {['Human context + system execution', 'Filters out low-quality setups', 'Waits for full alignment', 'Set it and walk away'].map(t => (
               <div key={t} className={s.compareItem}><Check size={15} color="var(--ob-green)" />{t}</div>
             ))}
           </div>
@@ -258,7 +258,7 @@ export function TestimonialSection() {
             My role is quite simple: I determine the daily bias,
             and the bot takes care of executing the trades.{' '}
             <strong>An ideal way to participate in the markets
-            without needing to be behind my screen all day.</strong>
+              without needing to be behind my screen all day.</strong>
           </p>
         </div>
         <div className={s.testiBadge}>
@@ -281,7 +281,7 @@ export function TestimonialSection() {
           </div>
           <div className={s.testiReview}>
             <div className={s.testiReviewStars}>
-              {[1,2,3,4,5].map(i => <Star key={i} size={16} fill="var(--ob-gold)" strokeWidth={0} />)}
+              {[1, 2, 3, 4, 5].map(i => <Star key={i} size={16} fill="var(--ob-gold)" strokeWidth={0} />)}
             </div>
             <p className={s.testiPara}>
               On March 26th, I was contacted by Bennie through social media after he saw a video
@@ -495,13 +495,13 @@ export function ExpectationsSection() {
         <div className={s.expectGrid}>
           <div className={`${s.expectCol} ${s.expectColYes}`}>
             <h4>✓ What You Can Expect</h4>
-            {['A structured, repeatable process','Consistent behavior on every trade','Safety filters that protect you when wrong','A process that takes minutes per day','Continuous support and improvements'].map(t => (
+            {['A structured, repeatable process', 'Consistent behavior on every trade', 'Safety filters that protect you when wrong', 'A process that takes minutes per day', 'Continuous support and improvements'].map(t => (
               <div key={t} className={s.expectItem}><Check size={15} color="var(--ob-green)" /> {t}</div>
             ))}
           </div>
           <div className={`${s.expectCol} ${s.expectColNo}`}>
             <h4>✗ What You Should NOT Expect</h4>
-            {['Guaranteed profits or risk-free trading','Winning every trade or every day','A system requiring zero input from you','Immediate or overnight results','A shortcut to replace discipline'].map(t => (
+            {['Guaranteed profits or risk-free trading', 'Winning every trade or every day', 'A system requiring zero input from you', 'Immediate or overnight results', 'A shortcut to replace discipline'].map(t => (
               <div key={t} className={s.expectItem}><X size={15} color="var(--ob-red)" /> {t}</div>
             ))}
           </div>
@@ -523,13 +523,13 @@ export function WhoItIsForSection() {
         <div className={s.forGrid}>
           <div className={`${s.forCol} ${s.forColYes}`}>
             <h3>This is for you if…</h3>
-            {['You want a structured approach to trading','You understand direction but struggle with execution',"You're willing to follow a clear process",'You prefer clarity over complexity','You want to reduce emotional decisions','You can make one simple daily decision'].map(t => (
+            {['You want a structured approach to trading', 'You understand direction but struggle with execution', "You're willing to follow a clear process", 'You prefer clarity over complexity', 'You want to reduce emotional decisions', 'You can make one simple daily decision'].map(t => (
               <div key={t} className={s.forItem}><Check size={15} color="var(--ob-green)" /> {t}</div>
             ))}
           </div>
           <div className={`${s.forCol} ${s.forColNo}`}>
             <h3>This is NOT for you if…</h3>
-            {['You expect guaranteed profits','You want zero input or responsibility',"You won't follow rules or a process",'You override systems on impulse','You expect constant trades or instant results',"You're searching for shortcuts"].map(t => (
+            {['You expect guaranteed profits', 'You want zero input or responsibility', "You won't follow rules or a process", 'You override systems on impulse', 'You expect constant trades or instant results', "You're searching for shortcuts"].map(t => (
               <div key={t} className={s.forItem}><X size={15} color="var(--ob-red)" /> {t}</div>
             ))}
           </div>
