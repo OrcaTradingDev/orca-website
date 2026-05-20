@@ -1,7 +1,9 @@
 "use client";
 
-// dashboard.module.css — colocated feature styles (db- namespaced utilities + keyframes)
-import styles from "./dashboard.module.css";
+// Pre-compiled Tailwind v4 output — provides all utility classes for dashboard components.
+// Plain CSS (not a module) because Tailwind utilities must remain unhashed/global.
+import "../styles/dashboard.css";
+
 import { useState } from "react";
 import Sidebar from "@/features/dashboard/components/Sidebar";
 import PremiumScreenerSection from "@/features/dashboard/components/PremiumScreenerSection";
