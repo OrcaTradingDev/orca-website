@@ -1,0 +1,28 @@
+/* ============================================================
+   src/features/dashboard/styles/dashboard-tw.css
+   ============================================================
+   PURPOSE
+   -------
+   Enables Tailwind v4 utility classes for the dashboard feature.
+
+   HOW IT WORKS
+   ------------
+   @tailwindcss/postcss processes this @import directive and
+   generates all Tailwind utilities. Tailwind v4 auto-detects
+   source files — no content array config needed.
+
+   WHY NOT A CSS MODULE?
+   ----------------------
+   This MUST be a plain CSS file (not .module.css).
+   CSS Modules hash class names at build time, which would
+   break Tailwind utility strings like className="p-4 text-white".
+   Import it as a side-effect: import "./dashboard-tw.css"
+
+   SCOPE
+   -----
+   Loaded only for the /dashboard route via DashboardClient.tsx.
+   The rest of the app (marketing, orcabot, login) uses custom
+   CSS modules + tokens.css and does not depend on Tailwind.
+   ============================================================ */
+
+@import "tailwindcss";
