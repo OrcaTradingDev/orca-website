@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "@/styles/globals.css";
 import "@/styles/tokens.css";
 import { Navbar } from "@/components/shared/Navbar";
@@ -18,6 +19,15 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-ZJR508TE6C" strategy="afterInteractive" />
+        <Script id="gtag-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-ZJR508TE6C');
+        `}</Script>
+      </head>
       <body>
         <Providers>
           <Navbar />
