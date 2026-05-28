@@ -118,4 +118,20 @@
   --input:                  var(--color-border);
   --ring:                   var(--color-primary-20);
   --radius:                 var(--radius-md);
+
+  /* ── Portal: Risk categories ── */
+  --color-safe:             #10b981;               /* alias of --color-success */
+  --color-safe-20:          rgba(16, 185, 129, 0.20);
+  --color-safe-15:          rgba(16, 185, 129, 0.15);
+  --color-safe-10:          rgba(16, 185, 129, 0.10);
+  --color-safe-border:      rgba(16, 185, 129, 0.30);
+  --color-aggressive:       #f59e0b;               /* alias of --color-warning */
+  --color-aggressive-20:    rgba(245, 158, 11, 0.20);
+  --color-aggressive-15:    rgba(245, 158, 11, 0.15);
+  --color-aggressive-10:    rgba(245, 158, 11, 0.10);
+  --color-aggressive-border: rgba(245, 158, 11, 0.30);
+
+  /* ── Portal: Layout ── */
+  --portal-header-height:   116px;
+  --portal-tab-height:      48px;
 }

@@ -148,6 +148,7 @@ export function Navbar() {
                     <div className="navbar__mobile-user-email">{user.email ?? ''}</div>
                   </div>
                 </div>
+                <a href="/portal"   className="navbar__mobile-link" onClick={handleLinkClick}>OrcaBot Portal</a>
                 <a href="/profile"  className="navbar__mobile-link" onClick={handleLinkClick}>Profile</a>
                 <a href="/settings" className="navbar__mobile-link" onClick={handleLinkClick}>Settings</a>
                 <a href="/billing"  className="navbar__mobile-link" onClick={handleLinkClick}>Billing</a>
@@ -209,6 +210,7 @@ function UserMenu({
             </div>
             <div className="user-menu__divider" />
             <a href="/dashboard" className="user-menu__item">Dashboard</a>
+            <a href="/portal"    className="user-menu__item">OrcaBot Portal</a>
             <a href="/profile"   className="user-menu__item">Profile</a>
             <a href="/settings"  className="user-menu__item">Settings</a>
             <a href="/billing"   className="user-menu__item">Billing</a>
