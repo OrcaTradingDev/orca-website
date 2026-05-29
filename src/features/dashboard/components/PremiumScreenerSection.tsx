@@ -78,6 +78,8 @@ export default function PremiumScreenerSection() {
       if (s === "US500" || s === "US100" || s === "US30") return "Indices";
       if (s.includes("BTC") || s.includes("ETH") || s.includes("USDT"))
         return "Crypto";
+      // 6-char all-alpha symbols are FX pairs (e.g. EURUSD, EURJPY, GBPJPY)
+      if (/^[A-Z]{6}$/.test(s)) return "Forex";
       return "Stocks";
     };
 
