@@ -591,7 +591,7 @@ export default function PremiumScreenerSection() {
 
       {/* Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-3xl">
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl">
               {selectedAsset?.symbol} - {selectedAsset?.name}
@@ -602,9 +602,9 @@ export default function PremiumScreenerSection() {
           </DialogHeader>
 
           {selectedAsset && (
-            <div className="space-y-6 py-4">
+            <div className="space-y-4 py-2">
               {/* TradingView Chart */}
-              <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 280 }}>
+              <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 220 }}>
                 <iframe
                   key={selectedAsset.symbol}
                   src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(selectedAsset.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
