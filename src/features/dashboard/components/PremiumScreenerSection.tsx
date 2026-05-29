@@ -219,6 +219,25 @@ export default function PremiumScreenerSection() {
     window.URL.revokeObjectURL(url);
   }, [filteredAssets]);
 
+  // Map internal symbol → TradingView symbol format
+  const getTVSymbol = (symbol: string): string => {
+    if (symbol === "XAUUSD") return "TVC:GOLD";
+    if (symbol === "XAGUSD") return "TVC:SILVER";
+    if (symbol === "WTI")    return "TVC:USOIL";
+    if (symbol === "US500")  return "SP:SPX";
+    if (symbol === "US100")  return "NASDAQ:NDX";
+    if (symbol === "US30")   return "DJ:DJI";
+    // Crypto like BTC/USD, ETH/USD, SOL/USD
+    if (symbol.includes("/")) {
+      const base = symbol.split("/")[0];
+      return `CRYPTO:${base}USD`;
+    }
+    // 6-char FX pairs like EURUSD
+    if (/^[A-Z]{6}$/.test(symbol)) return `FX:${symbol}`;
+    // Stocks — default (exchange prefix not needed for major US stocks)
+    return symbol;
+  };
+
   // Stacked Bar Component with Original Gradients
   const StackedBar = ({ bear, bull }: { bear: number; bull: number }) => (
     <div className="relative w-full h-9 bg-[#1A1F2E] rounded-md overflow-hidden flex">
@@ -584,15 +603,15 @@ export default function PremiumScreenerSection() {
 
           {selectedAsset && (
             <div className="space-y-6 py-4">
-              {/* Chart Placeholder */}
-              <div className="bg-[#0A1628] rounded-lg p-6 h-64 flex items-center justify-center border border-[#1E293B]">
-                <div className="text-center text-[#94A3B8]">
-                  <TrendingUp className="w-12 h-12 mx-auto mb-2 text-[#00D4FF]" />
-                  <p>Interactive chart would appear here</p>
-                  <p className="text-sm mt-1">
-                    Showing price action and indicators
-                  </p>
-                </div>
+              {/* TradingView Chart */}
+              <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 280 }}>
+                <iframe
+                  key={selectedAsset.symbol}
+                  src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(selectedAsset.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
+                  style={{ width: "100%", height: "100%", border: "none" }}
+                  allowFullScreen
+                  title={`${selectedAsset.symbol} chart`}
+                />
               </div>
 
               {/* Analysis Grid */}

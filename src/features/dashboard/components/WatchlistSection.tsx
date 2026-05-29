@@ -13,19 +13,19 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 export default function WatchlistSection() {
   const watchlistItems = [
     {
-      ticker: "AAPL",
-      name: "Apple Inc.",
-      price: "$175.23",
-      change: 2.34,
-      changeValue: "$4.01",
+      ticker: "EUR/USD",
+      name: "Euro / US Dollar",
+      price: "1.0842",
+      change: 0.18,
+      changeValue: "+0.0019",
       sparklineData: [
-        { value: 170 },
-        { value: 171 },
-        { value: 169 },
-        { value: 172 },
-        { value: 174 },
-        { value: 173 },
-        { value: 175.23 },
+        { value: 1.0820 },
+        { value: 1.0825 },
+        { value: 1.0818 },
+        { value: 1.0830 },
+        { value: 1.0835 },
+        { value: 1.0838 },
+        { value: 1.0842 },
       ],
     },
     {

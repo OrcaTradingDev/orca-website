@@ -11,7 +11,7 @@ export default function SavedAlertsSection() {
     },
     {
       id: 2,
-      condition: "AAPL volume spike > 20%",
+      condition: "EUR/USD breaks above 1.0900",
       status: "active",
     },
     {

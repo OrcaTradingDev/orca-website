@@ -3,8 +3,9 @@
 # Canonical launch timeframes
 LAUNCH_TIMEFRAMES = ["5m", "30m", "1h", "4h", "1d"]
 
-# --- FX Majors (Twelve Data FX format handled later) ---
+# --- FX Majors + popular crosses ---
 FX_MAJORS = [
+    # Majors
     "EURUSD",
     "GBPUSD",
     "USDJPY",
@@ -12,11 +13,16 @@ FX_MAJORS = [
     "USDCAD",
     "AUDUSD",
     "NZDUSD",
+    # Crosses (added)
+    "EURJPY",
+    "GBPJPY",
+    "EURGBP",
+    "AUDJPY",
 ]
 
 # --- Stocks (daily only for launch) ---
 MAJOR_STOCKS_DAILY = [
-    "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA", "TSLA",
+    "AMZN", "GOOGL", "META", "TSLA",
     "JPM", "BAC", "XOM", "CVX", "WMT", "UNH", "JNJ", "V",
 ]
 
@@ -30,6 +36,6 @@ COMMODITIES_DAILY = [
 # --- Indices (optional / stretch) ---
 INDICES_DAILY = [
     "US500",
-    "US100",
+    "US30",
 ]
 
