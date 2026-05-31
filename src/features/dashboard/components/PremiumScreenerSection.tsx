@@ -226,9 +226,9 @@ export default function PremiumScreenerSection() {
     if (symbol === "XAUUSD") return "TVC:GOLD";
     if (symbol === "XAGUSD") return "TVC:SILVER";
     if (symbol === "WTI")    return "TVC:USOIL";
-    if (symbol === "US500")  return "SP:SPX";
-    if (symbol === "US100")  return "NASDAQ:NDX";
-    if (symbol === "US30")   return "DJ:DJI";
+    if (symbol === "US500")  return "FOREXCOM:SPXUSD";
+    if (symbol === "US100")  return "FOREXCOM:NASUSD";
+    if (symbol === "US30")   return "FOREXCOM:DJUSD";
     // Crypto like BTC/USD, ETH/USD, SOL/USD
     if (symbol.includes("/")) {
       const base = symbol.split("/")[0];
