@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   Star, Bell, SlidersHorizontal, TrendingUp, Grid, Bot,
-  User, Crown, BarChart3, Menu,
+  User, Crown, BarChart3, Menu, ShieldCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,6 +32,7 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
   const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.isAdmin ?? false;
 
   useEffect(() => {
     onCollapsedChange?.(isCollapsed);
@@ -126,6 +127,20 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
 
       {/* ── NAVIGATION ── */}
       <nav className={styles["sidebar-nav"]}>
+        {isAdmin && (
+          <button
+            onClick={() => onSectionChange("admin")}
+            data-active={activeSection === "admin"}
+            className={`${styles["sidebar-nav-btn"]}${activeSection === "admin" ? " " + styles["sidebar-nav-btn--active"] : ""}`}
+            style={{ justifyContent: isCollapsed ? "center" : "flex-start" }}
+            title={isCollapsed ? "User Management" : undefined}
+          >
+            <ShieldCheck style={{ width: "20px", height: "20px", flexShrink: 0, color: "#00D4FF" }} />
+            {!isCollapsed && (
+              <span className={styles["sidebar-nav-btn__label"]}>User Management</span>
+            )}
+          </button>
+        )}
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;

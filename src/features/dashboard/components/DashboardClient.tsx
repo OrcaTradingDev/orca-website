@@ -15,6 +15,7 @@ import ToolsSection from "@/features/dashboard/components/ToolsSection";
 import BotSection from "@/features/dashboard/components/BotSection";
 import AccountSection from "@/features/dashboard/components/AccountSection";
 import SubscriptionSection from "@/features/dashboard/components/SubscriptionSection";
+import AdminSection from "@/features/dashboard/components/AdminSection";
 import { useAuthStore } from "@/store/auth-store";
 
 function ScreenerAccessGate() {
@@ -51,8 +52,12 @@ export default function DashboardClient() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const user = useAuthStore((s) => s.user);
   const hasScreenerAccess = user?.screenerAccess ?? false;
+  const isAdmin = user?.isAdmin ?? false;
 
   const renderSection = () => {
+    if (activeSection === "admin") {
+      return isAdmin ? <AdminSection /> : null;
+    }
     if (activeSection === "screener") {
       return hasScreenerAccess ? <PremiumScreenerSection /> : <ScreenerAccessGate />;
     }

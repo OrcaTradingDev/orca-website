@@ -8,7 +8,6 @@ import jwt
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +22,10 @@ GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "")
 APP_JWT_SECRET = os.getenv("APP_JWT_SECRET", "")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
+# Comma-separated list of admin emails, e.g. "founder@example.com,dev@example.com"
+_raw_admin_emails = os.getenv("ADMIN_EMAILS", "J.benjelloun2000@gmail.com")
+ADMIN_EMAILS: set[str] = {e.strip().lower() for e in _raw_admin_emails.split(",") if e.strip()}
+
 oauth = OAuth()
 oauth.register(
     name="google",
@@ -33,7 +36,10 @@ oauth.register(
 )
 
 
-def _issue_app_jwt(*, sub: str, email: str, name: str, picture: Optional[str], screener_access: bool) -> str:
+def _issue_app_jwt(
+    *, sub: str, email: str, name: str, picture: Optional[str],
+    screener_access: bool, is_admin: bool
+) -> str:
     now = int(time.time())
     payload = {
         "iss": "orcatrading",
@@ -41,7 +47,8 @@ def _issue_app_jwt(*, sub: str, email: str, name: str, picture: Optional[str], s
         "email": email,
         "name": name,
         "picture": picture,
-        "screener_access": screener_access,
+        "screener_access": screener_access or is_admin,  # admins always have screener access
+        "is_admin": is_admin,
         "iat": now,
         "exp": now + 60 * 60 * 24 * 7,  # 7 days
     }
@@ -59,9 +66,6 @@ async def google_login(request: Request):
 async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     try:
         token = await oauth.google.authorize_access_token(request)
-
-        # Bulletproof: don't rely on id_token being present.
-        # Use Google's UserInfo endpoint to get the profile.
         user_info = await oauth.google.userinfo(token=token)
 
     except OAuthError as e:
@@ -87,8 +91,10 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     if not APP_JWT_SECRET:
         return JSONResponse({"error": "missing APP_JWT_SECRET"}, status_code=500)
 
+    is_admin = email.lower() in ADMIN_EMAILS
+
     # Upsert user — create on first login, update name/picture on subsequent logins.
-    # screener_access is never overwritten here; it's set manually by the founder.
+    # screener_access is never overwritten here; it's toggled via the admin panel.
     stmt = (
         insert(User)
         .values(google_sub=sub, email=email, name=name, picture=picture)
@@ -104,6 +110,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     screener_access: bool = bool(row[0]) if row else False
 
     app_token = _issue_app_jwt(
-        sub=sub, email=email, name=name, picture=picture, screener_access=screener_access
+        sub=sub, email=email, name=name, picture=picture,
+        screener_access=screener_access, is_admin=is_admin,
     )
     return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback#token={app_token}")
