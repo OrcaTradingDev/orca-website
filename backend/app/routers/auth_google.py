@@ -6,8 +6,14 @@ from typing import Optional
 
 import jwt
 from authlib.integrations.starlette_client import OAuth, OAuthError
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.db import get_db
+from app.models.user import User
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
 
@@ -27,7 +33,7 @@ oauth.register(
 )
 
 
-def _issue_app_jwt(*, sub: str, email: str, name: str, picture: Optional[str]) -> str:
+def _issue_app_jwt(*, sub: str, email: str, name: str, picture: Optional[str], screener_access: bool) -> str:
     now = int(time.time())
     payload = {
         "iss": "orcatrading",
@@ -35,6 +41,7 @@ def _issue_app_jwt(*, sub: str, email: str, name: str, picture: Optional[str]) -
         "email": email,
         "name": name,
         "picture": picture,
+        "screener_access": screener_access,
         "iat": now,
         "exp": now + 60 * 60 * 24 * 7,  # 7 days
     }
@@ -49,18 +56,17 @@ async def google_login(request: Request):
 
 
 @router.get("/callback")
-async def google_callback(request: Request):
+async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     try:
         token = await oauth.google.authorize_access_token(request)
 
         # Bulletproof: don't rely on id_token being present.
         # Use Google's UserInfo endpoint to get the profile.
-        user = await oauth.google.userinfo(token=token)
+        user_info = await oauth.google.userinfo(token=token)
 
     except OAuthError as e:
         return JSONResponse({"error": "oauth_error", "detail": str(e)}, status_code=400)
     except Exception as e:
-        # Show the true issue in-browser
         safe_token_keys = []
         try:
             safe_token_keys = list(getattr(token, "keys", lambda: [])())
@@ -71,15 +77,33 @@ async def google_callback(request: Request):
             status_code=500,
         )
 
-    sub = user.get("sub")
-    email = user.get("email")
-    name = user.get("name") or ""
-    picture = user.get("picture")
+    sub = user_info.get("sub")
+    email = user_info.get("email")
+    name = user_info.get("name") or ""
+    picture = user_info.get("picture")
 
     if not sub or not email:
-        return JSONResponse({"error": "missing_claims", "user": dict(user)}, status_code=400)
+        return JSONResponse({"error": "missing_claims", "user": dict(user_info)}, status_code=400)
     if not APP_JWT_SECRET:
         return JSONResponse({"error": "missing APP_JWT_SECRET"}, status_code=500)
 
-    app_token = _issue_app_jwt(sub=sub, email=email, name=name, picture=picture)
+    # Upsert user — create on first login, update name/picture on subsequent logins.
+    # screener_access is never overwritten here; it's set manually by the founder.
+    stmt = (
+        insert(User)
+        .values(google_sub=sub, email=email, name=name, picture=picture)
+        .on_conflict_do_update(
+            index_elements=["google_sub"],
+            set_={"name": name, "picture": picture, "email": email},
+        )
+        .returning(User.screener_access)
+    )
+    result = await db.execute(stmt)
+    await db.commit()
+    row = result.fetchone()
+    screener_access: bool = bool(row[0]) if row else False
+
+    app_token = _issue_app_jwt(
+        sub=sub, email=email, name=name, picture=picture, screener_access=screener_access
+    )
     return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback#token={app_token}")

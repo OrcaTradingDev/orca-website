@@ -8,6 +8,7 @@ interface JWTPayload {
   email: string;
   name: string;
   picture: string | null;
+  screener_access: boolean;
   iat: number;
   exp: number;
 }
@@ -19,6 +20,7 @@ interface AuthState {
     email: string | null;
     name: string | null;
     picture: string | null;
+    screenerAccess: boolean;
   } | null;
   isHydrated: boolean;
   setAuth: (token: string) => void;
@@ -43,6 +45,7 @@ export const useAuthStore = create<AuthState>()(
               email: decoded.email,
               name: decoded.name,
               picture: decoded.picture,
+              screenerAccess: decoded.screener_access ?? false,
             },
           });
         } catch (error) {
@@ -52,7 +55,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => set({ token: null, user: null }),
-      
+
       setHasHydrated: (state: boolean) => set({ isHydrated: state }),
     }),
     {

@@ -15,9 +15,27 @@ import ToolsSection from "@/features/dashboard/components/ToolsSection";
 import BotSection from "@/features/dashboard/components/BotSection";
 import AccountSection from "@/features/dashboard/components/AccountSection";
 import SubscriptionSection from "@/features/dashboard/components/SubscriptionSection";
+import { useAuthStore } from "@/store/auth-store";
+
+function ScreenerAccessGate() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+      <div className="text-5xl mb-6">🔒</div>
+      <h2 className="text-2xl font-bold text-white mb-3">Screener Access Required</h2>
+      <p className="text-[#94A3B8] max-w-md mb-8 leading-relaxed">
+        The OrcaTrading Flowscreener is available to approved users. Reach out to get access.
+      </p>
+      <a
+        href="mailto:support@tradewithorca.com"
+        className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#00D4FF] text-black font-semibold hover:bg-[#00B8E6] transition-colors"
+      >
+        Request Access
+      </a>
+    </div>
+  );
+}
 
 const SECTIONS: Record<string, React.ReactNode> = {
-  screener: <PremiumScreenerSection />,
   watchlist: <WatchlistSection />,
   alerts: <SavedAlertsSection />,
   filters: <FiltersSettingsSection />,
@@ -31,6 +49,15 @@ const SECTIONS: Record<string, React.ReactNode> = {
 export default function DashboardClient() {
   const [activeSection, setActiveSection] = useState("screener");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const user = useAuthStore((s) => s.user);
+  const hasScreenerAccess = user?.screenerAccess ?? false;
+
+  const renderSection = () => {
+    if (activeSection === "screener") {
+      return hasScreenerAccess ? <PremiumScreenerSection /> : <ScreenerAccessGate />;
+    }
+    return SECTIONS[activeSection] ?? <ScreenerAccessGate />;
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white pt-[64px]">
@@ -45,7 +72,7 @@ export default function DashboardClient() {
         style={{ marginLeft: isSidebarCollapsed ? "64px" : "260px" }}
       >
         <div className="max-w-[1400px]">
-          {SECTIONS[activeSection] ?? <PremiumScreenerSection />}
+          {renderSection()}
         </div>
       </main>
     </div>
