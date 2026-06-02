@@ -59,7 +59,7 @@ export default function DashboardClient() {
       return isAdmin ? <AdminSection /> : null;
     }
     if (activeSection === "screener") {
-      return hasScreenerAccess ? <PremiumScreenerSection /> : <ScreenerAccessGate />;
+      return <PremiumScreenerSection />;
     }
     return SECTIONS[activeSection] ?? <ScreenerAccessGate />;
   };

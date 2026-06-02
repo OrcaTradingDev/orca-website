@@ -62,7 +62,6 @@ async def get_screener_rows(
     page_size: int = Query(50, ge=1, le=500, alias="pageSize"),
     search: Optional[str] = Query(None, description="Optional search by symbol or name"),
     db: AsyncSession = Depends(get_db),
-    _user: dict = Depends(require_screener_access),
 ) -> ScreenerPage:
     """
     Return paginated screener rows backed by FXUniverse + market_trend_aggregates_latest + market_indicators_latest.
