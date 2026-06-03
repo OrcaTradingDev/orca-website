@@ -11,7 +11,7 @@ interface UserRow {
   created_at: string | null;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 export default function AdminSection() {
   const token = useAuthStore((s) => s.token);
