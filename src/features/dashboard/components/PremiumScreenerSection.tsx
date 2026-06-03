@@ -650,16 +650,22 @@ export default function PremiumScreenerSection() {
 
       {/* ── Detail Modal ─────────────────────────────────────────────────────── */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-xl">
-              {selectedRow?.symbol} – {selectedRow?.name}
-            </DialogTitle>
-            <DialogDescription className="text-[#94A3B8] text-sm">
-              Full multi-timeframe breakdown &amp; OrcaBot signals
-            </DialogDescription>
-          </DialogHeader>
+        {/* overflow-hidden keeps the X button pinned; the inner div scrolls */}
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-3xl max-h-[90vh] flex flex-col overflow-hidden p-0 gap-0">
+          {/* Sticky header — X button lives here, never scrolls away */}
+          <div className="px-6 pt-6 pb-4 border-b border-[#1E293B] shrink-0 pr-14">
+            <DialogHeader>
+              <DialogTitle className="text-xl">
+                {selectedRow?.symbol} – {selectedRow?.name}
+              </DialogTitle>
+              <DialogDescription className="text-[#94A3B8] text-sm">
+                Full multi-timeframe breakdown &amp; OrcaBot signals
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
+          {/* Scrollable body */}
+          <div className="overflow-y-auto flex-1 px-6 py-4">
           {detailLoading || !detail ? (
             <div className="space-y-3 py-4">
               {[...Array(5)].map((_, i) => (
@@ -667,7 +673,7 @@ export default function PremiumScreenerSection() {
               ))}
             </div>
           ) : (
-            <div className="space-y-4 py-2">
+            <div className="space-y-4">
               {/* ── OrcaBot Status Banner ─────────────────────────────────── */}
               <div
                 className={`flex items-center justify-between rounded-xl px-5 py-3 ${
@@ -733,14 +739,14 @@ export default function PremiumScreenerSection() {
 
               {/* ── TradingView Chart ─────────────────────────────────────── */}
               <div
-                className="rounded-lg overflow-hidden border border-[#1E293B]"
-                style={{ height: 200 }}
+                className="rounded-lg overflow-hidden border border-[#1E293B] w-full"
+                style={{ height: 280 }}
               >
                 <iframe
                   key={detail.symbol}
                   src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
                     getTVSymbol(detail.symbol)
-                  )}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
+                  )}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=0&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
                   style={{ width: "100%", height: "100%", border: "none" }}
                   allowFullScreen
                   title={`${detail.symbol} chart`}
@@ -854,7 +860,7 @@ export default function PremiumScreenerSection() {
               </div>
 
               {/* ── Action Buttons ────────────────────────────────────────── */}
-              <div className="flex gap-3">
+              <div className="flex gap-3 pb-2">
                 <Button
                   className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
                   onClick={() => toggleAlert(detail.symbol)}
@@ -877,6 +883,7 @@ export default function PremiumScreenerSection() {
               </div>
             </div>
           )}
+          </div>{/* end scrollable body */}
         </DialogContent>
       </Dialog>
     </div>
