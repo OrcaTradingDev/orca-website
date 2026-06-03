@@ -655,7 +655,7 @@ export default function PremiumScreenerSection() {
           flex-col so header is pinned, body fills remaining height.
           overflow-hidden on root keeps X button always visible.
         */}
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-5xl w-[95vw] h-[85vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-[1200px] w-[95vw] h-[74vh] flex flex-col overflow-hidden p-0 gap-0">
 
           {/* ── Pinned header (X button lives here) ── */}
           <div className="px-6 pt-5 pb-4 border-b border-[#1E293B] shrink-0 pr-14">
@@ -682,7 +682,7 @@ export default function PremiumScreenerSection() {
             <div className="flex flex-1 min-h-0 overflow-hidden">
 
               {/* LEFT — TradingView chart, no scroll, fills full height */}
-              <div className="w-[55%] shrink-0 border-r border-[#1E293B] overflow-hidden">
+              <div className="w-[50%] shrink-0 border-r border-[#1E293B] overflow-hidden">
                 <iframe
                   key={detail.symbol}
                   src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
@@ -771,55 +771,48 @@ export default function PremiumScreenerSection() {
                   </div>
                 </div>
 
-                {/* Metrics 2×2 */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">ADX Strength</div>
-                    <div className="text-2xl text-white font-bold">{detail.advanced.adx}</div>
-                    <div className={`text-xs mt-0.5 ${detail.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}`}>
-                      {detail.advanced.adx >= 35
-                        ? "Very Strong"
-                        : detail.advanced.adx >= 25
-                        ? "Strong Trend"
-                        : detail.advanced.adx >= 20
-                        ? "Developing"
-                        : "Weak / Ranging"}
+                {/* Metrics — single card, one row per metric, no wrapping */}
+                <div className="bg-[#0A1628] rounded-lg border border-[#1E293B] divide-y divide-[#1E293B]">
+                  {/* ADX Strength */}
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <span className="text-[#94A3B8] text-xs shrink-0">ADX Strength</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white font-bold">{detail.advanced.adx}</span>
+                      <span className={`text-xs ${detail.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}`}>
+                        {detail.advanced.adx >= 35 ? "Very Strong" : detail.advanced.adx >= 25 ? "Strong" : detail.advanced.adx >= 20 ? "Developing" : "Weak"}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">EMA Alignment</div>
-                    <div className={`text-xl font-bold ${detail.advanced.ema === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                  {/* EMA Alignment */}
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <span className="text-[#94A3B8] text-xs shrink-0">EMA 9 / 21 / 50</span>
+                    <span className={`text-sm font-bold ${detail.advanced.ema === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
                       {detail.advanced.ema === "aligned" ? "✓ Aligned" : "✗ Mixed"}
-                    </div>
-                    <div className="text-xs text-[#64748B] mt-0.5">EMA 9, 21, 50</div>
+                    </span>
                   </div>
-
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">Volatility</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#00D4FF]" style={{ width: `${detail.advanced.vol}%` }} />
-                      </div>
-                      <span className="text-white font-bold">{detail.advanced.vol}</span>
-                    </div>
-                    <div className="text-xs text-[#64748B] mt-0.5">
-                      {detail.advanced.vol >= 70 ? "High" : detail.advanced.vol >= 40 ? "Moderate" : "Low"}
-                    </div>
-                  </div>
-
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">ADX Direction</div>
-                    <div className="flex items-center gap-1.5 mt-1">
+                  {/* ADX Direction */}
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <span className="text-[#94A3B8] text-xs shrink-0">ADX Direction</span>
+                    <div className="flex items-center gap-1">
                       {detail.advanced.adx_dir === "up" ? (
-                        <><TrendingUp className="w-5 h-5 text-[#10B981]" /><span className="text-[#10B981] font-bold">Rising</span></>
+                        <><TrendingUp className="w-4 h-4 text-[#10B981]" /><span className="text-[#10B981] text-sm font-bold">Rising</span></>
                       ) : detail.advanced.adx_dir === "down" ? (
-                        <><TrendingDown className="w-5 h-5 text-[#EF4444]" /><span className="text-[#EF4444] font-bold">Falling</span></>
+                        <><TrendingDown className="w-4 h-4 text-[#EF4444]" /><span className="text-[#EF4444] text-sm font-bold">Falling</span></>
                       ) : (
-                        <><ArrowRight className="w-5 h-5 text-[#94A3B8]" /><span className="text-[#94A3B8] font-bold">Flat</span></>
+                        <><ArrowRight className="w-4 h-4 text-[#94A3B8]" /><span className="text-[#94A3B8] text-sm font-bold">Flat</span></>
                       )}
                     </div>
-                    <div className="text-xs text-[#64748B] mt-0.5">+DI vs −DI</div>
+                  </div>
+                  {/* Volatility */}
+                  <div className="flex items-center justify-between px-4 py-2.5">
+                    <span className="text-[#94A3B8] text-xs shrink-0">Volatility (ATR)</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-20 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
+                        <div className="h-full bg-[#00D4FF]" style={{ width: `${detail.advanced.vol}%` }} />
+                      </div>
+                      <span className="text-white text-xs font-bold w-5 text-right">{detail.advanced.vol}</span>
+                      <span className="text-[#64748B] text-xs">{detail.advanced.vol >= 70 ? "High" : detail.advanced.vol >= 40 ? "Med" : "Low"}</span>
+                    </div>
                   </div>
                 </div>
 
