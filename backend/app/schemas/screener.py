@@ -22,6 +22,7 @@ class ScreenerRow(BaseModel):
     name: str
     intraday: TrendBreakdown
     daily: TrendBreakdown
+    longterm: TrendBreakdown
     advanced: AdvancedMetrics
 
 class ScreenerPage(BaseModel):

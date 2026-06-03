@@ -111,6 +111,8 @@ async def get_screener_rows(
             MarketTrendAggregatesLatest.intraday_bearish_pct,
             MarketTrendAggregatesLatest.daily_bullish_pct,
             MarketTrendAggregatesLatest.daily_bearish_pct,
+            MarketTrendAggregatesLatest.longterm_bullish_pct,
+            MarketTrendAggregatesLatest.longterm_bearish_pct,
             MarketTrendAggregatesLatest.intraday_score,
             MarketTrendAggregatesLatest.daily_score,
             MarketTrendAggregatesLatest.updated_at,
@@ -149,6 +151,8 @@ async def get_screener_rows(
         intraday_bear,
         daily_bull,
         daily_bear,
+        longterm_bull,
+        longterm_bear,
         intraday_score,
         daily_score,
         updated_at,
@@ -160,11 +164,13 @@ async def get_screener_rows(
         minus_di_14,
         atr_14,
     ) in rows_db:
-        # If no aggregate exists yet, return neutral-ish values (or pick a fallback you prefer)
+        # If no aggregate exists yet, return neutral-ish values
         intraday_bull = int(intraday_bull) if intraday_bull is not None else 50
         intraday_bear = int(intraday_bear) if intraday_bear is not None else 50
         daily_bull = int(daily_bull) if daily_bull is not None else 50
         daily_bear = int(daily_bear) if daily_bear is not None else 50
+        longterm_bull = int(longterm_bull) if longterm_bull is not None else 50
+        longterm_bear = int(longterm_bear) if longterm_bear is not None else 50
 
         # Advanced metrics: real indicator-backed values (1day)
         adx = int(max(0, min(100, round(adx_14)))) if adx_14 is not None else 0
@@ -179,6 +185,7 @@ async def get_screener_rows(
                 name=name,
                 intraday=TrendBreakdown(bear=intraday_bear, bull=intraday_bull),
                 daily=TrendBreakdown(bear=daily_bear, bull=daily_bull),
+                longterm=TrendBreakdown(bear=longterm_bear, bull=longterm_bull),
                 advanced=AdvancedMetrics(
                     adx=adx,
                     adx_dir=adx_dir,

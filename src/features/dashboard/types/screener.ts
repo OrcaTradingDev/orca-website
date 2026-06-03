@@ -21,6 +21,7 @@ export interface ScreenerRow {
   name: string;
   intraday: TrendBreakdown;
   daily: TrendBreakdown;
+  longterm: TrendBreakdown;
   advanced: AdvancedMetrics;
 }
 

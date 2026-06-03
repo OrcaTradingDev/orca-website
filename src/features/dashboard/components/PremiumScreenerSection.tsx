@@ -397,6 +397,10 @@ export default function PremiumScreenerSection() {
                   <div className="mb-1">DAILY</div>
                   <div className="text-xs text-[#94A3B8]">4H | 1D | 1W</div>
                 </th>
+                <th className="py-4 px-4 text-center text-white">
+                  <div className="mb-1">LONG-TERM</div>
+                  <div className="text-xs text-[#94A3B8]">1D | 1W | 1M</div>
+                </th>
                 <th className="py-4 px-4 text-center text-white w-[280px]">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <span>ADVANCED</span>
@@ -415,7 +419,7 @@ export default function PremiumScreenerSection() {
                 <LoadingSkeleton />
               ) : isError ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center">
+                  <td colSpan={5} className="py-12 text-center">
                     <div className="text-red-400">
                       Failed to load market data. Please check your connection.
                     </div>
@@ -423,7 +427,7 @@ export default function PremiumScreenerSection() {
                 </tr>
               ) : filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-12 text-center">
+                  <td colSpan={5} className="py-12 text-center">
                     <div className="text-[#94A3B8]">
                       {assets.length === 0
                         ? "No data available. Data may be warming up..."
@@ -481,6 +485,14 @@ export default function PremiumScreenerSection() {
                       <StackedBar
                         bear={asset.daily.bear}
                         bull={asset.daily.bull}
+                      />
+                    </td>
+
+                    {/* LONG-TERM */}
+                    <td className="py-4 px-4">
+                      <StackedBar
+                        bear={asset.longterm.bear}
+                        bull={asset.longterm.bull}
                       />
                     </td>
 

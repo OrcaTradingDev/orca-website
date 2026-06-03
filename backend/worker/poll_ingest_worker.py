@@ -346,6 +346,7 @@ def score_timeframe_from_indicators(ind: Dict[str, Any]) -> Optional[Dict[str, A
 # ----------------------------
 INTRADAY_TIMEFRAMES = ("5min", "30min", "1h")
 DAILY_TIMEFRAMES = ("4h", "1day")
+LONGTERM_TIMEFRAMES = ("1day", "1week")
 
 # TF weights (longer = heavier)
 TF_WEIGHTS: Dict[str, float] = {
@@ -354,6 +355,7 @@ TF_WEIGHTS: Dict[str, float] = {
     "1h": 3.0,
     "4h": 3.0,
     "1day": 4.0,
+    "1week": 5.0,
 }
 
 
@@ -519,6 +521,7 @@ async def upsert_symbol_aggregates_latest(
     symbol: str,
     intraday: Optional[Dict[str, Any]],
     daily: Optional[Dict[str, Any]],
+    longterm: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     One row per symbol. Keep the same "delete + insert" approach (no uniqueness assumptions).
@@ -532,11 +535,13 @@ async def upsert_symbol_aggregates_latest(
                   symbol,
                   intraday_last_timestamp, intraday_score, intraday_bullish_pct, intraday_bearish_pct,
                   daily_last_timestamp, daily_score, daily_bullish_pct, daily_bearish_pct,
+                  longterm_last_timestamp, longterm_score, longterm_bullish_pct, longterm_bearish_pct,
                   updated_at
                 ) VALUES (
                   :symbol,
                   :intraday_last_timestamp, :intraday_score, :intraday_bullish_pct, :intraday_bearish_pct,
                   :daily_last_timestamp, :daily_score, :daily_bullish_pct, :daily_bearish_pct,
+                  :longterm_last_timestamp, :longterm_score, :longterm_bullish_pct, :longterm_bearish_pct,
                   NOW()
                 )
                 """
@@ -551,6 +556,10 @@ async def upsert_symbol_aggregates_latest(
                 "daily_score": None if daily is None else daily["score"],
                 "daily_bullish_pct": None if daily is None else daily["bullish_pct"],
                 "daily_bearish_pct": None if daily is None else daily["bearish_pct"],
+                "longterm_last_timestamp": None if longterm is None else longterm["last_timestamp"],
+                "longterm_score": None if longterm is None else longterm["score"],
+                "longterm_bullish_pct": None if longterm is None else longterm["bullish_pct"],
+                "longterm_bearish_pct": None if longterm is None else longterm["bearish_pct"],
             },
         )
         await db.commit()
@@ -794,11 +803,12 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
                 logger.exception("[trend] failed upserting trend score for %s %s", symbol, timeframe)
                 continue
 
-            # ✅ Per-symbol aggregates: intraday (5m/30m/1h) and daily (4h/1d)
+            # ✅ Per-symbol aggregates: intraday (5m/30m/1h), daily (4h/1d), longterm (1d/1w)
             try:
                 intraday = await compute_symbol_aggregate(symbol, INTRADAY_TIMEFRAMES)
                 daily = await compute_symbol_aggregate(symbol, DAILY_TIMEFRAMES)
-                await upsert_symbol_aggregates_latest(symbol, intraday, daily)
+                longterm = await compute_symbol_aggregate(symbol, LONGTERM_TIMEFRAMES)
+                await upsert_symbol_aggregates_latest(symbol, intraday, daily, longterm)
 
                 if intraday is not None:
                     logger.info(

@@ -20,5 +20,10 @@ class MarketTrendAggregatesLatest(Base):
     daily_bullish_pct = Column(Integer)
     daily_bearish_pct = Column(Integer)
 
+    longterm_last_timestamp = Column(TIMESTAMP(timezone=True))
+    longterm_score = Column(Float)
+    longterm_bullish_pct = Column(Integer)
+    longterm_bearish_pct = Column(Integer)
+
     updated_at = Column(TIMESTAMP(timezone=True))
 
