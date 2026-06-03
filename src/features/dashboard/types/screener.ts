@@ -1,6 +1,6 @@
 // types/screener.ts
 
-// Matches your Pydantic "TrendBreakdown"
+// Matches Pydantic "TrendBreakdown"
 export interface TrendBreakdown {
   bear: number;
   bull: number;
@@ -15,6 +15,23 @@ export interface AdvancedMetrics {
   alert: boolean;
 }
 
+// Matches Pydantic "OrcaSignals"
+export interface OrcaSignals {
+  status: "ON" | "WATCH" | "OFF";
+  direction: "LONG ONLY" | "SHORT ONLY" | "WATCH LONG" | "WATCH SHORT" | "FLAT";
+  market_phase:
+    | "Compression"
+    | "Expansion"
+    | "Healthy Trend"
+    | "Pullback"
+    | "Continuation"
+    | "Exhaustion"
+    | "Chop";
+  pullback: "Shallow" | "Healthy" | "Deep" | "Failed" | null;
+  orca_score: number;
+  is_best: boolean;
+}
+
 // Matches Pydantic "ScreenerRow"
 export interface ScreenerRow {
   symbol: string;
@@ -23,6 +40,7 @@ export interface ScreenerRow {
   daily: TrendBreakdown;
   longterm: TrendBreakdown;
   advanced: AdvancedMetrics;
+  signals: OrcaSignals;
 }
 
 // Matches Pydantic "ScreenerPage"
@@ -32,4 +50,22 @@ export interface ScreenerPage {
   pageSize: number;
   total: number;
   lastUpdated: string; // ISO string
+}
+
+// Matches Pydantic "TimeframeBar"
+export interface TimeframeBar {
+  timeframe: string;
+  label: string;
+  bull: number;
+  bear: number;
+  score: number;
+}
+
+// Matches Pydantic "SymbolDetail"
+export interface SymbolDetail {
+  symbol: string;
+  name: string;
+  timeframes: TimeframeBar[];
+  signals: OrcaSignals;
+  advanced: AdvancedMetrics;
 }

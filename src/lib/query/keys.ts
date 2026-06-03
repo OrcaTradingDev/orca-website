@@ -10,5 +10,10 @@ export const queryKeys = {
     // Example output: ["screener", "rows", 1, 50]
     rows: (page: number, pageSize: number) =>
       [...queryKeys.screener.all, "rows", page, pageSize] as const,
+
+    // 3. Symbol Detail
+    // Example output: ["screener", "detail", "EURUSD"]
+    detail: (symbol: string) =>
+      [...queryKeys.screener.all, "detail", symbol] as const,
   },
 };
