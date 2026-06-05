@@ -115,7 +115,7 @@ const StackedBar = ({
 );
 
 // ── Score ring ────────────────────────────────────────────────────────────────
-const ScoreRing = ({ score }: { score: number }) => {
+const ScoreRing = ({ score, size = 52 }: { score: number; size?: number }) => {
   const color =
     score >= 65
       ? "#10B981"
@@ -126,25 +126,27 @@ const ScoreRing = ({ score }: { score: number }) => {
       : score >= 35
       ? "#F97316"
       : "#EF4444";
-  const r = 20;
+  const cx = size / 2;
+  const r = size * 0.38;
   const circ = 2 * Math.PI * r;
   const dash = (score / 100) * circ;
+  const sw = size * 0.077;
 
   return (
-    <svg width="52" height="52" viewBox="0 0 52 52">
-      <circle cx="26" cy="26" r={r} fill="none" stroke="#1E293B" strokeWidth="4" />
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={cx} cy={cx} r={r} fill="none" stroke="#1E293B" strokeWidth={sw} />
       <circle
-        cx="26"
-        cy="26"
+        cx={cx}
+        cy={cx}
         r={r}
         fill="none"
         stroke={color}
-        strokeWidth="4"
+        strokeWidth={sw}
         strokeDasharray={`${dash} ${circ - dash}`}
         strokeLinecap="round"
-        transform="rotate(-90 26 26)"
+        transform={`rotate(-90 ${cx} ${cx})`}
       />
-      <text x="26" y="31" textAnchor="middle" fontSize="13" fontWeight="bold" fill={color}>
+      <text x={cx} y={cx + size * 0.1} textAnchor="middle" fontSize={size * 0.25} fontWeight="bold" fill={color}>
         {score}
       </text>
     </svg>
@@ -667,7 +669,7 @@ export default function PremiumScreenerSection() {
               {selectedAsset?.symbol} – {selectedAsset?.name}
             </DialogTitle>
             <DialogDescription className="text-[#94A3B8] text-xs mt-0.5">
-              Multi-timeframe breakdown &amp; OrcaBot signals
+              Full multi-timeframe breakdown &amp; OrcaBot signals
             </DialogDescription>
           </div>
 
@@ -682,29 +684,33 @@ export default function PremiumScreenerSection() {
               </div>
             ) : (
               <>
-                {/* OrcaBot Status */}
-                <div className={`flex items-center justify-between rounded-lg px-4 py-3 ${
-                  detail.signals.status === "ON"
-                    ? "bg-[#10B981]/10 border border-[#10B981]/30"
-                    : detail.signals.status === "WATCH"
-                    ? "bg-[#F59E0B]/10 border border-[#F59E0B]/30"
-                    : "bg-[#64748B]/10 border border-[#64748B]/30"
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-2xl font-bold ${
-                      detail.signals.status === "ON" ? "text-[#10B981]"
-                      : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
-                      : "text-[#64748B]"
-                    }`}>{detail.signals.status}</span>
-                    <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
-                      {detail.signals.direction}
-                    </span>
+                {/* OrcaBot Status — 3-column strip */}
+                <div className="flex items-center justify-between py-2">
+                  {/* Left: Status + Direction */}
+                  <div>
+                    <div className="text-[#64748B] text-xs mb-1.5">OrcaBot Status</div>
+                    <div className="flex items-baseline gap-2">
+                      <span className={`text-3xl font-bold ${
+                        detail.signals.status === "ON" ? "text-[#10B981]"
+                        : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
+                        : "text-white"
+                      }`}>{detail.signals.status}</span>
+                      <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
+                        {detail.signals.direction}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <ScoreRing score={detail.signals.orca_score} />
-                    <Badge className={`${PHASE_STYLES[detail.signals.market_phase]} border-0 text-xs`}>
-                      {detail.signals.market_phase}
-                    </Badge>
+
+                  {/* Center: Score Ring */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="text-[#64748B] text-xs">Orca Score</div>
+                    <ScoreRing score={detail.signals.orca_score} size={62} />
+                  </div>
+
+                  {/* Right: Market Phase */}
+                  <div className="text-right">
+                    <div className="text-[#64748B] text-xs mb-1.5">Market Phase</div>
+                    <div className="text-white font-bold text-lg">{detail.signals.market_phase}</div>
                   </div>
                 </div>
 
@@ -721,7 +727,7 @@ export default function PremiumScreenerSection() {
 
                 {/* MTF Breakdown */}
                 <div className="bg-[#0A1628] rounded-lg px-4 py-3 border border-[#1E293B]">
-                  <div className="text-[#94A3B8] text-xs font-medium uppercase tracking-wider mb-2">
+                  <div className="text-white text-sm font-semibold mb-2">
                     Multi-Timeframe Breakdown
                   </div>
                   <div className="space-y-1.5">
