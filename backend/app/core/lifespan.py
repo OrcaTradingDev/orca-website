@@ -1,9 +1,12 @@
-from fastapi import FastAPI
+import asyncio
 from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.core.db import engine
 from app.core.redis import get_redis_client
+from app.services.alert_checker import alert_checker_loop
 
 
 @asynccontextmanager
@@ -22,9 +25,19 @@ async def lifespan(app: FastAPI):
         print("Redis connected (optional).")
         app.state.redis = redis
 
+    # Background alert checker (every 5 minutes)
+    alert_task = asyncio.create_task(alert_checker_loop())
+    print("Alert checker background task started.")
+
     yield
 
     # shutdown
+    alert_task.cancel()
+    try:
+        await alert_task
+    except asyncio.CancelledError:
+        pass
+
     try:
         if getattr(app.state, "redis", None) is not None:
             await app.state.redis.aclose()

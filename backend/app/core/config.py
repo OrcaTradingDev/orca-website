@@ -42,6 +42,12 @@ class Settings(BaseSettings):
     ]
 
     # -------------------------
+    # Email (Resend)
+    # -------------------------
+    RESEND_API_KEY: str = ""
+    FROM_EMAIL: str = "OrcaBot Alerts <alerts@tradewithorca.com>"
+
+    # -------------------------
     # Twelve Data
     # -------------------------
     TWELVE_DATA_API_KEY: str = ""

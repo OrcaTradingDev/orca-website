@@ -7,6 +7,8 @@ import { useSymbolDetail } from "@/features/dashboard/hooks/useSymbolDetail";
 import { ScreenerRow, OrcaSignals } from "@/features/dashboard/types/screener";
 import { queryKeys } from "@/lib/query/keys";
 import { useScreenerStore } from "@/store/screener-store";
+import { useUserAlerts } from "@/features/dashboard/hooks/useUserAlerts";
+import { subscribeAlert, unsubscribeAlert } from "@/features/dashboard/services/alerts";
 import {
   Search,
   RefreshCw,
@@ -230,6 +232,9 @@ export default function PremiumScreenerSection() {
   const dailyTFs     = ["4H", "1D"].filter((tf) => enabledTimeframes.includes(tf));
   const longtermTFs  = ["1W", "1M"].filter((tf) => enabledTimeframes.includes(tf)); // 1W/1M always shown
 
+  // Sync server-side alert subscriptions into the store on mount
+  useUserAlerts();
+
   const { data, isLoading, isFetching, isError, refetch } = useScreener(page, 50, {
     autoRefresh,
     refreshInterval,
@@ -316,16 +321,37 @@ export default function PremiumScreenerSection() {
   );
 
   const toggleAlert = useCallback(
-    (symbol: string) => {
+    async (symbol: string) => {
+      const wasSubscribed = alertSymbols.includes(symbol);
+
+      // Optimistic update
       storeToggleAlert(symbol);
       if (selectedAsset?.symbol === symbol) {
         setSelectedAsset({
           ...selectedAsset,
-          advanced: { ...selectedAsset.advanced, hasAlert: !selectedAsset.advanced.hasAlert },
+          advanced: { ...selectedAsset.advanced, hasAlert: !wasSubscribed },
         });
       }
+
+      // Persist to backend
+      try {
+        if (wasSubscribed) {
+          await unsubscribeAlert(symbol);
+        } else {
+          await subscribeAlert(symbol);
+        }
+      } catch {
+        // Revert on error
+        storeToggleAlert(symbol);
+        if (selectedAsset?.symbol === symbol) {
+          setSelectedAsset({
+            ...selectedAsset,
+            advanced: { ...selectedAsset.advanced, hasAlert: wasSubscribed },
+          });
+        }
+      }
     },
-    [selectedAsset, storeToggleAlert]
+    [alertSymbols, selectedAsset, storeToggleAlert]
   );
 
   const handleRefresh = useCallback(() => {

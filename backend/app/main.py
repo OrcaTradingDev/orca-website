@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.lifespan import lifespan
 from app.routers import screener, ops
 from app.routers.admin import router as admin_router
+from app.routers.alerts import router as alerts_router
 from app.routers.auth_google import router as auth_google_router
 
 
@@ -67,3 +68,4 @@ app.include_router(screener.router)
 app.include_router(ops.router)
 app.include_router(auth_google_router)
 app.include_router(admin_router)
+app.include_router(alerts_router)

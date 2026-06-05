@@ -19,6 +19,7 @@ interface ScreenerStoreState extends ScreenerSettings {
   // Actions
   toggleWatchlist:     (symbol: string) => void;
   toggleAlert:         (symbol: string) => void;
+  setAlertSymbols:     (symbols: string[]) => void;
   setScreenerSettings: (settings: Partial<ScreenerSettings>) => void;
 }
 
@@ -50,6 +51,9 @@ export const useScreenerStore = create<ScreenerStoreState>()(
             ? state.alertSymbols.filter((s) => s !== symbol)
             : [...state.alertSymbols, symbol],
         })),
+
+      setAlertSymbols: (symbols) =>
+        set(() => ({ alertSymbols: symbols })),
 
       setScreenerSettings: (settings) =>
         set((state) => ({ ...state, ...settings })),
