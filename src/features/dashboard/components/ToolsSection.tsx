@@ -1,96 +1,97 @@
-import { Search, PieChart, Calendar, Calculator, LineChart } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BarChart3, PieChart, Calendar, Calculator, LineChart, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export default function ToolsSection() {
-  const tools = [
-    {
-      id: 1,
-      name: "Advanced Screener",
-      description: "Our premium multi-timeframe scanner",
-      icon: Search,
-      available: true,
-      badge: null,
-    },
-    {
-      id: 2,
-      name: "Portfolio Tracker",
-      description: "Track and analyze your investments",
-      icon: PieChart,
-      available: false,
-      badge: "Coming Soon",
-    },
-    {
-      id: 3,
-      name: "Economic Calendar",
-      description: "Stay updated with market events",
-      icon: Calendar,
-      available: false,
-      badge: "Coming Soon",
-    },
-    {
-      id: 4,
-      name: "Risk Calculator",
-      description: "Calculate position sizing and risk",
-      icon: Calculator,
-      available: false,
-      badge: "Coming Soon",
-    },
-    {
-      id: 5,
-      name: "Backtesting Tool",
-      description: "Test your strategies on historical data",
-      icon: LineChart,
-      available: false,
-      badge: "In Development",
-    },
-  ];
+const tools = [
+  {
+    id: 1,
+    name: "OrcaBot Flowscreener",
+    description:
+      "Real-time multi-timeframe scanner with OrcaBot signals, market phase detection, pullback analysis, and ADX/EMA metrics.",
+    icon: BarChart3,
+    status: "live" as const,
+  },
+  {
+    id: 2,
+    name: "Portfolio Tracker",
+    description: "Track and analyse your open positions across asset classes with real-time P&L.",
+    icon: PieChart,
+    status: "soon" as const,
+  },
+  {
+    id: 3,
+    name: "Economic Calendar",
+    description: "Stay ahead of high-impact events — central bank decisions, NFP, CPI, and more.",
+    icon: Calendar,
+    status: "soon" as const,
+  },
+  {
+    id: 4,
+    name: "Risk Calculator",
+    description: "Calculate precise position sizes, risk-reward ratios, and optimal stop levels.",
+    icon: Calculator,
+    status: "soon" as const,
+  },
+  {
+    id: 5,
+    name: "Strategy Backtester",
+    description: "Test OrcaBot signal strategies against historical multi-timeframe data.",
+    icon: LineChart,
+    status: "dev" as const,
+  },
+] as const;
 
+const STATUS_MAP = {
+  live: { label: "Live",        cls: "bg-[#10B981]/20 text-[#10B981] border-0" },
+  soon: { label: "Coming Soon", cls: "bg-[#FFD700]/20 text-[#FFD700] border-0" },
+  dev:  { label: "In Dev",      cls: "bg-[#00D4FF]/20 text-[#00D4FF] border-0" },
+} as const;
+
+export default function ToolsSection() {
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-white mb-2">Tools & Features</h1>
-        <p className="text-[#94A3B8]">Explore our trading toolkit</p>
+    <div className="space-y-6">
+      <div className="space-y-1">
+        <h1 className="text-white text-[32px]">Tools & Features</h1>
+        <p className="text-[#94A3B8]">Your full OrcaTrading toolkit</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-4">
         {tools.map((tool) => {
-          const Icon = tool.icon;
+          const Icon   = tool.icon;
+          const s      = STATUS_MAP[tool.status];
+          const isLive = tool.status === "live";
+
           return (
             <div
               key={tool.id}
-              className={`bg-[#14181F] border border-[#1E293B] rounded-lg p-6 ${
-                tool.available
-                  ? "hover:border-[#00D4FF] hover:shadow-[0_0_20px_rgba(0,212,255,0.3)] hover:-translate-y-1 cursor-pointer"
-                  : "opacity-60"
-              } transition-all`}
+              className={`bg-[#14181F] border rounded-xl p-6 flex flex-col transition-all ${
+                isLive
+                  ? "border-[#00D4FF]/30 hover:border-[#00D4FF] hover:shadow-[0_0_24px_rgba(0,212,255,0.12)] cursor-pointer"
+                  : "border-[#1E293B] opacity-60"
+              }`}
             >
+              {/* Icon + badge */}
               <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-[#00D4FF]/10 rounded-lg flex items-center justify-center">
-                  <Icon className="w-6 h-6 text-[#00D4FF]" />
+                <div
+                  className={`w-11 h-11 rounded-lg flex items-center justify-center ${
+                    isLive ? "bg-[#00D4FF]/10" : "bg-[#1A1F2E]"
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${isLive ? "text-[#00D4FF]" : "text-[#64748B]"}`} />
                 </div>
-                {tool.badge && (
-                  <Badge
-                    className={`${
-                      tool.badge === "In Development"
-                        ? "bg-[#00D4FF]/20 text-[#00D4FF]"
-                        : "bg-[#FFD700]/20 text-[#FFD700]"
-                    }`}
-                  >
-                    {tool.badge}
-                  </Badge>
-                )}
+                <Badge className={s.cls}>{s.label}</Badge>
               </div>
-              <h3 className="text-white mb-2">{tool.name}</h3>
-              <p className="text-[#94A3B8] text-sm mb-4">{tool.description}</p>
-              {tool.available ? (
-                <Button className="w-full bg-[#00D4FF] hover:bg-[#00B8E6] text-white">
-                  Launch
-                </Button>
+
+              {/* Text */}
+              <h3 className="text-white font-semibold mb-1.5">{tool.name}</h3>
+              <p className="text-[#64748B] text-sm flex-1 mb-4 leading-relaxed">{tool.description}</p>
+
+              {/* CTA */}
+              {isLive ? (
+                <div className="flex items-center gap-1.5 text-[#00D4FF] text-sm font-semibold">
+                  Open in Screener <ArrowRight className="w-4 h-4" />
+                </div>
               ) : (
-                <Button disabled className="w-full" variant="secondary">
-                  Unavailable
-                </Button>
+                <div className="text-[#2D3748] text-sm">Available soon →</div>
               )}
             </div>
           );

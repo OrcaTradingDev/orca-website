@@ -6,6 +6,7 @@ import { useScreener } from "@/features/dashboard/hooks/useScreener";
 import { useSymbolDetail } from "@/features/dashboard/hooks/useSymbolDetail";
 import { ScreenerRow, OrcaSignals } from "@/features/dashboard/types/screener";
 import { queryKeys } from "@/lib/query/keys";
+import { useScreenerStore } from "@/store/screener-store";
 import {
   Search,
   RefreshCw,
@@ -213,8 +214,12 @@ export default function PremiumScreenerSection() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [watchedSymbols, setWatchedSymbols] = useState<string[]>([]);
-  const [alertSymbols, setAlertSymbols] = useState<string[]>([]);
+
+  // Shared persisted state — also consumed by Watchlist + Alerts tabs
+  const watchedSymbols      = useScreenerStore((s) => s.watchedSymbols);
+  const alertSymbols        = useScreenerStore((s) => s.alertSymbols);
+  const storeToggleWatchlist = useScreenerStore((s) => s.toggleWatchlist);
+  const storeToggleAlert     = useScreenerStore((s) => s.toggleAlert);
 
   const { data, isLoading, isFetching, isError, refetch } = useScreener(page, 50);
   const { data: detail, isLoading: detailLoading } = useSymbolDetail(
@@ -288,21 +293,17 @@ export default function PremiumScreenerSection() {
 
   const toggleWatchlist = useCallback(
     (symbol: string) => {
-      setWatchedSymbols((prev) =>
-        prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
-      );
+      storeToggleWatchlist(symbol);
       if (selectedAsset?.symbol === symbol) {
         setSelectedAsset({ ...selectedAsset, inWatchlist: !selectedAsset.inWatchlist });
       }
     },
-    [selectedAsset]
+    [selectedAsset, storeToggleWatchlist]
   );
 
   const toggleAlert = useCallback(
     (symbol: string) => {
-      setAlertSymbols((prev) =>
-        prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
-      );
+      storeToggleAlert(symbol);
       if (selectedAsset?.symbol === symbol) {
         setSelectedAsset({
           ...selectedAsset,
@@ -310,7 +311,7 @@ export default function PremiumScreenerSection() {
         });
       }
     },
-    [selectedAsset]
+    [selectedAsset, storeToggleAlert]
   );
 
   const handleRefresh = useCallback(() => {

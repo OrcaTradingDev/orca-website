@@ -1,80 +1,136 @@
-import { Plus, Edit, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+"use client";
 
+import { useMemo } from "react";
+import { Bell, X, Zap } from "lucide-react";
+import { useScreener } from "@/features/dashboard/hooks/useScreener";
+import { useScreenerStore } from "@/store/screener-store";
+import { OrcaSignals } from "@/features/dashboard/types/screener";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const STATUS_STYLES: Record<OrcaSignals["status"], string> = {
+  ON:    "bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30",
+  WATCH: "bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30",
+  OFF:   "bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30",
+};
+
+const DIRECTION_COLORS: Record<OrcaSignals["direction"], string> = {
+  "LONG ONLY":   "text-[#10B981]",
+  "WATCH LONG":  "text-[#F59E0B]",
+  "SHORT ONLY":  "text-[#EF4444]",
+  "WATCH SHORT": "text-[#F97316]",
+  "FLAT":        "text-[#64748B]",
+};
+
+const PULSE_COLORS: Record<OrcaSignals["status"], string> = {
+  ON:    "bg-[#10B981]",
+  WATCH: "bg-[#F59E0B]",
+  OFF:   "bg-[#64748B]",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 export default function SavedAlertsSection() {
-  const alerts = [
-    {
-      id: 1,
-      condition: "BTC/USD > $70,000",
-      status: "active",
-    },
-    {
-      id: 2,
-      condition: "EUR/USD breaks above 1.0900",
-      status: "active",
-    },
-    {
-      id: 3,
-      condition: "ETH < $3,500",
-      status: "paused",
-    },
-  ];
+  const { data, isLoading } = useScreener(1, 50);
+  const alertSymbols  = useScreenerStore((s) => s.alertSymbols);
+  const toggleAlert   = useScreenerStore((s) => s.toggleAlert);
+
+  const alerted = useMemo(
+    () => (data?.rows ?? []).filter((r) => alertSymbols.includes(r.symbol)),
+    [data?.rows, alertSymbols]
+  );
 
   return (
-    <div>
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-white mb-2">Saved Alerts</h1>
-          <p className="text-[#94A3B8]">Manage your price and volume alerts</p>
-        </div>
-        <Button variant="outline" className="border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white">
-          <Plus className="w-4 h-4 mr-2" />
-          Create Alert
-        </Button>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="space-y-1">
+        <h1 className="text-white text-[32px]">Saved Alerts</h1>
+        <p className="text-[#94A3B8]">Get notified when OrcaBot signals change</p>
       </div>
 
-      <div className="space-y-4">
-        {alerts.map((alert) => (
-          <div
-            key={alert.id}
-            className="bg-[#14181F] border border-[#1E293B] rounded-lg p-5 flex items-center justify-between hover:border-[#2D3748] transition-colors"
-          >
-            <div className="flex items-center gap-4">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  alert.status === "active" ? "bg-[#10B981]" : "bg-[#94A3B8]"
-                }`}
-              />
-              <div>
-                <div className="text-white">{alert.condition}</div>
-                <Badge
-                  variant="secondary"
-                  className={`mt-2 ${
-                    alert.status === "active"
-                      ? "bg-[#10B981]/20 text-[#10B981]"
-                      : "bg-[#94A3B8]/20 text-[#94A3B8]"
-                  }`}
+      {/* Empty state */}
+      {!isLoading && alertSymbols.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 bg-[#14181F] border border-[#1E293B] rounded-xl text-center">
+          <div className="w-14 h-14 bg-[#1E293B] rounded-full flex items-center justify-center mb-4">
+            <Bell className="w-7 h-7 text-[#64748B]" strokeWidth={1.5} />
+          </div>
+          <h3 className="text-white font-semibold text-lg mb-2">No alerts set</h3>
+          <p className="text-[#64748B] text-sm max-w-xs leading-relaxed">
+            Click the <span className="text-[#00D4FF]">🔔</span> icon on any asset in the{" "}
+            <span className="text-[#00D4FF]">Premium Screener</span> to receive signal change notifications.
+          </p>
+        </div>
+      )}
+
+      {/* Loading skeletons */}
+      {isLoading && (
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-xl" />
+          ))}
+        </div>
+      )}
+
+      {/* Alert list */}
+      {!isLoading && alerted.length > 0 && (
+        <div className="space-y-3">
+          {alerted.map((row) => (
+            <div
+              key={row.symbol}
+              className="bg-[#14181F] border border-[#1E293B] rounded-xl px-5 py-4 flex items-center justify-between hover:border-[#2D3748] transition-colors"
+            >
+              {/* Left: pulse + symbol */}
+              <div className="flex items-center gap-4">
+                <div className="relative flex items-center justify-center shrink-0 w-4 h-4">
+                  <div
+                    className={`w-2.5 h-2.5 rounded-full ${PULSE_COLORS[row.signals.status]} ${
+                      row.signals.status !== "OFF" ? "animate-pulse" : ""
+                    }`}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white font-semibold">{row.symbol}</span>
+                    <Badge className={`${STATUS_STYLES[row.signals.status]} text-xs font-bold border-0 px-2`}>
+                      {row.signals.status}
+                    </Badge>
+                  </div>
+                  <div className="text-[#64748B] text-sm mt-0.5">{row.name}</div>
+                </div>
+              </div>
+
+              {/* Right: signal detail + remove */}
+              <div className="flex items-center gap-6">
+                <div className="text-right hidden sm:block">
+                  <div className={`text-sm font-semibold ${DIRECTION_COLORS[row.signals.direction]}`}>
+                    {row.signals.direction}
+                  </div>
+                  <div className="text-[#64748B] text-xs mt-0.5">{row.signals.market_phase}</div>
+                </div>
+                <div className="text-center hidden sm:block min-w-[52px]">
+                  <div className="text-white font-bold text-xl leading-tight">{row.signals.orca_score}</div>
+                  <div className="text-[#64748B] text-xs">Score</div>
+                </div>
+                <button
+                  onClick={() => toggleAlert(row.symbol)}
+                  className="text-[#64748B] hover:text-[#EF4444] transition-colors p-1 rounded shrink-0"
+                  title="Remove alert"
                 >
-                  {alert.status === "active" ? "Active" : "Paused"}
-                </Badge>
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button className="p-2 text-[#94A3B8] hover:text-[#00D4FF] transition-colors">
-                <Edit className="w-4 h-4" />
-              </button>
-              <button className="p-2 text-[#94A3B8] hover:text-[#EF4444] transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {alerts.length === 0 && (
-        <div className="bg-[#14181F] border border-[#1E293B] rounded-lg p-12 text-center">
-          <p className="text-[#94A3B8]">No alerts set up yet. Create your first alert!</p>
+      {/* Info note */}
+      {!isLoading && alerted.length > 0 && (
+        <div className="flex items-start gap-3 bg-[#0A1628] border border-[#1E293B] rounded-xl px-4 py-3">
+          <Zap className="w-4 h-4 text-[#00D4FF] mt-0.5 shrink-0" />
+          <p className="text-[#64748B] text-sm leading-relaxed">
+            A pulsing dot means the signal is currently active. Alerts fire when a signal transitions
+            between <span className="text-white">OFF → WATCH → ON</span>.
+          </p>
         </div>
       )}
     </div>
