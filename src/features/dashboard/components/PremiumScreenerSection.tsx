@@ -659,12 +659,17 @@ export default function PremiumScreenerSection() {
         )}
       </div>
 
-      {/* Detail Modal — fixed h-[88vh] so it never overflows top/bottom */}
+      {/* Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-2xl w-[95vw] h-[88vh] flex flex-col overflow-hidden p-0 gap-0">
+        {/*
+          max-w-2xl on mobile (fits 95vw phone width)
+          sm:max-w-3xl on tablet/desktop (wider for 2-col layout)
+          max-h-[92vh] — naturally sized; body scrolls only if viewport is tiny
+        */}
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-2xl sm:max-w-3xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden p-0 gap-0">
 
-          {/* Pinned header — X always visible */}
-          <div className="px-5 pt-3 pb-3 border-b border-[#1E293B] shrink-0 pr-12">
+          {/* Pinned header — X button always visible */}
+          <div className="px-5 pt-3 pb-2.5 border-b border-[#1E293B] shrink-0 pr-12">
             <DialogTitle className="text-base font-semibold leading-tight">
               {selectedAsset?.symbol} – {selectedAsset?.name}
             </DialogTitle>
@@ -673,8 +678,8 @@ export default function PremiumScreenerSection() {
             </DialogDescription>
           </div>
 
-          {/* min-h-0 is critical — lets the flex body shrink to respect h-[88vh] */}
-          <div className="overflow-y-auto flex-1 min-h-0 px-5 py-3 space-y-3">
+          {/* Scrollable body — min-h-0 lets flex child honour max-h on parent */}
+          <div className="overflow-y-auto flex-1 min-h-0 px-4 py-3">
 
             {detailLoading || !detail ? (
               <div className="space-y-3 pt-2">
@@ -683,139 +688,160 @@ export default function PremiumScreenerSection() {
                 ))}
               </div>
             ) : (
-              <>
-                {/* OrcaBot Status — 3-column strip */}
-                <div className="flex items-center justify-between py-2">
-                  {/* Left: Status + Direction */}
-                  <div>
-                    <div className="text-[#64748B] text-xs mb-1.5">OrcaBot Status</div>
-                    <div className="flex items-baseline gap-2">
-                      <span className={`text-3xl font-bold ${
-                        detail.signals.status === "ON" ? "text-[#10B981]"
-                        : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
-                        : "text-white"
-                      }`}>{detail.signals.status}</span>
-                      <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
-                        {detail.signals.direction}
-                      </span>
-                    </div>
-                  </div>
+              /*
+               * RESPONSIVE LAYOUT
+               * Mobile  (<640px): flex-col — OrcaBot strip → chart (fixed 145px) → MTF → metrics → buttons
+               * Desktop (≥640px): flex-row — left col (OrcaBot + chart fills height) | right col (MTF + metrics + buttons)
+               */
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
 
-                  {/* Center: Score Ring */}
-                  <div className="flex flex-col items-center gap-1">
-                    <div className="text-[#64748B] text-xs">Orca Score</div>
-                    <ScoreRing score={detail.signals.orca_score} size={62} />
-                  </div>
+                {/* ── LEFT PANEL: OrcaBot status strip + TradingView chart ── */}
+                <div className="flex flex-col gap-3 sm:w-[43%] sm:shrink-0">
 
-                  {/* Right: Market Phase */}
-                  <div className="text-right">
-                    <div className="text-[#64748B] text-xs mb-1.5">Market Phase</div>
-                    <div className="text-white font-bold text-lg">{detail.signals.market_phase}</div>
-                  </div>
-                </div>
-
-                {/* TradingView chart */}
-                <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 200 }}>
-                  <iframe
-                    key={detail.symbol}
-                    src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(detail.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
-                    style={{ width: "100%", height: "100%", border: "none" }}
-                    allowFullScreen
-                    title={`${detail.symbol} chart`}
-                  />
-                </div>
-
-                {/* MTF Breakdown */}
-                <div className="bg-[#0A1628] rounded-lg px-4 py-3 border border-[#1E293B]">
-                  <div className="text-white text-sm font-semibold mb-2">
-                    Multi-Timeframe Breakdown
-                  </div>
-                  <div className="space-y-1.5">
-                    {detail.timeframes.map((tf) => (
-                      <div key={tf.timeframe} className="flex items-center gap-3">
-                        <span className="text-[#64748B] text-xs w-8 shrink-0 text-right">{tf.label}</span>
-                        <div className="flex-1">
-                          <StackedBar bear={tf.bear} bull={tf.bull} compact />
-                        </div>
-                        <span className={`text-xs w-9 text-right shrink-0 font-medium ${
-                          tf.bull > tf.bear ? "text-[#10B981]" : tf.bear > tf.bull ? "text-[#EF4444]" : "text-[#94A3B8]"
-                        }`}>
-                          {tf.bull > tf.bear ? `+${tf.bull}` : `-${tf.bear}`}
+                  {/* OrcaBot 3-column strip */}
+                  <div className="flex items-center justify-between">
+                    {/* Status + Direction */}
+                    <div>
+                      <div className="text-[#64748B] text-xs mb-1">OrcaBot Status</div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-3xl font-bold ${
+                          detail.signals.status === "ON"    ? "text-[#10B981]"
+                          : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
+                          : "text-white"
+                        }`}>{detail.signals.status}</span>
+                        <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
+                          {detail.signals.direction}
                         </span>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
 
-                {/* Metrics 2×2 */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">ADX Trend Strength</div>
-                    <div className="text-2xl text-white font-bold">{detail.advanced.adx}</div>
-                    <div className={`text-sm mt-0.5 ${detail.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}`}>
-                      {detail.advanced.adx >= 35 ? "Very Strong Trend" : detail.advanced.adx >= 25 ? "Strong Trend" : detail.advanced.adx >= 20 ? "Developing Trend" : "Weak / Ranging"}
+                    {/* Score ring */}
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="text-[#64748B] text-xs">Orca Score</div>
+                      <ScoreRing score={detail.signals.orca_score} size={58} />
+                    </div>
+
+                    {/* Market Phase */}
+                    <div className="text-right">
+                      <div className="text-[#64748B] text-xs mb-1">Market Phase</div>
+                      <div className="text-white font-bold text-base leading-tight">{detail.signals.market_phase}</div>
                     </div>
                   </div>
 
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">EMA Alignment</div>
-                    <div className={`text-2xl font-bold ${detail.advanced.ema === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
-                      {detail.advanced.ema === "aligned" ? "✓ Aligned" : "✗ Mixed"}
-                    </div>
-                    <div className="text-sm text-[#64748B] mt-0.5">EMA 9, 21, 50</div>
-                  </div>
-
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">Volatility (ATR-based)</div>
-                    <div className="flex items-center gap-2 mt-1.5 mb-1">
-                      <div className="flex-1 h-2 bg-[#1E293B] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#00D4FF]" style={{ width: `${detail.advanced.vol}%` }} />
-                      </div>
-                      <span className="text-white font-bold">{detail.advanced.vol}</span>
-                    </div>
-                    <div className="text-sm text-[#64748B]">
-                      {detail.advanced.vol >= 70 ? "High volatility" : detail.advanced.vol >= 40 ? "Moderate volatility" : "Low volatility"}
-                    </div>
-                  </div>
-
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">ADX Direction</div>
-                    <div className="flex items-center gap-2 mt-1.5 mb-1">
-                      {detail.advanced.adx_dir === "up" ? (
-                        <><TrendingUp className="w-5 h-5 text-[#10B981]" /><span className="text-[#10B981] text-lg font-bold">Rising</span></>
-                      ) : detail.advanced.adx_dir === "down" ? (
-                        <><TrendingDown className="w-5 h-5 text-[#EF4444]" /><span className="text-[#EF4444] text-lg font-bold">Falling</span></>
-                      ) : (
-                        <><ArrowRight className="w-5 h-5 text-[#94A3B8]" /><span className="text-[#94A3B8] text-lg font-bold">Flat</span></>
-                      )}
-                    </div>
-                    <div className="text-sm text-[#64748B]">+DI vs −DI comparison</div>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex gap-3 pb-1">
-                  <Button
-                    className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
-                    onClick={() => toggleAlert(detail.symbol)}
-                  >
-                    <Bell className="w-4 h-4 mr-2" />
-                    {selectedAsset?.advanced.hasAlert ? "Remove Alert" : "Add Alert"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
-                    onClick={() => toggleWatchlist(detail.symbol)}
-                  >
-                    <Star
-                      className="w-4 h-4 mr-2"
-                      stroke={selectedAsset?.inWatchlist ? "#00D4FF" : "#FFFFFF"}
-                      fill={selectedAsset?.inWatchlist ? "#00D4FF" : "none"}
+                  {/* Chart — fixed 145px on mobile; grows to fill left col on desktop */}
+                  <div className="rounded-lg overflow-hidden border border-[#1E293B] h-[145px] sm:h-auto sm:flex-1 sm:min-h-[220px]">
+                    <iframe
+                      key={detail.symbol}
+                      src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(detail.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
+                      style={{ width: "100%", height: "100%", border: "none" }}
+                      allowFullScreen
+                      title={`${detail.symbol} chart`}
                     />
-                    {selectedAsset?.inWatchlist ? "Remove from" : "Add to"} Watchlist
-                  </Button>
+                  </div>
+
                 </div>
-              </>
+
+                {/* ── RIGHT PANEL: MTF breakdown + metrics + action buttons ── */}
+                <div className="flex flex-col gap-3 flex-1 min-w-0">
+
+                  {/* MTF Breakdown */}
+                  <div className="bg-[#0A1628] rounded-lg px-3 py-2.5 border border-[#1E293B]">
+                    <div className="text-white text-sm font-semibold mb-2">
+                      Multi-Timeframe Breakdown
+                    </div>
+                    <div className="space-y-1.5">
+                      {detail.timeframes.map((tf) => (
+                        <div key={tf.timeframe} className="flex items-center gap-2">
+                          <span className="text-[#64748B] text-xs w-8 shrink-0 text-right">{tf.label}</span>
+                          <div className="flex-1">
+                            <StackedBar bear={tf.bear} bull={tf.bull} compact />
+                          </div>
+                          <span className={`text-xs w-9 text-right shrink-0 font-medium ${
+                            tf.bull > tf.bear ? "text-[#10B981]" : tf.bear > tf.bull ? "text-[#EF4444]" : "text-[#94A3B8]"
+                          }`}>
+                            {tf.bull > tf.bear ? `+${tf.bull}` : `-${tf.bear}`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Metrics 2×2 */}
+                  <div className="grid grid-cols-2 gap-2.5 flex-1">
+
+                    <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
+                      <div className="text-[#94A3B8] text-xs mb-1">ADX Trend Strength</div>
+                      <div className="text-2xl text-white font-bold">{detail.advanced.adx}</div>
+                      <div className={`text-sm mt-0.5 ${detail.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}`}>
+                        {detail.advanced.adx >= 35 ? "Very Strong Trend"
+                          : detail.advanced.adx >= 25 ? "Strong Trend"
+                          : detail.advanced.adx >= 20 ? "Developing Trend"
+                          : "Weak / Ranging"}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
+                      <div className="text-[#94A3B8] text-xs mb-1">EMA Alignment</div>
+                      <div className={`text-2xl font-bold ${detail.advanced.ema === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                        {detail.advanced.ema === "aligned" ? "✓ Aligned" : "✗ Mixed"}
+                      </div>
+                      <div className="text-sm text-[#64748B] mt-0.5">EMA 9, 21, 50</div>
+                    </div>
+
+                    <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
+                      <div className="text-[#94A3B8] text-xs mb-1">Volatility (ATR-based)</div>
+                      <div className="flex items-center gap-2 mt-1.5 mb-1">
+                        <div className="flex-1 h-2 bg-[#1E293B] rounded-full overflow-hidden">
+                          <div className="h-full bg-[#00D4FF]" style={{ width: `${detail.advanced.vol}%` }} />
+                        </div>
+                        <span className="text-white font-bold">{detail.advanced.vol}</span>
+                      </div>
+                      <div className="text-sm text-[#64748B]">
+                        {detail.advanced.vol >= 70 ? "High volatility" : detail.advanced.vol >= 40 ? "Moderate volatility" : "Low volatility"}
+                      </div>
+                    </div>
+
+                    <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
+                      <div className="text-[#94A3B8] text-xs mb-1">ADX Direction</div>
+                      <div className="flex items-center gap-2 mt-1.5 mb-1">
+                        {detail.advanced.adx_dir === "up" ? (
+                          <><TrendingUp className="w-5 h-5 text-[#10B981]" /><span className="text-[#10B981] text-lg font-bold">Rising</span></>
+                        ) : detail.advanced.adx_dir === "down" ? (
+                          <><TrendingDown className="w-5 h-5 text-[#EF4444]" /><span className="text-[#EF4444] text-lg font-bold">Falling</span></>
+                        ) : (
+                          <><ArrowRight className="w-5 h-5 text-[#94A3B8]" /><span className="text-[#94A3B8] text-lg font-bold">Flat</span></>
+                        )}
+                      </div>
+                      <div className="text-sm text-[#64748B]">+DI vs −DI comparison</div>
+                    </div>
+
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-3">
+                    <Button
+                      className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
+                      onClick={() => toggleAlert(detail.symbol)}
+                    >
+                      <Bell className="w-4 h-4 mr-2" />
+                      {selectedAsset?.advanced.hasAlert ? "Remove Alert" : "Add Alert"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
+                      onClick={() => toggleWatchlist(detail.symbol)}
+                    >
+                      <Star
+                        className="w-4 h-4 mr-2"
+                        stroke={selectedAsset?.inWatchlist ? "#00D4FF" : "#FFFFFF"}
+                        fill={selectedAsset?.inWatchlist ? "#00D4FF" : "none"}
+                      />
+                      {selectedAsset?.inWatchlist ? "Remove from" : "Add to"} Watchlist
+                    </Button>
+                  </div>
+
+                </div>
+              </div>
             )}
 
           </div>
