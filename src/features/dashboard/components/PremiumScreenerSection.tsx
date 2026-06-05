@@ -3,7 +3,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useScreener } from "@/features/dashboard/hooks/useScreener";
-import { useSymbolDetail } from "@/features/dashboard/hooks/useSymbolDetail";
 import { ScreenerRow, OrcaSignals } from "@/features/dashboard/types/screener";
 import { queryKeys } from "@/lib/query/keys";
 import {
@@ -209,21 +208,12 @@ export default function PremiumScreenerSection() {
   const [assetClassFilter, setAssetClassFilter] = useState("All");
   const [trendFilter, setTrendFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [watchedSymbols, setWatchedSymbols] = useState<string[]>([]);
   const [alertSymbols, setAlertSymbols] = useState<string[]>([]);
 
   const { data, isLoading, isFetching, isError, refetch } = useScreener(page, 50);
-  const { data: detail, isLoading: detailLoading } = useSymbolDetail(
-    showDetailModal ? selectedSymbol : null
-  );
-
-  // Find row for modal header while detail loads
-  const selectedRow = useMemo(
-    () => data?.rows.find((r) => r.symbol === selectedSymbol) ?? null,
-    [data?.rows, selectedSymbol]
-  );
 
   // Last updated label
   const lastUpdatedLabel = useMemo(() => {
@@ -290,17 +280,32 @@ export default function PremiumScreenerSection() {
     [filteredAssets]
   );
 
-  const toggleWatchlist = useCallback((symbol: string) => {
-    setWatchedSymbols((prev) =>
-      prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
-    );
-  }, []);
+  const toggleWatchlist = useCallback(
+    (symbol: string) => {
+      setWatchedSymbols((prev) =>
+        prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
+      );
+      if (selectedAsset?.symbol === symbol) {
+        setSelectedAsset({ ...selectedAsset, inWatchlist: !selectedAsset.inWatchlist });
+      }
+    },
+    [selectedAsset]
+  );
 
-  const toggleAlert = useCallback((symbol: string) => {
-    setAlertSymbols((prev) =>
-      prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
-    );
-  }, []);
+  const toggleAlert = useCallback(
+    (symbol: string) => {
+      setAlertSymbols((prev) =>
+        prev.includes(symbol) ? prev.filter((s) => s !== symbol) : [...prev, symbol]
+      );
+      if (selectedAsset?.symbol === symbol) {
+        setSelectedAsset({
+          ...selectedAsset,
+          advanced: { ...selectedAsset.advanced, hasAlert: !selectedAsset.advanced.hasAlert },
+        });
+      }
+    },
+    [selectedAsset]
+  );
 
   const handleRefresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: queryKeys.screener.all });
@@ -326,8 +331,8 @@ export default function PremiumScreenerSection() {
     URL.revokeObjectURL(a.href);
   }, [filteredAssets]);
 
-  const openModal = useCallback((symbol: string) => {
-    setSelectedSymbol(symbol);
+  const openModal = useCallback((asset: Asset) => {
+    setSelectedAsset(asset);
     setShowDetailModal(true);
   }, []);
 
@@ -343,7 +348,7 @@ export default function PremiumScreenerSection() {
       {bestAsset && (
         <div
           className="flex items-center gap-4 bg-gradient-to-r from-[#FFD700]/10 to-[#F59E0B]/5 border border-[#FFD700]/30 rounded-xl px-5 py-3 cursor-pointer hover:border-[#FFD700]/60 transition-all"
-          onClick={() => openModal(bestAsset.symbol)}
+          onClick={() => openModal(bestAsset)}
         >
           <Trophy className="w-5 h-5 text-[#FFD700] shrink-0" />
           <div className="flex-1 min-w-0">
@@ -496,7 +501,7 @@ export default function PremiumScreenerSection() {
                     className={`border-b border-[#1E293B] hover:bg-[#1A1F2E] transition-all duration-200 cursor-pointer ${
                       asset.signals.is_best ? "ring-1 ring-inset ring-[#FFD700]/20" : ""
                     }`}
-                    onClick={() => openModal(asset.symbol)}
+                    onClick={() => openModal(asset)}
                   >
                     {/* SYMBOL */}
                     <td className="py-3 px-4">
@@ -648,201 +653,86 @@ export default function PremiumScreenerSection() {
         )}
       </div>
 
-      {/* ── Detail Modal ─────────────────────────────────────────────────────── */}
+      {/* Detail Modal */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        {/*
-          max-w-5xl + h-[85vh]: wide enough for side-by-side, tall enough for chart.
-          flex-col so header is pinned, body fills remaining height.
-          overflow-hidden on root keeps X button always visible.
-        */}
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-[1200px] w-[95vw] h-[74vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              {selectedAsset?.symbol} - {selectedAsset?.name}
+            </DialogTitle>
+            <DialogDescription className="text-[#94A3B8]">
+              Detailed multi-timeframe analysis
+            </DialogDescription>
+          </DialogHeader>
 
-          {/* ── Pinned header (X button lives here) ── */}
-          <div className="px-6 pt-5 pb-4 border-b border-[#1E293B] shrink-0 pr-14">
-            <DialogHeader>
-              <DialogTitle className="text-xl">
-                {selectedRow?.symbol} – {selectedRow?.name}
-              </DialogTitle>
-              <DialogDescription className="text-[#94A3B8] text-sm">
-                Multi-timeframe breakdown &amp; OrcaBot signals
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-
-          {/* ── Two-column body ── */}
-          {detailLoading || !detail ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="space-y-3 w-full max-w-md px-6">
-                {[...Array(5)].map((_, i) => (
-                  <Skeleton key={i} className="h-8 w-full rounded" />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-1 min-h-0 overflow-hidden">
-
-              {/* LEFT — TradingView chart, no scroll, fills full height */}
-              <div className="w-[50%] shrink-0 border-r border-[#1E293B] overflow-hidden">
+          {selectedAsset && (
+            <div className="space-y-4 py-2">
+              {/* TradingView Chart */}
+              <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 220 }}>
                 <iframe
-                  key={detail.symbol}
-                  src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(
-                    getTVSymbol(detail.symbol)
-                  )}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
+                  key={selectedAsset.symbol}
+                  src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(selectedAsset.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
                   style={{ width: "100%", height: "100%", border: "none" }}
                   allowFullScreen
-                  title={`${detail.symbol} chart`}
+                  title={`${selectedAsset.symbol} chart`}
                 />
               </div>
 
-              {/* RIGHT — scrollable signals & metrics panel */}
-              <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-
-                {/* OrcaBot Status */}
-                <div
-                  className={`rounded-xl px-4 py-3 ${
-                    detail.signals.status === "ON"
-                      ? "bg-[#10B981]/10 border border-[#10B981]/30"
-                      : detail.signals.status === "WATCH"
-                      ? "bg-[#F59E0B]/10 border border-[#F59E0B]/30"
-                      : "bg-[#64748B]/10 border border-[#64748B]/30"
-                  }`}
-                >
-                  <div className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">
-                    OrcaBot Status
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`text-2xl font-bold ${
-                          detail.signals.status === "ON"
-                            ? "text-[#10B981]"
-                            : detail.signals.status === "WATCH"
-                            ? "text-[#F59E0B]"
-                            : "text-[#64748B]"
-                        }`}
-                      >
-                        {detail.signals.status}
-                      </span>
-                      <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
-                        {detail.signals.direction}
-                      </span>
-                    </div>
-                    <ScoreRing score={detail.signals.orca_score} />
-                  </div>
-                  <div className="flex items-center gap-2 mt-2 flex-wrap">
-                    <Badge className={`${PHASE_STYLES[detail.signals.market_phase]} border-0 text-xs`}>
-                      {detail.signals.market_phase}
-                    </Badge>
-                    {detail.signals.pullback && (
-                      <Badge className={`${PULLBACK_STYLES[detail.signals.pullback]} border-0 text-xs`}>
-                        {detail.signals.pullback} Pullback
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* MTF Breakdown */}
+              {/* Analysis Grid */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
-                  <div className="text-[#94A3B8] text-xs font-medium uppercase tracking-wider mb-3">
-                    Multi-Timeframe Breakdown
-                  </div>
-                  <div className="space-y-2">
-                    {detail.timeframes.map((tf) => (
-                      <div key={tf.timeframe} className="flex items-center gap-2">
-                        <span className="text-[#64748B] text-xs w-7 shrink-0 text-right">
-                          {tf.label}
-                        </span>
-                        <div className="flex-1">
-                          <StackedBar bear={tf.bear} bull={tf.bull} compact />
-                        </div>
-                        <span
-                          className={`text-xs w-9 text-right shrink-0 font-medium ${
-                            tf.bull > tf.bear
-                              ? "text-[#10B981]"
-                              : tf.bear > tf.bull
-                              ? "text-[#EF4444]"
-                              : "text-[#94A3B8]"
-                          }`}
-                        >
-                          {tf.bull > tf.bear ? `+${tf.bull}` : `-${tf.bear}`}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="text-[#94A3B8] text-sm mb-2">Intraday Trend</div>
+                  <StackedBar bear={selectedAsset.intraday.bear} bull={selectedAsset.intraday.bull} />
+                  <div className="text-xs text-[#64748B] mt-2">Based on 1M, 5M, 15M, 1H timeframes</div>
+                </div>
+
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">Daily Trend</div>
+                  <StackedBar bear={selectedAsset.daily.bear} bull={selectedAsset.daily.bull} />
+                  <div className="text-xs text-[#64748B] mt-2">Based on 4H, 1D, 1W timeframes</div>
+                </div>
+
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">ADX Trend Strength</div>
+                  <div className="text-2xl text-white">{selectedAsset.advanced.adx}</div>
+                  <div className="text-sm text-[#10B981] mt-1">
+                    {selectedAsset.advanced.adx >= 25 ? "Strong Trend" : "Weak Trend"}
                   </div>
                 </div>
 
-                {/* Metrics — single card, one row per metric, no wrapping */}
-                <div className="bg-[#0A1628] rounded-lg border border-[#1E293B] divide-y divide-[#1E293B]">
-                  {/* ADX Strength */}
-                  <div className="flex items-center justify-between px-4 py-2.5">
-                    <span className="text-[#94A3B8] text-xs shrink-0">ADX Strength</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-bold">{detail.advanced.adx}</span>
-                      <span className={`text-xs ${detail.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}`}>
-                        {detail.advanced.adx >= 35 ? "Very Strong" : detail.advanced.adx >= 25 ? "Strong" : detail.advanced.adx >= 20 ? "Developing" : "Weak"}
-                      </span>
-                    </div>
+                <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-sm mb-2">EMA Alignment</div>
+                  <div className={`text-2xl ${selectedAsset.advanced.emaStatus === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                    {selectedAsset.advanced.emaStatus === "aligned" ? "✓ Aligned" : "✗ Crossed"}
                   </div>
-                  {/* EMA Alignment */}
-                  <div className="flex items-center justify-between px-4 py-2.5">
-                    <span className="text-[#94A3B8] text-xs shrink-0">EMA 9 / 21 / 50</span>
-                    <span className={`text-sm font-bold ${detail.advanced.ema === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
-                      {detail.advanced.ema === "aligned" ? "✓ Aligned" : "✗ Mixed"}
-                    </span>
-                  </div>
-                  {/* ADX Direction */}
-                  <div className="flex items-center justify-between px-4 py-2.5">
-                    <span className="text-[#94A3B8] text-xs shrink-0">ADX Direction</span>
-                    <div className="flex items-center gap-1">
-                      {detail.advanced.adx_dir === "up" ? (
-                        <><TrendingUp className="w-4 h-4 text-[#10B981]" /><span className="text-[#10B981] text-sm font-bold">Rising</span></>
-                      ) : detail.advanced.adx_dir === "down" ? (
-                        <><TrendingDown className="w-4 h-4 text-[#EF4444]" /><span className="text-[#EF4444] text-sm font-bold">Falling</span></>
-                      ) : (
-                        <><ArrowRight className="w-4 h-4 text-[#94A3B8]" /><span className="text-[#94A3B8] text-sm font-bold">Flat</span></>
-                      )}
-                    </div>
-                  </div>
-                  {/* Volatility */}
-                  <div className="flex items-center justify-between px-4 py-2.5">
-                    <span className="text-[#94A3B8] text-xs shrink-0">Volatility (ATR)</span>
-                    <div className="flex items-center gap-2">
-                      <div className="w-20 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#00D4FF]" style={{ width: `${detail.advanced.vol}%` }} />
-                      </div>
-                      <span className="text-white text-xs font-bold w-5 text-right">{detail.advanced.vol}</span>
-                      <span className="text-[#64748B] text-xs">{detail.advanced.vol >= 70 ? "High" : detail.advanced.vol >= 40 ? "Med" : "Low"}</span>
-                    </div>
-                  </div>
+                  <div className="text-sm text-[#64748B] mt-1">EMA 9, 21, 50</div>
                 </div>
+              </div>
 
-                {/* Action buttons */}
-                <div className="flex gap-2 pb-2">
-                  <Button
-                    className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black text-sm"
-                    onClick={() => toggleAlert(detail.symbol)}
-                  >
-                    <Bell className="w-4 h-4 mr-1.5" />
-                    {alertSymbols.includes(detail.symbol) ? "Remove Alert" : "Add Alert"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B] text-sm"
-                    onClick={() => toggleWatchlist(detail.symbol)}
-                  >
-                    <Star
-                      className="w-4 h-4 mr-1.5"
-                      stroke={watchedSymbols.includes(detail.symbol) ? "#00D4FF" : "#FFFFFF"}
-                      fill={watchedSymbols.includes(detail.symbol) ? "#00D4FF" : "none"}
-                    />
-                    {watchedSymbols.includes(detail.symbol) ? "Remove" : "Watchlist"}
-                  </Button>
-                </div>
-
-              </div>{/* end right panel */}
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button
+                  className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
+                  onClick={() => toggleAlert(selectedAsset.symbol)}
+                >
+                  <Bell className="w-4 h-4 mr-2" />
+                  {selectedAsset.advanced.hasAlert ? "Remove Alert" : "Add Alert"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
+                  onClick={() => toggleWatchlist(selectedAsset.symbol)}
+                >
+                  <Star
+                    className="w-4 h-4 mr-2"
+                    stroke={selectedAsset.inWatchlist ? "#00D4FF" : "#FFFFFF"}
+                    fill={selectedAsset.inWatchlist ? "#00D4FF" : "none"}
+                  />
+                  {selectedAsset.inWatchlist ? "Remove from" : "Add to"} Watchlist
+                </Button>
+              </div>
             </div>
           )}
-
         </DialogContent>
       </Dialog>
     </div>
