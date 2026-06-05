@@ -657,13 +657,13 @@ export default function PremiumScreenerSection() {
         )}
       </div>
 
-      {/* Detail Modal — single column, pinned header, compact to fit screen */}
+      {/* Detail Modal — fixed h-[88vh] so it never overflows top/bottom */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-2xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-2xl w-[95vw] h-[88vh] flex flex-col overflow-hidden p-0 gap-0">
 
           {/* Pinned header — X always visible */}
-          <div className="px-5 pt-4 pb-3 border-b border-[#1E293B] shrink-0 pr-12">
-            <DialogTitle className="text-lg font-semibold leading-tight">
+          <div className="px-5 pt-3 pb-3 border-b border-[#1E293B] shrink-0 pr-12">
+            <DialogTitle className="text-base font-semibold leading-tight">
               {selectedAsset?.symbol} – {selectedAsset?.name}
             </DialogTitle>
             <DialogDescription className="text-[#94A3B8] text-xs mt-0.5">
@@ -671,8 +671,9 @@ export default function PremiumScreenerSection() {
             </DialogDescription>
           </div>
 
-          {/* Scrollable body — compact spacing throughout */}
-          <div className="overflow-y-auto flex-1 px-5 py-3 space-y-3">
+          {/* min-h-0 is critical — without it flex children ignore the parent height
+              constraint and the content overflows outside the modal boundary */}
+          <div className="overflow-y-auto flex-1 min-h-0 px-5 py-2 space-y-2">
 
             {detailLoading || !detail ? (
               <div className="space-y-2 pt-2">
@@ -682,17 +683,16 @@ export default function PremiumScreenerSection() {
               </div>
             ) : (
               <>
-                {/* OrcaBot Status — compact single row */}
-                <div className={`flex items-center justify-between rounded-lg px-4 py-2.5 ${
+                {/* OrcaBot Status — single compact row */}
+                <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${
                   detail.signals.status === "ON"
                     ? "bg-[#10B981]/10 border border-[#10B981]/30"
                     : detail.signals.status === "WATCH"
                     ? "bg-[#F59E0B]/10 border border-[#F59E0B]/30"
                     : "bg-[#64748B]/10 border border-[#64748B]/30"
                 }`}>
-                  <div className="flex items-center gap-3">
-                    <div className="text-xs text-[#94A3B8] uppercase tracking-wider">OrcaBot Status</div>
-                    <span className={`text-xl font-bold ${
+                  <div className="flex items-center gap-2">
+                    <span className={`text-lg font-bold ${
                       detail.signals.status === "ON" ? "text-[#10B981]"
                       : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
                       : "text-[#64748B]"
@@ -702,21 +702,15 @@ export default function PremiumScreenerSection() {
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="text-center">
-                      <div className="text-xs text-[#94A3B8] mb-0.5">Score</div>
-                      <ScoreRing score={detail.signals.orca_score} />
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-[#94A3B8] mb-1">Phase</div>
-                      <Badge className={`${PHASE_STYLES[detail.signals.market_phase]} border-0 text-xs`}>
-                        {detail.signals.market_phase}
-                      </Badge>
-                    </div>
+                    <ScoreRing score={detail.signals.orca_score} />
+                    <Badge className={`${PHASE_STYLES[detail.signals.market_phase]} border-0 text-xs`}>
+                      {detail.signals.market_phase}
+                    </Badge>
                   </div>
                 </div>
 
-                {/* TradingView chart — shorter height */}
-                <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 175 }}>
+                {/* TradingView chart */}
+                <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 160 }}>
                   <iframe
                     key={detail.symbol}
                     src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(detail.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
@@ -726,12 +720,12 @@ export default function PremiumScreenerSection() {
                   />
                 </div>
 
-                {/* MTF Breakdown — tighter rows */}
-                <div className="bg-[#0A1628] rounded-lg px-4 py-3 border border-[#1E293B]">
-                  <div className="text-[#94A3B8] text-xs font-medium uppercase tracking-wider mb-2">
+                {/* MTF Breakdown */}
+                <div className="bg-[#0A1628] rounded-lg px-3 py-2.5 border border-[#1E293B]">
+                  <div className="text-[#94A3B8] text-xs font-medium uppercase tracking-wider mb-1.5">
                     Multi-Timeframe Breakdown
                   </div>
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     {detail.timeframes.map((tf) => (
                       <div key={tf.timeframe} className="flex items-center gap-2">
                         <span className="text-[#64748B] text-xs w-8 shrink-0 text-right">{tf.label}</span>
@@ -748,58 +742,56 @@ export default function PremiumScreenerSection() {
                   </div>
                 </div>
 
-                {/* Metrics 2×2 — compact cards */}
+                {/* Metrics 2×2 */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">ADX Trend Strength</div>
-                    <div className="text-xl text-white font-bold">{detail.advanced.adx}</div>
-                    <div className={`text-xs mt-0.5 ${detail.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}`}>
-                      {detail.advanced.adx >= 35 ? "Very Strong Trend"
-                        : detail.advanced.adx >= 25 ? "Strong Trend"
-                        : detail.advanced.adx >= 20 ? "Developing Trend"
-                        : "Weak / Ranging"}
+                  <div className="bg-[#0A1628] rounded-lg p-2.5 border border-[#1E293B]">
+                    <div className="text-[#94A3B8] text-xs mb-0.5">ADX Trend Strength</div>
+                    <div className="text-lg text-white font-bold leading-tight">{detail.advanced.adx}</div>
+                    <div className={`text-xs ${detail.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}`}>
+                      {detail.advanced.adx >= 35 ? "Very Strong" : detail.advanced.adx >= 25 ? "Strong Trend" : detail.advanced.adx >= 20 ? "Developing" : "Weak / Ranging"}
                     </div>
                   </div>
 
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">EMA Alignment</div>
-                    <div className={`text-xl font-bold ${detail.advanced.ema === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
+                  <div className="bg-[#0A1628] rounded-lg p-2.5 border border-[#1E293B]">
+                    <div className="text-[#94A3B8] text-xs mb-0.5">EMA Alignment</div>
+                    <div className={`text-lg font-bold leading-tight ${detail.advanced.ema === "aligned" ? "text-[#10B981]" : "text-[#EF4444]"}`}>
                       {detail.advanced.ema === "aligned" ? "✓ Aligned" : "✗ Mixed"}
                     </div>
-                    <div className="text-xs text-[#64748B] mt-0.5">EMA 9, 21, 50</div>
+                    <div className="text-xs text-[#64748B]">EMA 9, 21, 50</div>
                   </div>
 
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">Volatility (ATR-based)</div>
-                    <div className="flex items-center gap-2 mt-1">
+                  <div className="bg-[#0A1628] rounded-lg p-2.5 border border-[#1E293B]">
+                    <div className="text-[#94A3B8] text-xs mb-0.5">Volatility (ATR-based)</div>
+                    <div className="flex items-center gap-2 my-1">
                       <div className="flex-1 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
                         <div className="h-full bg-[#00D4FF]" style={{ width: `${detail.advanced.vol}%` }} />
                       </div>
-                      <span className="text-white font-bold">{detail.advanced.vol}</span>
+                      <span className="text-white font-bold text-sm">{detail.advanced.vol}</span>
                     </div>
-                    <div className="text-xs text-[#64748B] mt-0.5">
-                      {detail.advanced.vol >= 70 ? "High volatility" : detail.advanced.vol >= 40 ? "Moderate volatility" : "Low volatility"}
+                    <div className="text-xs text-[#64748B]">
+                      {detail.advanced.vol >= 70 ? "High" : detail.advanced.vol >= 40 ? "Moderate" : "Low"} volatility
                     </div>
                   </div>
 
-                  <div className="bg-[#0A1628] rounded-lg p-3 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-xs mb-1">ADX Direction</div>
-                    <div className="flex items-center gap-1.5 mt-1">
+                  <div className="bg-[#0A1628] rounded-lg p-2.5 border border-[#1E293B]">
+                    <div className="text-[#94A3B8] text-xs mb-0.5">ADX Direction</div>
+                    <div className="flex items-center gap-1.5 my-1">
                       {detail.advanced.adx_dir === "up" ? (
-                        <><TrendingUp className="w-5 h-5 text-[#10B981]" /><span className="text-[#10B981] font-bold">Rising</span></>
+                        <><TrendingUp className="w-4 h-4 text-[#10B981]" /><span className="text-[#10B981] font-bold">Rising</span></>
                       ) : detail.advanced.adx_dir === "down" ? (
-                        <><TrendingDown className="w-5 h-5 text-[#EF4444]" /><span className="text-[#EF4444] font-bold">Falling</span></>
+                        <><TrendingDown className="w-4 h-4 text-[#EF4444]" /><span className="text-[#EF4444] font-bold">Falling</span></>
                       ) : (
-                        <><ArrowRight className="w-5 h-5 text-[#94A3B8]" /><span className="text-[#94A3B8] font-bold">Flat</span></>
+                        <><ArrowRight className="w-4 h-4 text-[#94A3B8]" /><span className="text-[#94A3B8] font-bold">Flat</span></>
                       )}
                     </div>
-                    <div className="text-xs text-[#64748B] mt-0.5">+DI vs −DI comparison</div>
+                    <div className="text-xs text-[#64748B]">+DI vs −DI</div>
                   </div>
                 </div>
 
                 {/* Action buttons */}
                 <div className="flex gap-3 pb-1">
                   <Button
+                    size="sm"
                     className="flex-1 bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
                     onClick={() => toggleAlert(detail.symbol)}
                   >
@@ -807,6 +799,7 @@ export default function PremiumScreenerSection() {
                     {selectedAsset?.advanced.hasAlert ? "Remove Alert" : "Add Alert"}
                   </Button>
                   <Button
+                    size="sm"
                     variant="outline"
                     className="flex-1 border-[#1E293B] bg-[#1A1F2E] text-white hover:bg-[#16202B]"
                     onClick={() => toggleWatchlist(detail.symbol)}
