@@ -3,19 +3,29 @@ import { fetchScreenerRows } from "@/features/dashboard/services/screener";
 import { queryKeys } from "@/lib/query/keys";
 import { ScreenerPage } from "@/features/dashboard/types/screener";
 
-export const useScreener = (page = 1, pageSize = 250) => {
+interface UseScreenerOptions {
+  autoRefresh?:    boolean;
+  refreshInterval?: number; // seconds
+}
+
+export const useScreener = (
+  page = 1,
+  pageSize = 250,
+  options?: UseScreenerOptions,
+) => {
+  const auto     = options?.autoRefresh    ?? true;
+  const interval = options?.refreshInterval ?? 30;
+
   return useQuery<ScreenerPage, Error>({
     queryKey: queryKeys.screener.rows(page, pageSize),
-    queryFn: () => fetchScreenerRows(page, pageSize),
+    queryFn:  () => fetchScreenerRows(page, pageSize),
 
-    // Always fetch fresh — screener data changes every 30s
-    staleTime: 0,
-    refetchInterval: 30 * 1000,
+    staleTime:           0,
+    refetchInterval:     auto ? interval * 1000 : false,
     refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
+    refetchOnReconnect:  true,
     retry: 1,
 
-    // Keep previous data visible while next page loads
     placeholderData: keepPreviousData,
   });
 };

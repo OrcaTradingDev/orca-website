@@ -1,21 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
-
-const ASSET_CLASSES = ["Forex", "Commodities", "Indices", "Crypto"];
-const TIMEFRAMES    = ["5M", "30M", "1H", "4H", "1D"];
+import { useScreenerStore, ALL_ASSET_CLASSES, ALL_TIMEFRAMES } from "@/store/screener-store";
 
 export default function FiltersSettingsSection() {
-  const [selectedClasses, setSelectedClasses] = useState<string[]>(ASSET_CLASSES);
-  const [selectedTFs,     setSelectedTFs]     = useState<string[]>(["30M", "1H", "4H", "1D"]);
-  const [autoRefresh,     setAutoRefresh]     = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState([60]);
-  const [emailAlerts,     setEmailAlerts]     = useState(true);
-  const [browserAlerts,   setBrowserAlerts]   = useState(false);
+  const store = useScreenerStore();
+
+  // Local draft state — only committed on Save
+  const [selectedClasses,  setSelectedClasses]  = useState<string[]>(store.enabledAssetClasses);
+  const [selectedTFs,      setSelectedTFs]      = useState<string[]>(store.enabledTimeframes);
+  const [autoRefresh,      setAutoRefresh]      = useState(store.autoRefresh);
+  const [refreshInterval,  setRefreshInterval]  = useState([store.refreshInterval]);
+  const [emailAlerts,      setEmailAlerts]      = useState(store.emailAlerts);
+  const [browserAlerts,    setBrowserAlerts]    = useState(store.browserAlerts);
+  const [saved,            setSaved]            = useState(false);
 
   const toggleClass = (c: string) =>
     setSelectedClasses((prev) =>
@@ -26,6 +29,27 @@ export default function FiltersSettingsSection() {
     setSelectedTFs((prev) =>
       prev.includes(tf) ? prev.filter((x) => x !== tf) : [...prev, tf]
     );
+
+  const handleSave = () => {
+    store.setScreenerSettings({
+      enabledAssetClasses: selectedClasses,
+      enabledTimeframes:   selectedTFs,
+      autoRefresh,
+      refreshInterval:     refreshInterval[0],
+      emailAlerts,
+      browserAlerts,
+    });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
+
+  const isDirty =
+    JSON.stringify(selectedClasses.slice().sort()) !== JSON.stringify(store.enabledAssetClasses.slice().sort()) ||
+    JSON.stringify(selectedTFs.slice().sort())     !== JSON.stringify(store.enabledTimeframes.slice().sort())   ||
+    autoRefresh     !== store.autoRefresh     ||
+    refreshInterval[0] !== store.refreshInterval ||
+    emailAlerts     !== store.emailAlerts     ||
+    browserAlerts   !== store.browserAlerts;
 
   return (
     <div className="space-y-6">
@@ -42,7 +66,7 @@ export default function FiltersSettingsSection() {
           Choose which asset classes appear in the screener table.
         </p>
         <div className="flex gap-2 flex-wrap">
-          {ASSET_CLASSES.map((c) => (
+          {ALL_ASSET_CLASSES.map((c) => (
             <button
               key={c}
               onClick={() => toggleClass(c)}
@@ -56,16 +80,21 @@ export default function FiltersSettingsSection() {
             </button>
           ))}
         </div>
+        {selectedClasses.length === 0 && (
+          <p className="text-[#EF4444] text-xs mt-3">
+            At least one asset class must be selected.
+          </p>
+        )}
       </div>
 
       {/* Timeframe display */}
       <div className="bg-[#14181F] border border-[#1E293B] rounded-xl p-6">
         <h2 className="text-white font-semibold mb-1.5">Timeframe Display</h2>
         <p className="text-[#64748B] text-sm mb-5">
-          Select which timeframes contribute to the intraday, daily, and long-term bars.
+          Select which timeframes are visible in the screener columns.
         </p>
         <div className="flex gap-2 flex-wrap">
-          {TIMEFRAMES.map((tf) => (
+          {ALL_TIMEFRAMES.map((tf) => (
             <button
               key={tf}
               onClick={() => toggleTF(tf)}
@@ -79,6 +108,9 @@ export default function FiltersSettingsSection() {
             </button>
           ))}
         </div>
+        <p className="text-[#475569] text-xs mt-3">
+          Controls which timeframe labels are shown in the column headers.
+        </p>
       </div>
 
       {/* Display settings */}
@@ -149,9 +181,30 @@ export default function FiltersSettingsSection() {
         </div>
       </div>
 
-      <Button className="bg-[#00D4FF] hover:bg-[#00B8E6] text-black font-semibold px-8">
-        Save Changes
-      </Button>
+      {/* Save */}
+      <div className="flex items-center gap-4">
+        <Button
+          onClick={handleSave}
+          disabled={selectedClasses.length === 0}
+          className={`px-8 font-semibold transition-all ${
+            saved
+              ? "bg-[#10B981] hover:bg-[#10B981] text-white"
+              : "bg-[#00D4FF] hover:bg-[#00B8E6] text-black"
+          }`}
+        >
+          {saved ? (
+            <>
+              <Check className="w-4 h-4 mr-2" />
+              Saved
+            </>
+          ) : (
+            "Save Changes"
+          )}
+        </Button>
+        {isDirty && !saved && (
+          <span className="text-[#F59E0B] text-sm">You have unsaved changes</span>
+        )}
+      </div>
     </div>
   );
 }

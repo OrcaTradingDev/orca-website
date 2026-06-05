@@ -216,12 +216,24 @@ export default function PremiumScreenerSection() {
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Shared persisted state — also consumed by Watchlist + Alerts tabs
-  const watchedSymbols      = useScreenerStore((s) => s.watchedSymbols);
-  const alertSymbols        = useScreenerStore((s) => s.alertSymbols);
+  const watchedSymbols       = useScreenerStore((s) => s.watchedSymbols);
+  const alertSymbols         = useScreenerStore((s) => s.alertSymbols);
   const storeToggleWatchlist = useScreenerStore((s) => s.toggleWatchlist);
   const storeToggleAlert     = useScreenerStore((s) => s.toggleAlert);
+  const enabledAssetClasses  = useScreenerStore((s) => s.enabledAssetClasses);
+  const autoRefresh          = useScreenerStore((s) => s.autoRefresh);
+  const refreshInterval      = useScreenerStore((s) => s.refreshInterval);
+  const enabledTimeframes    = useScreenerStore((s) => s.enabledTimeframes);
 
-  const { data, isLoading, isFetching, isError, refetch } = useScreener(page, 50);
+  // Derive per-column TF label strings from enabled timeframes
+  const intradayTFs  = ["5M", "30M", "1H"].filter((tf) => enabledTimeframes.includes(tf));
+  const dailyTFs     = ["4H", "1D"].filter((tf) => enabledTimeframes.includes(tf));
+  const longtermTFs  = ["1W", "1M"].filter((tf) => enabledTimeframes.includes(tf)); // 1W/1M always shown
+
+  const { data, isLoading, isFetching, isError, refetch } = useScreener(page, 50, {
+    autoRefresh,
+    refreshInterval,
+  });
   const { data: detail, isLoading: detailLoading } = useSymbolDetail(
     showDetailModal ? (selectedAsset?.symbol ?? null) : null
   );
@@ -270,8 +282,10 @@ export default function PremiumScreenerSection() {
       const matchesSearch =
         asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
         asset.name.toLowerCase().includes(searchQuery.toLowerCase());
+      // Global class filter (from Filters & Settings) + screener dropdown filter
       const matchesAssetClass =
-        assetClassFilter === "All" || asset.assetClass === assetClassFilter;
+        enabledAssetClasses.includes(asset.assetClass) &&
+        (assetClassFilter === "All" || asset.assetClass === assetClassFilter);
       let matchesTrend = true;
       if (trendFilter !== "All") {
         const bull = asset.daily.bull;
@@ -283,7 +297,7 @@ export default function PremiumScreenerSection() {
       }
       return matchesSearch && matchesAssetClass && matchesTrend;
     });
-  }, [assets, searchQuery, assetClassFilter, trendFilter]);
+  }, [assets, searchQuery, assetClassFilter, trendFilter, enabledAssetClasses]);
 
   // Best market (visible on current page)
   const bestAsset = useMemo(
@@ -458,15 +472,21 @@ export default function PremiumScreenerSection() {
                 <th className="py-4 px-4 text-left text-white w-[220px]">SYMBOL</th>
                 <th className="py-4 px-4 text-center text-white">
                   <div className="mb-1">INTRADAY</div>
-                  <div className="text-xs text-[#94A3B8]">5M | 30M | 1H</div>
+                  <div className="text-xs text-[#94A3B8]">
+                    {intradayTFs.length > 0 ? intradayTFs.join(" | ") : "—"}
+                  </div>
                 </th>
                 <th className="py-4 px-4 text-center text-white">
                   <div className="mb-1">DAILY</div>
-                  <div className="text-xs text-[#94A3B8]">4H | 1D</div>
+                  <div className="text-xs text-[#94A3B8]">
+                    {dailyTFs.length > 0 ? dailyTFs.join(" | ") : "—"}
+                  </div>
                 </th>
                 <th className="py-4 px-4 text-center text-white">
                   <div className="mb-1">LONG-TERM</div>
-                  <div className="text-xs text-[#94A3B8]">1D | 1W | 1M</div>
+                  <div className="text-xs text-[#94A3B8]">
+                    {["1D", ...longtermTFs].join(" | ")}
+                  </div>
                 </th>
                 <th className="py-4 px-4 text-center text-white w-[150px]">
                   <div className="flex items-center justify-center gap-2 mb-1">
