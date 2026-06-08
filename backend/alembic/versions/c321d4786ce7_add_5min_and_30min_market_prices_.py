@@ -15,9 +15,8 @@ depends_on = None
 
 
 def upgrade():
-    # Add new timeframe enum values for intraday ingestion
-    op.execute("ALTER TYPE timeframe_enum ADD VALUE IF NOT EXISTS '5min'")
-    op.execute("ALTER TYPE timeframe_enum ADD VALUE IF NOT EXISTS '30min'")
+    # timeframe is a String column (not a Postgres enum) — no schema change needed.
+    pass
 
 
 def downgrade():
