@@ -50,7 +50,7 @@ def _issue_app_jwt(
         "screener_access": screener_access or is_admin,  # admins always have screener access
         "is_admin": is_admin,
         "iat": now,
-        "exp": now + 60 * 60 * 24 * 7,  # 7 days
+        "exp": now + 60 * 60 * 24 * 30,  # 30 days
     }
     return jwt.encode(payload, APP_JWT_SECRET, algorithm="HS256")
 

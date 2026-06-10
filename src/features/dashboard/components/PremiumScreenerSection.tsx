@@ -119,16 +119,16 @@ const StackedBar = ({
 
 // ── Score ring ────────────────────────────────────────────────────────────────
 const ScoreRing = ({ score, size = 52 }: { score: number; size?: number }) => {
+  // Quality scale: high score = strong trend opportunity (long OR short)
+  // low score = choppy / no edge
   const color =
-    score >= 65
-      ? "#10B981"
-      : score >= 55
-      ? "#F59E0B"
-      : score >= 45
-      ? "#94A3B8"
-      : score >= 35
-      ? "#F97316"
-      : "#EF4444";
+    score >= 70
+      ? "#10B981"   // green  — strong trend, high-conviction opportunity
+      : score >= 50
+      ? "#F59E0B"   // amber  — moderate trend, worth watching
+      : score >= 30
+      ? "#F97316"   // orange — weak trend, low confidence
+      : "#94A3B8";  // slate  — neutral / chop, no meaningful opportunity
   const cx = size / 2;
   const r = size * 0.38;
   const circ = 2 * Math.PI * r;

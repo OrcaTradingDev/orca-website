@@ -53,11 +53,23 @@ def compute_orca_score(
     adx: int,
     ema_aligned: bool,
 ) -> int:
+    """
+    Trend-quality score (0–100).  Higher = stronger opportunity in EITHER direction.
+    A reading near 100 means a confirmed, high-conviction trend worth following
+    (long or short).  A reading near 0 means a choppy, neutral market with no edge.
+
+    Formula:
+        deviation  = |weighted_bull - 50|   # 0–50; 0 = neutral, 50 = fully one-sided
+        adx_factor = 0.8 + (min(ADX, 50)/50) * 0.4   # [0.8, 1.2]; ADX amplifies quality
+        score      = deviation * 2 * adx_factor         # [0, 120] before clamping
+        +5 bonus if EMAs are aligned (9>21>50 or 9<21<50) — confirms trend structure
+    """
     weighted = intraday_bull * 0.30 + daily_bull * 0.50 + longterm_bull * 0.20
-    adx_factor = 0.8 + (min(adx, 50) / 50) * 0.4
-    score = (weighted - 50) * adx_factor + 50
+    deviation = abs(weighted - 50)                    # 0–50; symmetric around neutral
+    adx_factor = 0.8 + (min(adx, 50) / 50) * 0.4    # [0.8, 1.2]
+    score = deviation * 2 * adx_factor                # [0, ~120]
     if ema_aligned:
-        score += 3 if weighted > 50 else -3
+        score += 5                                    # EMA structure confirmation bonus
     return int(max(0, min(100, round(score))))
 
 

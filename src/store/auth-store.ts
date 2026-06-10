@@ -30,6 +30,17 @@ interface AuthState {
   setHasHydrated: (state: boolean) => void;
 }
 
+/** Returns true if the JWT exp timestamp is in the past. */
+function isTokenExpired(token: string): boolean {
+  try {
+    const { exp } = jwtDecode<JWTPayload>(token);
+    // exp is in seconds; give a 30-second grace window
+    return Date.now() / 1000 > exp - 30;
+  } catch {
+    return true; // treat malformed tokens as expired
+  }
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -65,6 +76,12 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
+        // Clear expired tokens immediately on page load so users are never
+        // shown as "logged in" while the backend rejects their requests.
+        if (state?.token && isTokenExpired(state.token)) {
+          state.token = null;
+          state.user = null;
+        }
         state?.setHasHydrated(true);
       },
     }
