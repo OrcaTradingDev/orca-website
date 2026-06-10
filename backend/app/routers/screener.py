@@ -33,6 +33,7 @@ from app.domain.signals import (
     vol_score_from_atr,
     build_signals,
 )
+from app.domain.config import load_screener_config
 
 router = APIRouter(prefix="/screener", tags=["screener"])
 
@@ -69,6 +70,7 @@ async def get_screener_rows(
     """
     Paginated screener rows with OrcaBot signals.
     """
+    cfg = await load_screener_config(db)
     offset = (page - 1) * page_size
 
     base_query = select(FXUniverse)
@@ -159,7 +161,7 @@ async def get_screener_rows(
         ema_aligned = (ema_str == "aligned")
 
         signals = _build_signals(
-            daily_bull, intraday_bull, longterm_bull, adx, ema_aligned, adx_dir
+            daily_bull, intraday_bull, longterm_bull, adx, ema_aligned, adx_dir, cfg=cfg
         )
 
         rows.append(
@@ -210,6 +212,7 @@ async def get_symbol_detail(
     Return per-timeframe breakdown and full OrcaBot signals for a single symbol.
     Used to populate the detail modal.
     """
+    cfg = await load_screener_config(db)
     symbol = symbol.upper()
 
     # Fetch FXUniverse name
