@@ -11,6 +11,7 @@ from app.core.db import get_db
 from app.models.journal_trade import JournalTrade
 from app.models.user import User
 from app.schemas.journal import (
+    BulkImportResult,
     CoachingSettings,
     JournalStats,
     TradeCreate,
@@ -132,6 +133,34 @@ async def delete_trade(
         raise HTTPException(status_code=404, detail="Trade not found")
     await db.delete(trade)
     await db.commit()
+
+
+# ── Bulk import ──────────────────────────────────────────────────────────────
+
+@router.post("/trades/bulk", response_model=BulkImportResult, status_code=201)
+async def bulk_import_trades(
+    body: list[TradeCreate],
+    db: AsyncSession = Depends(get_db),
+    user_payload: dict = Depends(get_current_user),
+) -> BulkImportResult:
+    """Import multiple trades at once (used by CSV import flow)."""
+    user = await _get_user_row(user_payload, db)
+
+    imported = 0
+    errors: list[str] = []
+
+    for i, trade_data in enumerate(body):
+        try:
+            trade = JournalTrade(user_id=user.id, **trade_data.model_dump())
+            db.add(trade)
+            imported += 1
+        except Exception as exc:
+            errors.append(f"Row {i + 1}: {str(exc)}")
+
+    if imported:
+        await db.commit()
+
+    return BulkImportResult(imported=imported, skipped=len(errors), errors=errors[:10])
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { http } from "@/lib/http";
 import type {
+  BulkImportResult,
   CoachingSettings,
   JournalStats,
   Trade,
@@ -39,6 +40,11 @@ export const deleteTrade = async (id: number): Promise<void> => {
 
 export const fetchStats = async (): Promise<JournalStats> => {
   const { data } = await http.get<JournalStats>("/journal/stats");
+  return data;
+};
+
+export const bulkImportTrades = async (trades: TradeCreatePayload[]): Promise<BulkImportResult> => {
+  const { data } = await http.post<BulkImportResult>("/journal/trades/bulk", trades);
   return data;
 };
 

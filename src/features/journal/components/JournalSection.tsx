@@ -4,8 +4,9 @@ import { useState, useCallback } from "react";
 import {
   BookOpen, Plus, TrendingUp, TrendingDown, BarChart2,
   Calendar, ChevronDown, Search, Trash2, Edit3, X, Check,
-  Brain, Target, Award, AlertCircle, ChevronLeft, ChevronRight,
+  Brain, Target, Award, AlertCircle, ChevronLeft, ChevronRight, Upload,
 } from "lucide-react";
+import ImportCSVModal from "./ImportCSVModal";
 import {
   useJournalTrades,
   useJournalStats,
@@ -901,6 +902,7 @@ type Tab = "dashboard" | "history" | "settings";
 export default function JournalSection() {
   const [activeTab, setActiveTab] = useState<Tab>("dashboard");
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editTrade, setEditTrade] = useState<Trade | null>(null);
 
   const openEdit = useCallback((trade: Trade) => {
@@ -938,20 +940,36 @@ export default function JournalSection() {
           </div>
         </div>
 
-        <button
-          onClick={() => { setEditTrade(null); setShowForm(true); }}
-          style={{
-            display: "flex", alignItems: "center", gap: "8px",
-            background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
-            border: "none", borderRadius: "10px",
-            padding: "10px 18px",
-            color: "white", fontSize: "14px", fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          <Plus style={{ width: "16px", height: "16px" }} />
-          Log Trade
-        </button>
+        <div style={{ display: "flex", gap: "8px" }}>
+          <button
+            onClick={() => setShowImport(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              background: "transparent",
+              border: "1px solid #1E293B", borderRadius: "10px",
+              padding: "10px 16px",
+              color: "#94A3B8", fontSize: "14px", fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            <Upload style={{ width: "15px", height: "15px" }} />
+            Import CSV
+          </button>
+          <button
+            onClick={() => { setEditTrade(null); setShowForm(true); }}
+            style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+              border: "none", borderRadius: "10px",
+              padding: "10px 18px",
+              color: "white", fontSize: "14px", fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <Plus style={{ width: "16px", height: "16px" }} />
+            Log Trade
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -989,6 +1007,14 @@ export default function JournalSection() {
           initial={editTrade ?? undefined}
           onClose={closeForm}
           onSaved={closeForm}
+        />
+      )}
+
+      {/* CSV import modal */}
+      {showImport && (
+        <ImportCSVModal
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); setActiveTab("history"); }}
         />
       )}
     </div>

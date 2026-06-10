@@ -96,3 +96,9 @@ class JournalStats(BaseModel):
 
 class CoachingSettings(BaseModel):
     journal_coaching_access: bool
+
+
+class BulkImportResult(BaseModel):
+    imported: int
+    skipped: int
+    errors: list[str]

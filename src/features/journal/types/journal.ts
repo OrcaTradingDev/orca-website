@@ -77,3 +77,9 @@ export interface TradeCreatePayload {
 }
 
 export type TradeUpdatePayload = Partial<TradeCreatePayload>;
+
+export interface BulkImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
