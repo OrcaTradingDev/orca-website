@@ -10,10 +10,18 @@ from app.core.auth import get_current_user
 from app.core.db import get_db
 from app.models.journal_trade import JournalTrade
 from app.models.user import User
+from app.domain.config import load_screener_config
+from app.domain.signals import adx_dir_from_di, build_signals, ema_state, vol_score_from_atr
+from app.models.market_indicators_latest import MarketIndicatorsLatest
+from app.models.market_trend_aggregates_latest import MarketTrendAggregatesLatest
 from app.schemas.journal import (
     BulkImportResult,
     CoachingSettings,
     JournalStats,
+    OrcaAnalytics,
+    OrcaPhaseStat,
+    OrcaScoreBucket,
+    OrcaStatusStat,
     TradeCreate,
     TradeOut,
     TradesPage,
@@ -21,6 +29,62 @@ from app.schemas.journal import (
 )
 
 router = APIRouter(prefix="/journal", tags=["journal"])
+
+
+# ── OrcaScreener snapshot helper ──────────────────────────────────────────────
+
+async def _snapshot_orca(symbol: str, db: AsyncSession) -> dict:
+    """
+    Look up the current OrcaScreener data for a symbol and return a dict of
+    snapshot fields to merge into the JournalTrade row.
+    Returns {} (empty) if the symbol is not in the screener universe.
+    """
+    # Normalise: "EUR/USD" → "EURUSD"
+    normalized = symbol.replace("/", "").replace(" ", "").replace("-", "").upper()
+
+    # Fetch aggregates (bull%)
+    agg = (await db.execute(
+        select(MarketTrendAggregatesLatest).where(MarketTrendAggregatesLatest.symbol == normalized)
+    )).scalar_one_or_none()
+
+    # Fetch indicators (ADX, EMA, ATR) — daily timeframe only
+    ind = (await db.execute(
+        select(MarketIndicatorsLatest).where(
+            MarketIndicatorsLatest.symbol == normalized,
+            MarketIndicatorsLatest.timeframe == "1day",
+        )
+    )).scalar_one_or_none()
+
+    if not agg and not ind:
+        return {}
+
+    intraday_bull = int(agg.intraday_bullish_pct) if agg and agg.intraday_bullish_pct is not None else 50
+    daily_bull    = int(agg.daily_bullish_pct)    if agg and agg.daily_bullish_pct    is not None else 50
+    longterm_bull = int(agg.longterm_bullish_pct) if agg and agg.longterm_bullish_pct is not None else 50
+
+    adx       = int(max(0, min(100, round(ind.adx_14)))) if ind and ind.adx_14 is not None else 0
+    ema_str   = ema_state(ind.ema_9, ind.ema_21, ind.ema_50) if ind else "mixed"
+    adx_dir   = adx_dir_from_di(ind.plus_di_14, ind.minus_di_14) if ind else "flat"
+    vol       = vol_score_from_atr(ind.atr_14 if ind else None)
+
+    cfg = await load_screener_config(db)
+    signals = build_signals(
+        daily_bull, intraday_bull, longterm_bull, adx,
+        ema_str == "aligned", adx_dir, cfg=cfg,
+    )
+
+    return {
+        "orca_score":             signals.orca_score,
+        "orca_status":            signals.status,
+        "orca_direction":         signals.direction,
+        "market_phase":           signals.market_phase,
+        "adx_at_entry":           adx,
+        "ema_aligned_at_entry":   ema_str == "aligned",
+        "intraday_bull_at_entry": intraday_bull,
+        "daily_bull_at_entry":    daily_bull,
+        "longterm_bull_at_entry": longterm_bull,
+        "vol_score_at_entry":     vol,
+    }
 
 
 async def _get_user_row(user_payload: dict, db: AsyncSession) -> User:
@@ -82,7 +146,9 @@ async def create_trade(
     user_payload: dict = Depends(get_current_user),
 ) -> TradeOut:
     user = await _get_user_row(user_payload, db)
-    trade = JournalTrade(user_id=user.id, **body.model_dump())
+    # Auto-snapshot OrcaScreener context for the symbol
+    orca_ctx = await _snapshot_orca(body.market, db)
+    trade = JournalTrade(user_id=user.id, **body.model_dump(), **orca_ctx)
     db.add(trade)
     await db.commit()
     await db.refresh(trade)
@@ -220,6 +286,77 @@ async def get_stats(
         avg_confidence=round(avg_confidence, 1) if avg_confidence is not None else None,
         avg_stress=round(avg_stress, 1) if avg_stress is not None else None,
     )
+
+
+# ── Orca analytics ───────────────────────────────────────────────────────────
+
+def _win_rate(trades_with_pnl: list) -> Optional[float]:
+    if not trades_with_pnl:
+        return None
+    wins = sum(1 for t in trades_with_pnl if float(t.pnl) > 0)
+    return round(wins / len(trades_with_pnl) * 100, 1)
+
+
+@router.get("/orca-analytics", response_model=OrcaAnalytics)
+async def get_orca_analytics(
+    db: AsyncSession = Depends(get_db),
+    user_payload: dict = Depends(get_current_user),
+) -> OrcaAnalytics:
+    """Performance breakdown by OrcaBot score, status and market phase."""
+    user = await _get_user_row(user_payload, db)
+
+    result = await db.execute(
+        select(JournalTrade).where(
+            JournalTrade.user_id == user.id,
+            JournalTrade.status == "CLOSED",
+            JournalTrade.pnl.isnot(None),
+        )
+    )
+    trades = result.scalars().all()
+
+    # Only trades that have an Orca snapshot
+    snapped = [t for t in trades if t.orca_score is not None]
+
+    if not snapped:
+        return OrcaAnalytics(has_data=False, by_score=[], by_status=[], by_phase=[])
+
+    # ── By score bucket ────────────────────────────────────────────────────
+    buckets = [
+        ("Weak (0–29)",     0,  29),
+        ("Low (30–49)",    30,  49),
+        ("Moderate (50–69)", 50, 69),
+        ("Strong (70–100)", 70, 100),
+    ]
+    by_score = []
+    for label, lo, hi in buckets:
+        group = [t for t in snapped if lo <= (t.orca_score or 0) <= hi]
+        by_score.append(OrcaScoreBucket(
+            label=label, range_min=lo, range_max=hi,
+            trades=len(group), win_rate=_win_rate(group),
+        ))
+
+    # ── By status ──────────────────────────────────────────────────────────
+    status_groups: dict[str, list] = {}
+    for t in snapped:
+        key = t.orca_status or "Unknown"
+        status_groups.setdefault(key, []).append(t)
+    order = ["ON", "WATCH", "OFF", "Unknown"]
+    by_status = [
+        OrcaStatusStat(status=s, trades=len(g), win_rate=_win_rate(g))
+        for s in order if (g := status_groups.get(s))
+    ]
+
+    # ── By market phase ────────────────────────────────────────────────────
+    phase_groups: dict[str, list] = {}
+    for t in snapped:
+        key = t.market_phase or "Unknown"
+        phase_groups.setdefault(key, []).append(t)
+    by_phase = [
+        OrcaPhaseStat(phase=p, trades=len(g), win_rate=_win_rate(g))
+        for p, g in sorted(phase_groups.items(), key=lambda x: -len(x[1]))
+    ]
+
+    return OrcaAnalytics(has_data=True, by_score=by_score, by_status=by_status, by_phase=by_phase)
 
 
 # ── Coaching settings ─────────────────────────────────────────────────────────

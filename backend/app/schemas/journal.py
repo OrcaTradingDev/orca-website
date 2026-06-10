@@ -67,6 +67,18 @@ class TradeOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # OrcaScreener snapshot
+    orca_score: Optional[int] = None
+    orca_status: Optional[str] = None
+    orca_direction: Optional[str] = None
+    market_phase: Optional[str] = None
+    adx_at_entry: Optional[int] = None
+    ema_aligned_at_entry: Optional[bool] = None
+    intraday_bull_at_entry: Optional[int] = None
+    daily_bull_at_entry: Optional[int] = None
+    longterm_bull_at_entry: Optional[int] = None
+    vol_score_at_entry: Optional[int] = None
+
     model_config = {"from_attributes": True}
 
 
@@ -102,3 +114,30 @@ class BulkImportResult(BaseModel):
     imported: int
     skipped: int
     errors: list[str]
+
+
+class OrcaScoreBucket(BaseModel):
+    label: str          # e.g. "Strong (70-100)"
+    range_min: int
+    range_max: int
+    trades: int
+    win_rate: Optional[float]
+
+
+class OrcaStatusStat(BaseModel):
+    status: str         # ON | WATCH | OFF | Unknown
+    trades: int
+    win_rate: Optional[float]
+
+
+class OrcaPhaseStat(BaseModel):
+    phase: str
+    trades: int
+    win_rate: Optional[float]
+
+
+class OrcaAnalytics(BaseModel):
+    has_data: bool
+    by_score: list[OrcaScoreBucket]
+    by_status: list[OrcaStatusStat]
+    by_phase: list[OrcaPhaseStat]

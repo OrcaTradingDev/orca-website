@@ -3,6 +3,7 @@ import type {
   BulkImportResult,
   CoachingSettings,
   JournalStats,
+  OrcaAnalytics,
   Trade,
   TradeCreatePayload,
   TradesPage,
@@ -45,6 +46,11 @@ export const fetchStats = async (): Promise<JournalStats> => {
 
 export const bulkImportTrades = async (trades: TradeCreatePayload[]): Promise<BulkImportResult> => {
   const { data } = await http.post<BulkImportResult>("/journal/trades/bulk", trades);
+  return data;
+};
+
+export const fetchOrcaAnalytics = async (): Promise<OrcaAnalytics> => {
+  const { data } = await http.get<OrcaAnalytics>("/journal/orca-analytics");
   return data;
 };
 

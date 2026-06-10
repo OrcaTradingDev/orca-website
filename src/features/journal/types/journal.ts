@@ -10,7 +10,7 @@ export type EmotionalState =
   | "FRUSTRATED"
   | "GREEDY";
 
-export interface Trade {
+export interface Trade extends TradeOrcaSnapshot {
   id: number;
   user_id: number;
   market: string;
@@ -82,4 +82,46 @@ export interface BulkImportResult {
   imported: number;
   skipped: number;
   errors: string[];
+}
+
+// ── Orca snapshot on each trade ───────────────────────────────────────────────
+export interface TradeOrcaSnapshot {
+  orca_score: number | null;
+  orca_status: "ON" | "WATCH" | "OFF" | null;
+  orca_direction: string | null;
+  market_phase: string | null;
+  adx_at_entry: number | null;
+  ema_aligned_at_entry: boolean | null;
+  intraday_bull_at_entry: number | null;
+  daily_bull_at_entry: number | null;
+  longterm_bull_at_entry: number | null;
+  vol_score_at_entry: number | null;
+}
+
+// ── Orca analytics ────────────────────────────────────────────────────────────
+export interface OrcaScoreBucket {
+  label: string;
+  range_min: number;
+  range_max: number;
+  trades: number;
+  win_rate: number | null;
+}
+
+export interface OrcaStatusStat {
+  status: string;
+  trades: number;
+  win_rate: number | null;
+}
+
+export interface OrcaPhaseStat {
+  phase: string;
+  trades: number;
+  win_rate: number | null;
+}
+
+export interface OrcaAnalytics {
+  has_data: boolean;
+  by_score: OrcaScoreBucket[];
+  by_status: OrcaStatusStat[];
+  by_phase: OrcaPhaseStat[];
 }

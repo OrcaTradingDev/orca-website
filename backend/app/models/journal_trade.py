@@ -32,6 +32,19 @@ class JournalTrade(Base):
     stress_level: Mapped[int | None] = mapped_column(Integer, nullable=True)     # 1–10
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # ── OrcaScreener snapshot at entry ───────────────────────────────────────
+    # Populated automatically for manually logged trades; null for CSV imports.
+    orca_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    orca_status: Mapped[str | None] = mapped_column(String(10), nullable=True)    # ON | WATCH | OFF
+    orca_direction: Mapped[str | None] = mapped_column(String(20), nullable=True) # LONG ONLY | etc.
+    market_phase: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    adx_at_entry: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ema_aligned_at_entry: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    intraday_bull_at_entry: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    daily_bull_at_entry: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    longterm_bull_at_entry: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    vol_score_at_entry: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     # ── Timestamps ────────────────────────────────────────────────────────────
     trade_date: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

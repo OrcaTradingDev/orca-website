@@ -10,6 +10,7 @@ import ImportCSVModal from "./ImportCSVModal";
 import {
   useJournalTrades,
   useJournalStats,
+  useOrcaAnalytics,
   useCoachingSettings,
   useCreateTrade,
   useUpdateTrade,
@@ -438,6 +439,128 @@ const saveBtnStyle = (disabled: boolean): React.CSSProperties => ({
   cursor: disabled ? "not-allowed" : "pointer",
 });
 
+// ── Orca Score badge ──────────────────────────────────────────────────────────
+
+function OrcaScoreBadge({ score }: { score: number | null }) {
+  if (score == null) return <span style={{ color: "#334155", fontSize: "12px" }}>—</span>;
+  const color = score >= 70 ? "#10B981" : score >= 50 ? "#F59E0B" : score >= 30 ? "#F97316" : "#64748B";
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: "36px", height: "22px", borderRadius: "6px",
+      background: `${color}20`, color, fontSize: "12px", fontWeight: 700,
+    }}>
+      {score}
+    </span>
+  );
+}
+
+function OrcaStatusBadge({ status }: { status: string | null }) {
+  if (!status) return null;
+  const colors: Record<string, string> = { ON: "#10B981", WATCH: "#F59E0B", OFF: "#64748B" };
+  const color = colors[status] ?? "#64748B";
+  return (
+    <span style={{
+      padding: "2px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+      background: `${color}20`, color,
+    }}>
+      {status}
+    </span>
+  );
+}
+
+// ── Orca analytics card ───────────────────────────────────────────────────────
+
+function OrcaAnalyticsCard() {
+  const { data, isLoading } = useOrcaAnalytics();
+
+  if (isLoading) return null;
+  if (!data?.has_data) {
+    return (
+      <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", padding: "20px 22px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <span style={{ fontSize: "16px" }}>🐋</span>
+          <span style={{ color: "#94A3B8", fontSize: "14px", fontWeight: 600 }}>OrcaBot Performance</span>
+        </div>
+        <div style={{ color: "#475569", fontSize: "13px" }}>
+          Log trades manually to start seeing how your performance correlates with OrcaBot signals.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", padding: "22px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
+        <span style={{ fontSize: "16px" }}>🐋</span>
+        <span style={{ color: "white", fontSize: "15px", fontWeight: 600 }}>OrcaBot Performance</span>
+        <span style={{ color: "#475569", fontSize: "12px", marginLeft: "auto" }}>Based on {data.by_score.reduce((s, b) => s + b.trades, 0)} trades with Orca data</span>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+        {/* By score */}
+        <div>
+          <div style={{ color: "#64748B", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>Win Rate by Orca Score</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {data.by_score.map((b) => {
+              if (b.trades === 0) return null;
+              const wr = b.win_rate ?? 0;
+              const color = wr >= 60 ? "#10B981" : wr >= 45 ? "#F59E0B" : "#EF4444";
+              return (
+                <div key={b.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ color: "#64748B", fontSize: "12px", width: "130px", flexShrink: 0 }}>{b.label}</div>
+                  <div style={{ flex: 1, height: "6px", background: "#1E293B", borderRadius: "99px", overflow: "hidden" }}>
+                    <div style={{ width: `${wr}%`, height: "100%", background: color, borderRadius: "99px", transition: "width 0.4s" }} />
+                  </div>
+                  <div style={{ color, fontSize: "12px", fontWeight: 600, width: "40px", textAlign: "right" }}>{b.win_rate != null ? `${b.win_rate}%` : "—"}</div>
+                  <div style={{ color: "#475569", fontSize: "11px", width: "30px" }}>{b.trades}t</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* By status + phase */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          {data.by_status.length > 0 && (
+            <div>
+              <div style={{ color: "#64748B", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>Win Rate by Status</div>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {data.by_status.map((s) => {
+                  const color = s.status === "ON" ? "#10B981" : s.status === "WATCH" ? "#F59E0B" : "#64748B";
+                  return (
+                    <div key={s.status} style={{ background: "#0B0F19", border: "1px solid #1E293B", borderRadius: "8px", padding: "10px 14px", textAlign: "center" }}>
+                      <div style={{ color, fontSize: "11px", fontWeight: 700, marginBottom: "2px" }}>{s.status}</div>
+                      <div style={{ color: "white", fontSize: "16px", fontWeight: 700 }}>{s.win_rate != null ? `${s.win_rate}%` : "—"}</div>
+                      <div style={{ color: "#475569", fontSize: "11px" }}>{s.trades} trades</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {data.by_phase.length > 0 && (
+            <div>
+              <div style={{ color: "#64748B", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>Win Rate by Phase</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {data.by_phase.slice(0, 4).map((p) => (
+                  <div key={p.phase} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ color: "#64748B", fontSize: "12px" }}>{p.phase}</span>
+                    <span style={{ color: (p.win_rate ?? 0) >= 50 ? "#10B981" : "#EF4444", fontSize: "12px", fontWeight: 600 }}>
+                      {p.win_rate != null ? `${p.win_rate}%` : "—"} <span style={{ color: "#334155", fontWeight: 400 }}>({p.trades})</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard tab ─────────────────────────────────────────────────────────────
 
 function DashboardTab() {
@@ -511,6 +634,9 @@ function DashboardTab() {
         </div>
       )}
 
+      {/* Orca analytics */}
+      <OrcaAnalyticsCard />
+
       {/* Recent trades */}
       {tradesPage && tradesPage.trades.length > 0 && (
         <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", overflow: "hidden" }}>
@@ -532,7 +658,7 @@ function TradeRowMini({ trade }: { trade: Trade }) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "1fr auto auto auto",
+      gridTemplateColumns: "1fr auto auto auto auto",
       alignItems: "center",
       padding: "12px 20px",
       borderBottom: "1px solid #0F1822",
@@ -552,6 +678,7 @@ function TradeRowMini({ trade }: { trade: Trade }) {
       {trade.session && (
         <span style={{ color: "#64748B", fontSize: "12px" }}>{SESSION_LABELS[trade.session]}</span>
       )}
+      <OrcaScoreBadge score={trade.orca_score} />
       <span style={{ color: pnlColor(pnl), fontSize: "14px", fontWeight: 600, textAlign: "right", minWidth: "70px" }}>
         {fmt(pnl)}
       </span>
@@ -615,12 +742,12 @@ function HistoryTab({ onEdit }: { onEdit: (trade: Trade) => void }) {
           {/* Table header */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "90px 1fr 70px 90px 90px 80px 80px 100px 120px 70px",
+            gridTemplateColumns: "90px 1fr 60px 80px 80px 60px 55px 80px 90px 110px 70px",
             padding: "10px 16px",
             borderBottom: "1px solid #1E293B",
             gap: "8px",
           }}>
-            {["Date", "Market", "Dir", "Entry", "Exit", "PnL", "R:R", "Session", "Emotion", ""].map((h) => (
+            {["Date", "Market", "Dir", "Entry", "Exit", "PnL", "R:R", "Score", "Status", "Emotion", ""].map((h) => (
               <div key={h} style={{ color: "#64748B", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>{h}</div>
             ))}
           </div>
@@ -691,7 +818,7 @@ function TradeRow({ trade, onEdit, confirmDelete, onDeleteRequest, onDeleteConfi
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "90px 1fr 70px 90px 90px 80px 80px 100px 120px 70px",
+      gridTemplateColumns: "90px 1fr 60px 80px 80px 60px 55px 80px 90px 110px 70px",
       padding: "11px 16px",
       borderBottom: "1px solid #0F1822",
       alignItems: "center",
@@ -718,7 +845,8 @@ function TradeRow({ trade, onEdit, confirmDelete, onDeleteRequest, onDeleteConfi
       <div style={{ color: "#94A3B8", fontSize: "12px" }}>{trade.exit_price ? parseFloat(trade.exit_price).toFixed(4) : "—"}</div>
       <div style={{ color: pnlColor(pnl), fontSize: "13px", fontWeight: 600 }}>{fmt(pnl)}</div>
       <div style={{ color: "#94A3B8", fontSize: "12px" }}>{fmtRR(rr)}</div>
-      <div style={{ color: "#64748B", fontSize: "12px" }}>{trade.session ? SESSION_LABELS[trade.session] : "—"}</div>
+      <OrcaScoreBadge score={trade.orca_score} />
+      <OrcaStatusBadge status={trade.orca_status} />
       <div>
         {trade.emotional_state ? (
           <span style={{
