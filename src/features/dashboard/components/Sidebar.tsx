@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   Star, Bell, SlidersHorizontal, TrendingUp, Grid, Bot,
-  User, Crown, BarChart3, Menu, ShieldCheck,
+  User, Crown, BarChart3, Menu, ShieldCheck, BookOpen,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -18,6 +18,7 @@ interface SidebarProps {
 
 const NAV_ITEMS = [
   { id: "screener",     label: "Premium Screener",  icon: BarChart3 },
+  { id: "journal",      label: "OrcaJournal",        icon: BookOpen },
   { id: "watchlist",    label: "Watchlist",          icon: Star },
   { id: "alerts",       label: "Saved Alerts",       icon: Bell },
   { id: "filters",      label: "Filters & Settings", icon: SlidersHorizontal },
