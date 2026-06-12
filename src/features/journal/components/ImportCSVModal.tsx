@@ -3,20 +3,22 @@
 /**
  * ImportCSVModal
  *
- * Handles cTrader trade history CSV imports.
- * Supported cTrader export formats (detected automatically):
- *   - cTrader Desktop: Position Id, Symbol, Direction, Volume (Lots),
- *                      Entry Price, Close Price, Open Time, Close Time,
- *                      Net Profit, Commission, Swap, Gross Profit
- *   - cTrader Web:     Position ID, Symbol, Side, Lots,
- *                      Open Price, Close Price, Open Time, Close Time,
- *                      Profit, Commission, Swap, Net Profit
- *   - Generic:         Any CSV with Symbol/Market + Direction/Side + PnL columns
+ * Handles cTrader trade history CSV and Excel (.xlsx) imports.
+ * Supported formats (detected automatically):
+ *   - cTrader Desktop CSV: Position Id, Symbol, Direction, Volume (Lots),
+ *                          Entry Price, Close Price, Open Time, Close Time,
+ *                          Net Profit, Commission, Swap, Gross Profit
+ *   - cTrader Web CSV:     Position ID, Symbol, Side, Lots,
+ *                          Open Price, Close Price, Open Time, Close Time,
+ *                          Profit, Commission, Swap, Net Profit
+ *   - Excel (.xlsx):       Same column layouts as above, first sheet used
+ *   - Generic:             Any file with Symbol/Market + Direction/Side + PnL columns
  */
 
 import { useCallback, useRef, useState } from "react";
 import { Upload, X, AlertCircle, CheckCircle, FileText, ChevronDown } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import * as XLSX from "xlsx";
 import { bulkImportTrades } from "../services/journal";
 import type { Direction, Session, TradeCreatePayload } from "../types/journal";
 
@@ -148,6 +150,22 @@ function parseSession(openTime: string | undefined): Session | null {
   if (hour >= 0 && hour < 8) return "ASIAN";
   return "OTHER";
 }
+
+// ── Excel → CSV converter ─────────────────────────────────────────────────────
+
+/**
+ * Read an .xlsx file (as ArrayBuffer) and convert the first sheet to
+ * a plain CSV string so we can pipe it straight into parseCTraderCSV.
+ */
+function xlsxToCsv(buffer: ArrayBuffer): string {
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  // sheet_to_csv uses comma delimiter by default and handles dates nicely
+  return XLSX.utils.sheet_to_csv(sheet, { forceQuotes: false });
+}
+
+// ── CSV parser ────────────────────────────────────────────────────────────────
 
 function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -300,30 +318,48 @@ export default function ImportCSVModal({ onClose, onImported }: ImportCSVModalPr
   });
 
   const handleFile = useCallback((file: File) => {
-    if (!file.name.endsWith(".csv")) {
-      setParseError("Please upload a .csv file.");
+    const isXlsx = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+    const isCsv  = file.name.endsWith(".csv");
+
+    if (!isXlsx && !isCsv) {
+      setParseError("Please upload a .csv or .xlsx file.");
       return;
     }
+
     setFileName(file.name);
     setParseError(null);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
+    const processText = (text: string) => {
       if (!text?.trim()) { setParseError("File is empty."); return; }
       try {
         const result = parseCTraderCSV(text);
         if (result.rows.length === 0) {
-          setParseError("No trade rows found in this file. Make sure you're exporting from cTrader History.");
+          setParseError("No trade rows found. Make sure you're exporting from cTrader History.");
           return;
         }
         setParseResult(result);
         setStep("preview");
       } catch {
-        setParseError("Failed to parse CSV. Please check the file format.");
+        setParseError("Failed to parse file. Please check the format.");
       }
     };
-    reader.readAsText(file);
+
+    const reader = new FileReader();
+
+    if (isXlsx) {
+      reader.onload = (e) => {
+        try {
+          const csv = xlsxToCsv(e.target?.result as ArrayBuffer);
+          processText(csv);
+        } catch {
+          setParseError("Failed to read Excel file. Try exporting as CSV instead.");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.onload = (e) => processText(e.target?.result as string);
+      reader.readAsText(file);
+    }
   }, []);
 
   const handleDrop = (e: React.DragEvent) => {
@@ -363,7 +399,7 @@ export default function ImportCSVModal({ onClose, onImported }: ImportCSVModalPr
               Import from cTrader
             </h2>
             <p style={{ color: "#64748B", fontSize: "13px", margin: "4px 0 0" }}>
-              Export your trade history from cTrader and upload the CSV file
+              Export your trade history from cTrader and upload as CSV or Excel
             </p>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B" }}>
@@ -382,7 +418,7 @@ export default function ImportCSVModal({ onClose, onImported }: ImportCSVModalPr
               <ol style={{ color: "#64748B", fontSize: "13px", margin: 0, padding: "0 0 0 18px", lineHeight: "2" }}>
                 <li>Open cTrader → go to <strong style={{ color: "#94A3B8" }}>History</strong> tab</li>
                 <li>Set your desired date range</li>
-                <li>Click the <strong style={{ color: "#94A3B8" }}>Export</strong> button (top right) → <strong style={{ color: "#94A3B8" }}>CSV</strong></li>
+                <li>Click the <strong style={{ color: "#94A3B8" }}>Export</strong> button (top right) → <strong style={{ color: "#94A3B8" }}>CSV</strong> or <strong style={{ color: "#94A3B8" }}>Excel</strong></li>
                 <li>Upload the downloaded file below</li>
               </ol>
             </div>
@@ -405,10 +441,12 @@ export default function ImportCSVModal({ onClose, onImported }: ImportCSVModalPr
             >
               <Upload style={{ width: "32px", height: "32px", color: dragOver ? "#6366F1" : "#334155", margin: "0 auto 12px" }} />
               <div style={{ color: "white", fontSize: "15px", fontWeight: 600, marginBottom: "6px" }}>
-                Drop your CSV file here
+                Drop your file here
               </div>
-              <div style={{ color: "#64748B", fontSize: "13px" }}>or click to browse</div>
-              <input ref={fileRef} type="file" accept=".csv" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
+              <div style={{ color: "#64748B", fontSize: "13px" }}>
+                CSV or Excel (.xlsx) — or click to browse
+              </div>
+              <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} />
             </div>
 
             {parseError && (
