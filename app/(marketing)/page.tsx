@@ -753,7 +753,7 @@ export default function Page() {
             </p>
 
             <div className="hp-ctas">
-              <a className="btn btn-primary btn-lg" href="/dashboard">
+              <a className="btn btn-primary btn-lg" href="/screener">
                 Try Free Screener <ArrowRight size={17} />
               </a>
               <a className="btn btn-ghost btn-lg" href="/orcabot">
@@ -935,7 +935,7 @@ export default function Page() {
 
             <div className="hp-products-grid">
               {/* FIX 3: Premium Screener icon now matches OrcaBot/OrcaJournal style — dark bg + outline, not filled cyan */}
-              <a className="hp-product" href="/dashboard">
+              <a className="hp-product" href="/screener">
                 <div className="hp-product-head">
                   <div className="hp-product-icon" style={{ background: 'var(--cyan-10)', border: '1px solid rgba(0,212,255,0.22)' }}>
                     <BarChart3 size={20} color="var(--cyan)" />
@@ -1005,7 +1005,7 @@ export default function Page() {
                   'No credit card needed',
                 ].map(t => <li key={t}>{t}</li>)}
               </ul>
-              <a className="btn btn-primary btn-lg" href="/dashboard" style={{ position: 'relative', zIndex: 1 }}>
+              <a className="btn btn-primary btn-lg" href="/screener" style={{ position: 'relative', zIndex: 1 }}>
                 Start Trading Smarter <ArrowRight size={18} />
               </a>
             </div>
@@ -1080,7 +1080,7 @@ export default function Page() {
               <h2>Ready to Trade Smarter?</h2>
               <p>Join traders using OrcaTrading for a real edge — free screener, hybrid automation, and a community that actually helps.</p>
               <div style={{ display: 'flex', gap: '0.875rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a className="btn btn-primary btn-lg" href="/dashboard">
+                <a className="btn btn-primary btn-lg" href="/screener">
                   Get Started Free <ArrowRight size={18} />
                 </a>
                 <a className="btn btn-ghost" href="/orcabot">

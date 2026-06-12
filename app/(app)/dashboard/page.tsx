@@ -1,5 +1,6 @@
-import DashboardClient from "@/features/dashboard/components/DashboardClient";
+import { redirect } from "next/navigation";
 
-export default function DashboardPage() {
-  return <DashboardClient />;
+// Legacy route — permanently moved to /screener
+export default function DashboardRedirect() {
+  redirect("/screener");
 }

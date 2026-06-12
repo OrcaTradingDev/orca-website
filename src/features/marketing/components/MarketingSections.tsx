@@ -38,7 +38,7 @@ const TRADE_CARDS = [
 ] as const;
 
 const PRODUCTS = [
-  { href: '/dashboard', icon: BarChart3, iconBg: 'var(--color-primary-10)', iconBorder: 'rgba(0,212,255,0.22)', iconColor: 'var(--color-primary)', tag: 'Live · Free', tagCls: 'productTagLive', title: 'Premium Screener', desc: 'Multi-timeframe trend analysis with intraday, daily, and advanced indicators. Spot opportunities across forex, crypto, stocks, and indices.', linkLabel: 'Try now (Free)', dim: false },
+  { href: '/screener', icon: BarChart3, iconBg: 'var(--color-primary-10)', iconBorder: 'rgba(0,212,255,0.22)', iconColor: 'var(--color-primary)', tag: 'Live · Free', tagCls: 'productTagLive', title: 'Premium Screener', desc: 'Multi-timeframe trend analysis with intraday, daily, and advanced indicators. Spot opportunities across forex, crypto, stocks, and indices.', linkLabel: 'Try now (Free)', dim: false },
   { href: '/orcabot', icon: Bot, iconBg: 'var(--color-primary-10)', iconBorder: 'rgba(0,212,255,0.20)', iconColor: 'var(--color-primary)', tag: 'Early Access', tagCls: 'productTagEarly', title: 'OrcaBot 2.0', desc: 'Hybrid automated trading. You set the direction. The system handles execution, risk, and trade management. One decision per day.', linkLabel: 'Learn more', dim: false },
   { href: '#', icon: Star, iconBg: 'rgba(129,140,248,0.1)', iconBorder: 'rgba(129,140,248,0.15)', iconColor: '#818cf8', tag: 'Coming Soon', tagCls: 'productTagSoon', title: 'OrcaJournal', desc: 'Track performance metrics, analyze expectancy, and get AI-powered insights for continuous improvement in your trading.', linkLabel: 'In development', dim: true },
 ] as const;
@@ -79,7 +79,7 @@ export function HeroSection() {
           Built for traders who want an edge — not a guessing game.
         </p>
         <div className={s.ctas}>
-          <a className={`${s.btn} ${s.btnPrimary} ${s.btnLg}`} href="/dashboard">Try Free Screener <ArrowRight size={17} /></a>
+          <a className={`${s.btn} ${s.btnPrimary} ${s.btnLg}`} href="/screener">Try Free Screener <ArrowRight size={17} /></a>
           <a className={`${s.btn} ${s.btnGhost} ${s.btnLg}`} href="/orcabot"><Bot size={17} /> OrcaBot 2.0</a>
         </div>
         <div className={s.stats}>
@@ -244,7 +244,7 @@ export function PricingSection() {
           <ul className={s.featList}>
             {BETA_FEATURES.map(t => <li key={t}>{t}</li>)}
           </ul>
-          <a className={`${s.btn} ${s.btnPrimary} ${s.btnLg}`} href="/dashboard" style={{ position: 'relative', zIndex: 1 }}>
+          <a className={`${s.btn} ${s.btnPrimary} ${s.btnLg}`} href="/screener" style={{ position: 'relative', zIndex: 1 }}>
             Start Trading Smarter <ArrowRight size={18} />
           </a>
         </div>
@@ -299,7 +299,7 @@ export function CtaSection() {
           <h2>Ready to Trade Smarter?</h2>
           <p>Join traders using OrcaTrading for a real edge — free screener, hybrid automation, and a community that actually helps.</p>
           <div className={s.ctaButtons}>
-            <a className={`${s.btn} ${s.btnPrimary} ${s.btnLg}`} href="/dashboard">Get Started Free <ArrowRight size={18} /></a>
+            <a className={`${s.btn} ${s.btnPrimary} ${s.btnLg}`} href="/screener">Get Started Free <ArrowRight size={18} /></a>
             <a className={`${s.btn} ${s.btnGhost}`} href="/orcabot">Explore OrcaBot</a>
           </div>
         </div>

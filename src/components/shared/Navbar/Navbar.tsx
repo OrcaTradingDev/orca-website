@@ -70,9 +70,14 @@ export function Navbar() {
                 About
               </a>
               {user && (
-                <a href="/dashboard" className={`navbar__link${pathname === '/dashboard' ? ' navbar__link--active' : ''}`}>
-                  Dashboard
-                </a>
+                <>
+                  <a href="/screener" className={`navbar__link${pathname === '/screener' ? ' navbar__link--active' : ''}`}>
+                    Screener
+                  </a>
+                  <a href="/journal" className={`navbar__link${pathname.startsWith('/journal') ? ' navbar__link--active' : ''}`}>
+                    Journal
+                  </a>
+                </>
               )}
             </div>
 
@@ -132,7 +137,10 @@ export function Navbar() {
             <a href="/orcabot"  className="navbar__mobile-link" onClick={handleLinkClick}>OrcaBot</a>
             <a href="/about"    className="navbar__mobile-link" onClick={handleLinkClick}>About</a>
             {user && (
-              <a href="/dashboard" className="navbar__mobile-link" onClick={handleLinkClick}>Dashboard</a>
+              <>
+                <a href="/screener" className="navbar__mobile-link" onClick={handleLinkClick}>Screener</a>
+                <a href="/journal"  className="navbar__mobile-link" onClick={handleLinkClick}>Journal</a>
+              </>
             )}
 
             <div className="navbar__mobile-divider" />
@@ -208,7 +216,8 @@ function UserMenu({
               <div className="user-menu__header-email">{user.email}</div>
             </div>
             <div className="user-menu__divider" />
-            <a href="/dashboard" className="user-menu__item">Dashboard</a>
+            <a href="/screener" className="user-menu__item">Screener</a>
+            <a href="/journal"  className="user-menu__item">Journal</a>
             <a href="/profile"   className="user-menu__item">Profile</a>
             <a href="/settings"  className="user-menu__item">Settings</a>
             <a href="/billing"   className="user-menu__item">Billing</a>
