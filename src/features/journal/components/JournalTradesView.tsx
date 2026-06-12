@@ -108,6 +108,8 @@ function OrcaStatusBadge({ status }: { status: string | null }) {
 
 // ── Trade row ─────────────────────────────────────────────────────────────────
 
+const COLS = "80px 1fr 52px 72px 70px 70px 72px 68px 52px 52px 80px 70px";
+
 function TradeRow({
   trade, onEdit, confirmDelete, onDeleteRequest, onDeleteConfirm, onDeleteCancel, deleting,
 }: {
@@ -121,13 +123,17 @@ function TradeRow({
 }) {
   const pnl = trade.pnl != null ? parseFloat(trade.pnl) : null;
   const rr  = trade.rr  != null ? parseFloat(trade.rr)  : null;
+  const sl  = trade.stop_loss   != null ? parseFloat(trade.stop_loss)   : null;
+  const tp  = trade.take_profit != null ? parseFloat(trade.take_profit) : null;
+
+  const px = (v: number | null) => v != null ? v.toFixed(5) : "—";
 
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "88px 1fr 58px 72px 72px 70px 55px 55px 80px 100px 70px",
-        padding: "11px 16px",
+        gridTemplateColumns: COLS,
+        padding: "10px 16px",
         borderBottom: "1px solid #0F1822",
         alignItems: "center",
         gap: "8px",
@@ -136,7 +142,7 @@ function TradeRow({
       onMouseEnter={(e) => (e.currentTarget.style.background = "#0F1822")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      <div style={{ color: "#64748B", fontSize: "12px" }}>{trade.trade_date}</div>
+      <div style={{ color: "#64748B", fontSize: "11px" }}>{trade.trade_date}</div>
 
       <div style={{ minWidth: 0 }}>
         <div style={{ color: "white", fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -150,24 +156,40 @@ function TradeRow({
       </div>
 
       <span style={{
-        fontSize: "11px", fontWeight: 700, padding: "2px 5px", borderRadius: "4px", display: "inline-block",
+        fontSize: "10px", fontWeight: 700, padding: "2px 4px", borderRadius: "4px", display: "inline-block",
         background: trade.direction === "LONG" ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
         color: trade.direction === "LONG" ? "#10B981" : "#EF4444",
       }}>
-        {trade.direction}
+        {trade.direction === "LONG" ? "▲L" : "▼S"}
       </span>
 
-      <div style={{ color: "#94A3B8", fontSize: "12px" }}>
-        {trade.entry_price ? parseFloat(trade.entry_price).toFixed(4) : "—"}
-      </div>
-      <div style={{ color: "#94A3B8", fontSize: "12px" }}>
-        {trade.exit_price ? parseFloat(trade.exit_price).toFixed(4) : "—"}
+      {/* Entry */}
+      <div style={{ color: "#94A3B8", fontSize: "11px" }}>
+        {trade.entry_price ? parseFloat(trade.entry_price).toFixed(5) : "—"}
       </div>
 
-      <div style={{ color: pnlColor(pnl), fontSize: "13px", fontWeight: 600 }}>
+      {/* SL */}
+      <div style={{ color: "#EF444490", fontSize: "11px" }} title="Stop Loss">
+        {px(sl)}
+      </div>
+
+      {/* TP */}
+      <div style={{ color: "#10B98190", fontSize: "11px" }} title="Take Profit">
+        {px(tp)}
+      </div>
+
+      {/* Exit */}
+      <div style={{ color: "#94A3B8", fontSize: "11px" }}>
+        {trade.exit_price ? parseFloat(trade.exit_price).toFixed(5) : "—"}
+      </div>
+
+      {/* PnL */}
+      <div style={{ color: pnlColor(pnl), fontSize: "12px", fontWeight: 600 }}>
         {fmt(pnl)}
       </div>
-      <div style={{ color: "#94A3B8", fontSize: "12px" }}>
+
+      {/* R:R */}
+      <div style={{ color: "#94A3B8", fontSize: "11px" }}>
         {rr != null ? `${rr.toFixed(2)}R` : "—"}
       </div>
 
@@ -369,12 +391,12 @@ export default function JournalTradesView({ onEdit, onLogTrade }: Props) {
           {/* Header row */}
           <div style={{
             display: "grid",
-            gridTemplateColumns: "88px 1fr 58px 72px 72px 70px 55px 55px 80px 100px 70px",
+            gridTemplateColumns: COLS,
             padding: "10px 16px",
             borderBottom: "1px solid #1E293B",
             gap: "8px",
           }}>
-            {["Date", "Market", "Dir", "Entry", "Exit", "PnL", "R:R", "Score", "Status", "Emotion", ""].map((h) => (
+            {["Date", "Market", "Dir", "Entry", "SL", "TP", "Exit", "PnL", "R:R", "Score", "Status", ""].map((h) => (
               <div key={h} style={{
                 color: "#475569", fontSize: "10px", fontWeight: 600,
                 textTransform: "uppercase", letterSpacing: "0.04em",

@@ -19,7 +19,10 @@ class JournalTrade(Base):
     market: Mapped[str] = mapped_column(String(150), nullable=False)
     direction: Mapped[str] = mapped_column(String(10), nullable=False)   # LONG | SHORT
     entry_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    stop_loss: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    take_profit: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
     exit_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 8), nullable=True)
+    lot_size: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)   # units / lots
     pnl: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)   # dollar amount
     rr: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)    # R multiple achieved
     risk_pct: Mapped[Decimal | None] = mapped_column(Numeric(8, 4), nullable=True)  # % of account

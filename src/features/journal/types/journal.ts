@@ -16,7 +16,10 @@ export interface Trade extends TradeOrcaSnapshot {
   market: string;
   direction: Direction;
   entry_price: string | null;
+  stop_loss: string | null;
+  take_profit: string | null;
   exit_price: string | null;
+  lot_size: string | null;
   pnl: string | null;
   rr: string | null;
   risk_pct: string | null;
@@ -63,7 +66,10 @@ export interface TradeCreatePayload {
   market: string;
   direction: Direction;
   entry_price?: number | null;
+  stop_loss?: number | null;
+  take_profit?: number | null;
   exit_price?: number | null;
+  lot_size?: number | null;
   pnl?: number | null;
   rr?: number | null;
   risk_pct?: number | null;

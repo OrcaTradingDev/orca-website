@@ -17,7 +17,10 @@ class TradeCreate(BaseModel):
     market: str = Field(..., min_length=1, max_length=150)
     direction: Direction
     entry_price: Optional[Decimal] = None
+    stop_loss: Optional[Decimal] = None
+    take_profit: Optional[Decimal] = None
     exit_price: Optional[Decimal] = None
+    lot_size: Optional[Decimal] = None
     pnl: Optional[Decimal] = None
     rr: Optional[Decimal] = None
     risk_pct: Optional[Decimal] = None
@@ -34,7 +37,10 @@ class TradeUpdate(BaseModel):
     market: Optional[str] = Field(None, min_length=1, max_length=150)
     direction: Optional[Direction] = None
     entry_price: Optional[Decimal] = None
+    stop_loss: Optional[Decimal] = None
+    take_profit: Optional[Decimal] = None
     exit_price: Optional[Decimal] = None
+    lot_size: Optional[Decimal] = None
     pnl: Optional[Decimal] = None
     rr: Optional[Decimal] = None
     risk_pct: Optional[Decimal] = None
@@ -53,7 +59,10 @@ class TradeOut(BaseModel):
     market: str
     direction: Direction
     entry_price: Optional[Decimal] = None
+    stop_loss: Optional[Decimal] = None
+    take_profit: Optional[Decimal] = None
     exit_price: Optional[Decimal] = None
+    lot_size: Optional[Decimal] = None
     pnl: Optional[Decimal] = None
     rr: Optional[Decimal] = None
     risk_pct: Optional[Decimal] = None
