@@ -31,6 +31,31 @@ import type { Direction, Session, TradeCreatePayload } from "../types/journal";
 const norm = (s: string) =>
   s.toLowerCase().replace(/[\s_\-()]/g, "").replace(/lots$/, "").replace(/price$/, "price");
 
+/**
+ * Parse a number that may use either:
+ *   - US/UK format:       "1,234.56"  (comma = thousands, dot = decimal)
+ *   - European format:    "1.234,56"  or  "7291,93"  (comma = decimal)
+ *
+ * Rule: whichever separator appears LAST is the decimal separator.
+ * If there is only a comma and no dot, it is the decimal separator.
+ */
+function parseNum(raw: string): number | null {
+  const s = raw.trim();
+  if (!s || s === "-" || s === "") return null;
+  const lastComma = s.lastIndexOf(",");
+  const lastDot   = s.lastIndexOf(".");
+  let normalised: string;
+  if (lastComma > lastDot) {
+    // Comma is the decimal separator (European): remove dots (thousands), replace comma with dot
+    normalised = s.replace(/\./g, "").replace(",", ".");
+  } else {
+    // Dot is the decimal separator (or no decimal at all): remove commas (thousands)
+    normalised = s.replace(/,/g, "");
+  }
+  const n = parseFloat(normalised);
+  return isNaN(n) ? null : n;
+}
+
 const HEADER_MAP: Record<string, string> = {
   // Symbol
   symbol: "symbol",
@@ -38,49 +63,54 @@ const HEADER_MAP: Record<string, string> = {
   instrument: "symbol",
   pair: "symbol",
 
-  // Direction
+  // Direction — plain and prefixed ("Opening direction", "Side", "Type", etc.)
   direction: "direction",
   side: "direction",
   tradeside: "direction",
   type: "direction",
+  openingdirection: "direction",   // cTrader: "Opening direction"
+  openingside: "direction",
 
   // Prices
   entryprice: "entry_price",
   openprice: "entry_price",
-  openingprice: "entry_price",
+  openingprice: "entry_price",     // cTrader: "Opening price"
   closeprice: "exit_price",
   exitprice: "exit_price",
-  closingprice: "exit_price",
+  closingprice: "exit_price",      // cTrader: "Closing price"
 
-  // PnL — prefer "net profit" over "gross profit"
+  // PnL — prefer net over gross
   netprofit: "pnl",
   netpl: "pnl",
   netpnl: "pnl",
+  "net$": "pnl",                   // cTrader: "Net $"
   profit: "pnl",
   pnl: "pnl",
   pl: "pnl",
-  grossprofit: "gross_profit",  // fallback only
+  grossprofit: "gross_profit",     // fallback
+  "gross$": "gross_profit",        // cTrader: "Gross $"
 
-  // Volume/risk
+  // Volume / lot size
   volumelots: "volume",
   volume: "volume",
   lots: "volume",
   quantity: "volume",
   size: "volume",
 
-  // Time
+  // Time — plain and prefixed ("Opening time", "Closing time", etc.)
   opentime: "open_time",
+  openingtime: "open_time",        // cTrader: "Opening time"
   entrytime: "open_time",
   opendate: "open_time",
   closetime: "close_time",
+  closingtime: "close_time",       // cTrader: "Closing time"
   exittime: "close_time",
   closedate: "close_time",
   date: "open_time",
   time: "open_time",
 
-  // Position id (ignored but mapped to avoid "unknown" warnings)
+  // Position id (mapped to avoid "unknown" warnings, value is ignored)
   positionid: "position_id",
-  positionid2: "position_id",
   id: "position_id",
   dealid: "position_id",
 
@@ -240,35 +270,22 @@ export function parseCTraderCSV(text: string): ParseResult {
     mapped.direction = parseDirection(canonical.direction || "buy");
 
     // Prices
-    if (canonical.entry_price) {
-      const n = parseFloat(canonical.entry_price.replace(/,/g, ""));
-      if (!isNaN(n)) mapped.entry_price = n;
-    }
-    if (canonical.exit_price) {
-      const n = parseFloat(canonical.exit_price.replace(/,/g, ""));
-      if (!isNaN(n)) mapped.exit_price = n;
-    }
+    const entryN = parseNum(canonical.entry_price ?? "");
+    if (entryN != null) mapped.entry_price = entryN;
+
+    const exitN = parseNum(canonical.exit_price ?? "");
+    if (exitN != null) mapped.exit_price = exitN;
 
     // PnL
-    if (canonical.pnl) {
-      const n = parseFloat(canonical.pnl.replace(/,/g, ""));
-      if (!isNaN(n)) mapped.pnl = n;
-    }
+    const pnlN = parseNum(canonical.pnl ?? "");
+    if (pnlN != null) mapped.pnl = pnlN;
 
-    // Volume → risk_pct placeholder (store as note context if no risk%)
-    if (canonical.volume) {
-      const n = parseFloat(canonical.volume);
-      if (!isNaN(n) && n > 0) {
-        mapped.notes = canonical.notes
-          ? `${canonical.notes} | Lots: ${n}`
-          : `Lots: ${n}`;
-      }
-    }
+    // Lot size — saved directly so it shows in the trades table
+    const lotN = parseNum(canonical.volume ?? "");
+    if (lotN != null && lotN > 0) mapped.lot_size = lotN;
 
     // Notes
-    if (canonical.notes && !mapped.notes) {
-      mapped.notes = canonical.notes;
-    }
+    if (canonical.notes) mapped.notes = canonical.notes;
 
     // Date
     mapped.trade_date = parseDate(canonical.open_time || "");
