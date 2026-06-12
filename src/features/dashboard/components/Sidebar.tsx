@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   Star, Bell, SlidersHorizontal, TrendingUp, Grid, Bot,
   User, Crown, BarChart3, Menu, ShieldCheck, BookOpen,
@@ -17,17 +18,17 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-  { id: "screener",     label: "Premium Screener",  icon: BarChart3 },
-  { id: "journal",      label: "OrcaJournal",        icon: BookOpen },
-  { id: "watchlist",    label: "Watchlist",          icon: Star },
-  { id: "alerts",       label: "Saved Alerts",       icon: Bell },
-  { id: "filters",      label: "Filters & Settings", icon: SlidersHorizontal },
-  { id: "trending",     label: "Trending Assets",    icon: TrendingUp },
-  { id: "tools",        label: "Tools & Features",   icon: Grid },
-  { id: "bot",          label: "Bot Integration",    icon: Bot,  badge: "Soon" },
-  { id: "account",      label: "Account Settings",   icon: User },
-  { id: "subscription", label: "Subscription",       icon: Crown },
-] as const;
+  { id: "screener",     label: "Premium Screener",  icon: BarChart3,        href: undefined  },
+  { id: "journal",      label: "OrcaJournal",        icon: BookOpen,         href: "/journal" },
+  { id: "watchlist",    label: "Watchlist",          icon: Star,             href: undefined  },
+  { id: "alerts",       label: "Saved Alerts",       icon: Bell,             href: undefined  },
+  { id: "filters",      label: "Filters & Settings", icon: SlidersHorizontal, href: undefined },
+  { id: "trending",     label: "Trending Assets",    icon: TrendingUp,       href: undefined  },
+  { id: "tools",        label: "Tools & Features",   icon: Grid,             href: undefined  },
+  { id: "bot",          label: "Bot Integration",    icon: Bot,              href: undefined, badge: "Soon" },
+  { id: "account",      label: "Account Settings",   icon: User,             href: undefined  },
+  { id: "subscription", label: "Subscription",       icon: Crown,            href: undefined  },
+];
 
 export default function Sidebar({ activeSection, onSectionChange, onCollapsedChange }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -145,26 +146,47 @@ export default function Sidebar({ activeSection, onSectionChange, onCollapsedCha
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
           const isActive = activeSection === item.id;
+          const sharedClassName = `${styles["sidebar-nav-btn"]}${isActive ? " " + styles["sidebar-nav-btn--active"] : ""}`;
+          const sharedStyle = { justifyContent: isCollapsed ? "center" : "flex-start" } as React.CSSProperties;
+
+          const inner = (
+            <>
+              <Icon style={{ width: "20px", height: "20px", flexShrink: 0 }} />
+              {!isCollapsed && (
+                <>
+                  <span className={styles["sidebar-nav-btn__label"]}>{item.label}</span>
+                  {item.badge && (
+                    <Badge className={styles["sidebar-nav-btn__badge"]}>{item.badge}</Badge>
+                  )}
+                </>
+              )}
+            </>
+          );
+
+          if (item.href) {
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={sharedClassName}
+                style={{ ...sharedStyle, textDecoration: "none" }}
+                title={isCollapsed ? item.label : undefined}
+              >
+                {inner}
+              </Link>
+            );
+          }
 
           return (
             <button
               key={item.id}
               onClick={() => onSectionChange(item.id)}
               data-active={isActive}
-              className={`${styles["sidebar-nav-btn"]}${isActive ? " " + styles["sidebar-nav-btn--active"] : ""}`}
-              style={{ justifyContent: isCollapsed ? "center" : "flex-start" }}
+              className={sharedClassName}
+              style={sharedStyle}
               title={isCollapsed ? item.label : undefined}
             >
-              <Icon style={{ width: "20px", height: "20px", flexShrink: 0 }} />
-
-              {!isCollapsed && (
-                <>
-                  <span className={styles["sidebar-nav-btn__label"]}>{item.label}</span>
-                  {"badge" in item && item.badge && (
-                    <Badge className={styles["sidebar-nav-btn__badge"]}>{item.badge}</Badge>
-                  )}
-                </>
-              )}
+              {inner}
             </button>
           );
         })}

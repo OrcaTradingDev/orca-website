@@ -16,7 +16,6 @@ import BotSection from "@/features/dashboard/components/BotSection";
 import AccountSection from "@/features/dashboard/components/AccountSection";
 import SubscriptionSection from "@/features/dashboard/components/SubscriptionSection";
 import AdminSection from "@/features/dashboard/components/AdminSection";
-import JournalSection from "@/features/journal/components/JournalSection";
 import { useAuthStore } from "@/store/auth-store";
 
 function ScreenerAccessGate() {
@@ -38,7 +37,6 @@ function ScreenerAccessGate() {
 }
 
 const SECTIONS: Record<string, React.ReactNode> = {
-  journal: <JournalSection />,
   watchlist: <WatchlistSection />,
   alerts: <SavedAlertsSection />,
   filters: <FiltersSettingsSection />,

@@ -110,6 +110,12 @@ class CoachingSettings(BaseModel):
     journal_coaching_access: bool
 
 
+class EquityPointOut(BaseModel):
+    date: str
+    daily_pnl: float
+    cumulative_pnl: float
+
+
 class BulkImportResult(BaseModel):
     imported: int
     skipped: int

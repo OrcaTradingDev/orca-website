@@ -2,6 +2,7 @@ import { http } from "@/lib/http";
 import type {
   BulkImportResult,
   CoachingSettings,
+  EquityPoint,
   JournalStats,
   OrcaAnalytics,
   Trade,
@@ -46,6 +47,11 @@ export const fetchStats = async (): Promise<JournalStats> => {
 
 export const bulkImportTrades = async (trades: TradeCreatePayload[]): Promise<BulkImportResult> => {
   const { data } = await http.post<BulkImportResult>("/journal/trades/bulk", trades);
+  return data;
+};
+
+export const fetchEquity = async (): Promise<EquityPoint[]> => {
+  const { data } = await http.get<EquityPoint[]>("/journal/equity");
   return data;
 };
 

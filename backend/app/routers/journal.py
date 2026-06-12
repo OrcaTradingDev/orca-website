@@ -288,6 +288,51 @@ async def get_stats(
     )
 
 
+# ── Equity curve ─────────────────────────────────────────────────────────────
+
+from collections import defaultdict
+from app.schemas.journal import EquityPointOut
+
+
+@router.get("/equity", response_model=list[EquityPointOut])
+async def get_equity(
+    db: AsyncSession = Depends(get_db),
+    user_payload: dict = Depends(get_current_user),
+) -> list[EquityPointOut]:
+    """Daily cumulative PnL series for the equity curve chart."""
+    user = await _get_user_row(user_payload, db)
+
+    result = await db.execute(
+        select(JournalTrade.trade_date, JournalTrade.pnl)
+        .where(
+            JournalTrade.user_id == user.id,
+            JournalTrade.status == "CLOSED",
+            JournalTrade.pnl.isnot(None),
+        )
+        .order_by(JournalTrade.trade_date.asc())
+    )
+    rows = result.all()
+
+    # Group by date, sum daily pnl
+    daily: dict[str, float] = defaultdict(float)
+    for trade_date, pnl in rows:
+        key = trade_date.isoformat() if hasattr(trade_date, "isoformat") else str(trade_date)
+        daily[key] += float(pnl)
+
+    # Build cumulative series
+    points: list[EquityPointOut] = []
+    cumulative = 0.0
+    for d in sorted(daily.keys()):
+        cumulative += daily[d]
+        points.append(EquityPointOut(
+            date=d,
+            daily_pnl=round(daily[d], 2),
+            cumulative_pnl=round(cumulative, 2),
+        ))
+
+    return points
+
+
 # ── Orca analytics ───────────────────────────────────────────────────────────
 
 def _win_rate(trades_with_pnl: list) -> Optional[float]:

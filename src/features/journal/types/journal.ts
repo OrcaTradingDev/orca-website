@@ -119,6 +119,12 @@ export interface OrcaPhaseStat {
   win_rate: number | null;
 }
 
+export interface EquityPoint {
+  date: string;
+  daily_pnl: number;
+  cumulative_pnl: number;
+}
+
 export interface OrcaAnalytics {
   has_data: boolean;
   by_score: OrcaScoreBucket[];

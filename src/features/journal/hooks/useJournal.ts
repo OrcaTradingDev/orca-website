@@ -5,6 +5,7 @@ import {
   createTrade,
   deleteTrade,
   fetchCoachingSettings,
+  fetchEquity,
   fetchOrcaAnalytics,
   fetchStats,
   fetchTrades,
@@ -19,6 +20,7 @@ export const JOURNAL_KEYS = {
   stats: () => ["journal", "stats"] as const,
   settings: () => ["journal", "settings"] as const,
   orcaAnalytics: () => ["journal", "orca-analytics"] as const,
+  equity: () => ["journal", "equity"] as const,
 };
 
 export function useJournalTrades(params: ListTradesParams = {}) {
@@ -34,6 +36,14 @@ export function useJournalStats() {
     queryKey: JOURNAL_KEYS.stats(),
     queryFn: fetchStats,
     staleTime: 30_000,
+  });
+}
+
+export function useEquity() {
+  return useQuery({
+    queryKey: JOURNAL_KEYS.equity(),
+    queryFn: fetchEquity,
+    staleTime: 60_000,
   });
 }
 
