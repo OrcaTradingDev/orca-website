@@ -1081,7 +1081,7 @@ export default function JournalSection() {
             }}
           >
             <Upload style={{ width: "15px", height: "15px" }} />
-            Import CSV
+            Upload CSV or XLSX
           </button>
           <button
             onClick={() => { setEditTrade(null); setShowForm(true); }}
