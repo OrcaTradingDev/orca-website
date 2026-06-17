@@ -149,7 +149,8 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
   const numOrNull = (s: string) => (s === "" ? null : parseFloat(s));
 
   // ── Live auto-calculations (recompute every render — no stale useEffect) ───
-  const autoRR  = calcRR(form.entry_price ?? null, form.stop_loss ?? null, form.take_profit ?? null, form.direction);
+  // SL and TP are dollar amounts, so R:R = TP$ / SL$
+  const autoRR  = calcRR(form.stop_loss ?? null, form.take_profit ?? null);
   const autoPnL = calcPnL(form.entry_price ?? null, form.exit_price ?? null, form.lot_size ?? null, form.direction);
 
   // The effective values used at submit time
@@ -253,10 +254,10 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
             </FormGroup>
           </div>
 
-          {/* ── Price Levels ──────────────────────────────────────────── */}
+          {/* ── Trade Setup ───────────────────────────────────────────── */}
           <div style={{ background: "#0B0F19", border: "1px solid #1E293B", borderRadius: "12px", padding: "16px" }}>
             <div style={{ color: "#64748B", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-              Price Levels
+              Trade Setup
               {autoRR != null && (
                 <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px", color: "#6366F1", fontWeight: 700, fontSize: "12px", letterSpacing: 0 }}>
                   <Zap style={{ width: "11px", height: "11px" }} />
@@ -265,45 +266,51 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
               )}
             </div>
 
-            {/* Entry / SL / TP on one line */}
+            {/* SL $ / TP $ / Entry price */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
-              <FormGroup label="Entry Price">
+              <FormGroup label="Stop Loss ($)" hint="dollars at risk">
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: "11px", top: "50%", transform: "translateY(-50%)", color: "#EF4444", fontSize: "13px", pointerEvents: "none" }}>$</span>
+                  <input type="number" step="any" placeholder="50.00"
+                    value={form.stop_loss ?? ""}
+                    onChange={(e) => set("stop_loss", numOrNull(e.target.value))}
+                    style={{ ...inputStyle, paddingLeft: "22px", borderColor: form.stop_loss ? "#EF444450" : "#1E293B" }} />
+                </div>
+              </FormGroup>
+              <FormGroup label="Take Profit ($)" hint="dollars targeted">
+                <div style={{ position: "relative" }}>
+                  <span style={{ position: "absolute", left: "11px", top: "50%", transform: "translateY(-50%)", color: "#10B981", fontSize: "13px", pointerEvents: "none" }}>$</span>
+                  <input type="number" step="any" placeholder="150.00"
+                    value={form.take_profit ?? ""}
+                    onChange={(e) => set("take_profit", numOrNull(e.target.value))}
+                    style={{ ...inputStyle, paddingLeft: "22px", borderColor: form.take_profit ? "#10B98150" : "#1E293B" }} />
+                </div>
+              </FormGroup>
+              <FormGroup label="Entry Price" hint="optional">
                 <input type="number" step="any" placeholder="0.00000"
                   value={form.entry_price ?? ""}
                   onChange={(e) => set("entry_price", numOrNull(e.target.value))}
                   style={inputStyle} />
               </FormGroup>
-              <FormGroup label="Stop Loss (SL)" hint="risk level">
-                <input type="number" step="any" placeholder="0.00000"
-                  value={form.stop_loss ?? ""}
-                  onChange={(e) => set("stop_loss", numOrNull(e.target.value))}
-                  style={{ ...inputStyle, borderColor: form.stop_loss ? "#EF444450" : "#1E293B" }} />
-              </FormGroup>
-              <FormGroup label="Take Profit (TP)" hint="target">
-                <input type="number" step="any" placeholder="0.00000"
-                  value={form.take_profit ?? ""}
-                  onChange={(e) => set("take_profit", numOrNull(e.target.value))}
-                  style={{ ...inputStyle, borderColor: form.take_profit ? "#10B98150" : "#1E293B" }} />
-              </FormGroup>
             </div>
 
-            {/* Visual R:R bar — only when autoRR is available */}
+            {/* Visual R:R bar */}
             {autoRR != null && (
               <div style={{ marginBottom: "12px" }}>
                 <div style={{ display: "flex", gap: "2px", height: "6px", borderRadius: "3px", overflow: "hidden" }}>
                   <div style={{ flex: 1, background: "#EF4444", opacity: 0.7 }} title="Risk" />
-                  <div style={{ flex: autoRR, background: "#10B981", opacity: 0.7 }} title={`Reward (${autoRR}×)`} />
+                  <div style={{ flex: Math.min(autoRR, 10), background: "#10B981", opacity: 0.7 }} title={`Reward (${autoRR}×)`} />
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  <span style={{ color: "#EF444490", fontSize: "10px" }}>Risk (1R)</span>
-                  <span style={{ color: "#10B98190", fontSize: "10px" }}>Reward ({autoRR}R)</span>
+                  <span style={{ color: "#EF444490", fontSize: "10px" }}>Risk: ${form.stop_loss?.toFixed(2)}</span>
+                  <span style={{ color: "#10B98190", fontSize: "10px" }}>Target: ${form.take_profit?.toFixed(2)} ({autoRR}R)</span>
                 </div>
               </div>
             )}
 
-            {/* Exit + Lot size */}
+            {/* Exit price + Lot size */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <FormGroup label="Exit Price">
+              <FormGroup label="Exit Price" hint="optional">
                 <input type="number" step="any" placeholder="0.00000"
                   value={form.exit_price ?? ""}
                   onChange={(e) => set("exit_price", numOrNull(e.target.value))}

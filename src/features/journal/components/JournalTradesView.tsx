@@ -164,9 +164,9 @@ function InlinePrice({
       <span
         onClick={open}
         title={`Click to edit ${label}`}
-        style={{ color, fontSize: "11px", cursor: "pointer" }}
+        style={{ color, fontSize: "11px", cursor: "pointer", fontWeight: 600 }}
       >
-        {value.toFixed(5)}
+        ${value.toFixed(2)}
       </span>
     );
   }
@@ -208,12 +208,12 @@ function TradeRow({
   const tp    = trade.take_profit != null ? parseFloat(trade.take_profit) : null;
   const entry = trade.entry_price != null ? parseFloat(trade.entry_price) : null;
 
-  /** Save a single price field and auto-compute R:R if we now have all three */
+  /** Save a dollar-amount SL/TP field and auto-compute R:R when both are present */
   const savePrice = async (field: "stop_loss" | "take_profit", newVal: number) => {
     const newSL = field === "stop_loss"   ? newVal : sl;
     const newTP = field === "take_profit" ? newVal : tp;
     const payload: TradeUpdatePayload = { [field]: newVal };
-    const autoRR = calcRR(entry, newSL, newTP, trade.direction);
+    const autoRR = calcRR(newSL, newTP);
     if (autoRR != null) payload.rr = autoRR;
     await updateMutation.mutateAsync({ id: trade.id, payload });
   };
@@ -492,7 +492,7 @@ export default function JournalTradesView({ onEdit, onLogTrade }: Props) {
             borderBottom: "1px solid #1E293B",
             gap: "8px",
           }}>
-            {["Date", "Market", "Dir", "Entry", "SL", "TP", "Exit", "PnL", "R:R", "Score", "Status", ""].map((h) => (
+            {["Date", "Market", "Dir", "Entry", "SL $", "TP $", "Exit", "PnL", "R:R", "Score", "Status", ""].map((h) => (
               <div key={h} style={{
                 color: "#475569", fontSize: "10px", fontWeight: 600,
                 textTransform: "uppercase", letterSpacing: "0.04em",
