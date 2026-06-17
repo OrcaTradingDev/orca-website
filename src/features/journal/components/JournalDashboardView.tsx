@@ -4,10 +4,11 @@ import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, TrendingDown, BarChart2, Target, Award, Brain, Trophy } from "lucide-react";
+import { TrendingUp, TrendingDown, BarChart2, Target, Award, Brain, Trophy, DollarSign } from "lucide-react";
 import { useJournalStats, useJournalTrades, useEquity, useOrcaAnalytics } from "../hooks/useJournal";
 import { useAccountSize } from "../hooks/useAccountSize";
 import type { Trade } from "../types/journal";
+import { useState, useRef } from "react";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,80 @@ function StatCard({ label, value, sub, color, icon: Icon }: {
       <div style={{ fontSize: "24px", fontWeight: 700, color: color ?? "white", lineHeight: 1.1 }}>{value}</div>
       {sub && <div style={{ fontSize: "12px", color: "#64748B" }}>{sub}</div>}
     </div>
+  );
+}
+
+// ── Account size button ───────────────────────────────────────────────────────
+
+function AccountSizeButton() {
+  const { accountSize, setAccountSize } = useAccountSize();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState("");
+  const inputRef              = useRef<HTMLInputElement>(null);
+
+  const open = () => {
+    setDraft(accountSize != null ? String(accountSize) : "");
+    setEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const save = () => {
+    const n = parseFloat(draft);
+    if (!isNaN(n) && n > 0) setAccountSize(n);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+        <div style={{ position: "relative" }}>
+          <span style={{
+            position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)",
+            color: "#64748B", fontSize: "13px", pointerEvents: "none",
+          }}>$</span>
+          <input
+            ref={inputRef}
+            type="number"
+            step="any"
+            min="1"
+            placeholder="10000"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); save(); }
+              if (e.key === "Escape") setEditing(false);
+            }}
+            onBlur={save}
+            style={{
+              background: "#14181F", border: "1px solid #6366F1", borderRadius: "8px",
+              padding: "9px 12px 9px 24px", color: "white", fontSize: "14px",
+              outline: "none", width: "150px",
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={open}
+      title={accountSize != null ? "Click to change account size" : "Set your starting account balance"}
+      style={{
+        display: "flex", alignItems: "center", gap: "6px",
+        background: "transparent",
+        border: `1px solid ${accountSize != null ? "#10B98140" : "#1E293B"}`,
+        borderRadius: "10px", padding: "10px 16px",
+        color: accountSize != null ? "#10B981" : "#64748B",
+        fontSize: "13px", fontWeight: 500, cursor: "pointer",
+        transition: "border-color 0.15s",
+      }}
+    >
+      <DollarSign style={{ width: "13px", height: "13px" }} />
+      {accountSize != null
+        ? `$${accountSize.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+        : "Account Size"}
+    </button>
   );
 }
 
@@ -420,17 +495,20 @@ export default function JournalDashboardView({ onLogTrade }: Props) {
           <h1 style={{ color: "white", fontSize: "22px", fontWeight: 700, margin: 0 }}>Dashboard</h1>
           <p style={{ color: "#64748B", fontSize: "13px", margin: "2px 0 0" }}>Your trading overview</p>
         </div>
-        <button
-          onClick={onLogTrade}
-          style={{
-            display: "flex", alignItems: "center", gap: "8px",
-            background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
-            border: "none", borderRadius: "10px", padding: "10px 18px",
-            color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer",
-          }}
-        >
-          + Log Trade
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <AccountSizeButton />
+          <button
+            onClick={onLogTrade}
+            style={{
+              display: "flex", alignItems: "center", gap: "8px",
+              background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+              border: "none", borderRadius: "10px", padding: "10px 18px",
+              color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer",
+            }}
+          >
+            + Log Trade
+          </button>
+        </div>
       </div>
 
       {/* Stats row */}
