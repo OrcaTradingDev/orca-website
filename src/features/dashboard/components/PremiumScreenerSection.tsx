@@ -206,8 +206,10 @@ const getTVSymbol = (symbol: string): string => {
   return symbol;
 };
 
+const STRIPE_UPGRADE_URL = "https://buy.stripe.com/00w14neBj8BggG252g6wE03";
+
 // ═════════════════════════════════════════════════════════════════════════════
-export default function PremiumScreenerSection() {
+export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?: boolean }) {
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(1);
@@ -386,13 +388,35 @@ export default function PremiumScreenerSection() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="space-y-1">
-        <h1 className="text-white text-[32px]">Premium Screener</h1>
-        <p className="text-[#94A3B8]">Real-time multi-timeframe trend analysis</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-white text-[32px]">
+            {freeOnly ? "OrcaTrading Screener" : "Premium Screener"}
+          </h1>
+          <p className="text-[#94A3B8]">Real-time multi-timeframe trend analysis</p>
+        </div>
+
+        {freeOnly && (
+          <a
+            href={STRIPE_UPGRADE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-all"
+            style={{
+              background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+              color: "white",
+              textDecoration: "none",
+              boxShadow: "0 0 20px rgba(99,102,241,0.35)",
+            }}
+          >
+            <Zap className="w-4 h-4" />
+            Get Advanced Screener Access
+          </a>
+        )}
       </div>
 
-      {/* Best Market Today Banner */}
-      {bestAsset && (
+      {/* Best Market Today Banner — advanced data, hide in free mode */}
+      {bestAsset && !freeOnly && (
         <div
           className="flex items-center gap-4 bg-gradient-to-r from-[#FFD700]/10 to-[#F59E0B]/5 border border-[#FFD700]/30 rounded-xl px-5 py-3 cursor-pointer hover:border-[#FFD700]/60 transition-all"
           onClick={() => openModal(bestAsset)}
@@ -422,6 +446,7 @@ export default function PremiumScreenerSection() {
           </div>
         </div>
       )}
+      {/* End Best Market Today banner */}
 
       {/* Controls */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -477,15 +502,17 @@ export default function PremiumScreenerSection() {
             <span className="text-sm">{lastUpdatedLabel}</span>
           </Button>
 
-          <Button
-            variant="outline"
-            onClick={handleExport}
-            disabled={filteredAssets.length === 0}
-            className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white disabled:opacity-50"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
+          {!freeOnly && (
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={filteredAssets.length === 0}
+              className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white disabled:opacity-50"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+          )}
         </div>
       </div>
 
@@ -508,26 +535,32 @@ export default function PremiumScreenerSection() {
                     {dailyTFs.length > 0 ? dailyTFs.join(" | ") : "—"}
                   </div>
                 </th>
-                <th className="py-4 px-4 text-center text-white">
-                  <div className="mb-1">LONG-TERM</div>
-                  <div className="text-xs text-[#94A3B8]">
-                    {["1D", ...longtermTFs].join(" | ")}
-                  </div>
-                </th>
-                <th className="py-4 px-4 text-center text-white w-[150px]">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <Zap className="w-4 h-4 text-[#00D4FF]" />
-                    <span>ORCA STATUS</span>
-                  </div>
-                  <div className="text-xs text-[#94A3B8]">Signal | Score</div>
-                </th>
-                <th className="py-4 px-4 text-center text-white w-[260px]">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    <span>ADVANCED</span>
-                    <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">PRO</Badge>
-                  </div>
-                  <div className="text-xs text-[#94A3B8]">ADX | EMA | VOL</div>
-                </th>
+                {!freeOnly && (
+                  <th className="py-4 px-4 text-center text-white">
+                    <div className="mb-1">LONG-TERM</div>
+                    <div className="text-xs text-[#94A3B8]">
+                      {["1D", ...longtermTFs].join(" | ")}
+                    </div>
+                  </th>
+                )}
+                {!freeOnly && (
+                  <th className="py-4 px-4 text-center text-white w-[150px]">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <Zap className="w-4 h-4 text-[#00D4FF]" />
+                      <span>ORCA STATUS</span>
+                    </div>
+                    <div className="text-xs text-[#94A3B8]">Signal | Score</div>
+                  </th>
+                )}
+                {!freeOnly && (
+                  <th className="py-4 px-4 text-center text-white w-[260px]">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <span>ADVANCED</span>
+                      <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">PRO</Badge>
+                    </div>
+                    <div className="text-xs text-[#94A3B8]">ADX | EMA | VOL</div>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -535,13 +568,13 @@ export default function PremiumScreenerSection() {
                 <LoadingSkeleton />
               ) : isError ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-red-400">
+                  <td colSpan={freeOnly ? 3 : 6} className="py-12 text-center text-red-400">
                     Failed to load market data. Please check your connection.
                   </td>
                 </tr>
               ) : filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-[#94A3B8]">
+                  <td colSpan={freeOnly ? 3 : 6} className="py-12 text-center text-[#94A3B8]">
                     {assets.length === 0
                       ? "No data available. Data may be warming up..."
                       : "No assets found. Try adjusting your filters."}
@@ -551,10 +584,10 @@ export default function PremiumScreenerSection() {
                 filteredAssets.map((asset) => (
                   <tr
                     key={asset.symbol}
-                    className={`border-b border-[#1E293B] hover:bg-[#1A1F2E] transition-all duration-200 cursor-pointer ${
-                      asset.signals.is_best ? "ring-1 ring-inset ring-[#FFD700]/20" : ""
-                    }`}
-                    onClick={() => openModal(asset)}
+                    className={`border-b border-[#1E293B] transition-all duration-200 ${
+                      freeOnly ? "" : "hover:bg-[#1A1F2E] cursor-pointer"
+                    } ${asset.signals.is_best && !freeOnly ? "ring-1 ring-inset ring-[#FFD700]/20" : ""}`}
+                    onClick={() => !freeOnly && openModal(asset)}
                   >
                     {/* SYMBOL */}
                     <td className="py-3 px-4">
@@ -595,28 +628,33 @@ export default function PremiumScreenerSection() {
                       <StackedBar bear={asset.daily.bear} bull={asset.daily.bull} />
                     </td>
 
-                    {/* LONG-TERM */}
-                    <td className="py-3 px-4">
-                      <StackedBar bear={asset.longterm.bear} bull={asset.longterm.bull} />
-                    </td>
+                    {/* LONG-TERM — advanced only */}
+                    {!freeOnly && (
+                      <td className="py-3 px-4">
+                        <StackedBar bear={asset.longterm.bear} bull={asset.longterm.bull} />
+                      </td>
+                    )}
 
-                    {/* ORCA STATUS */}
-                    <td className="py-3 px-4">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <Badge className={`${STATUS_STYLES[asset.signals.status]} text-xs font-bold border-0 px-3`}>
-                          {asset.signals.status}
-                        </Badge>
-                        <span className={`text-xs font-medium ${DIRECTION_STYLES[asset.signals.direction]}`}>
-                          {asset.signals.direction}
-                        </span>
-                        <span className="text-[#94A3B8] text-xs">
-                          Score: <span className="text-white font-semibold">{asset.signals.orca_score}</span>
-                        </span>
-                      </div>
-                    </td>
+                    {/* ORCA STATUS — advanced only */}
+                    {!freeOnly && (
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col items-center gap-1.5">
+                          <Badge className={`${STATUS_STYLES[asset.signals.status]} text-xs font-bold border-0 px-3`}>
+                            {asset.signals.status}
+                          </Badge>
+                          <span className={`text-xs font-medium ${DIRECTION_STYLES[asset.signals.direction]}`}>
+                            {asset.signals.direction}
+                          </span>
+                          <span className="text-[#94A3B8] text-xs">
+                            Score: <span className="text-white font-semibold">{asset.signals.orca_score}</span>
+                          </span>
+                        </div>
+                      </td>
+                    )}
 
-                    {/* ADVANCED */}
-                    <td className="py-3 px-4">
+                    {/* ADVANCED — advanced only */}
+                    {!freeOnly && (
+                      <td className="py-3 px-4">
                       <div className="flex items-center gap-3 text-sm">
                         {/* ADX */}
                         <div className="flex items-center gap-1">
@@ -667,7 +705,8 @@ export default function PremiumScreenerSection() {
                           />
                         </button>
                       </div>
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}

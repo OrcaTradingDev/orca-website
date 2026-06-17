@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { jwtDecode } from 'jwt-decode';
+import { http } from '@/lib/http';
 
 interface JWTPayload {
   iss: string;
@@ -28,6 +29,8 @@ interface AuthState {
   setAuth: (token: string) => void;
   logout: () => void;
   setHasHydrated: (state: boolean) => void;
+  /** Re-fetches the user's JWT from the backend so screener_access updates instantly after payment. */
+  refreshAuth: () => Promise<void>;
 }
 
 /** Returns true if the JWT exp timestamp is in the past. */
@@ -69,6 +72,26 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => set({ token: null, user: null }),
+
+      refreshAuth: async () => {
+        try {
+          const { data } = await http.get<{ token: string }>("/auth/google/me/refresh");
+          const decoded = jwtDecode<JWTPayload>(data.token);
+          set({
+            token: data.token,
+            user: {
+              id: decoded.sub,
+              email: decoded.email,
+              name: decoded.name,
+              picture: decoded.picture,
+              screenerAccess: decoded.screener_access ?? false,
+              isAdmin: decoded.is_admin ?? false,
+            },
+          });
+        } catch (err) {
+          console.error("Failed to refresh auth token:", err);
+        }
+      },
 
       setHasHydrated: (state: boolean) => set({ isHydrated: state }),
     }),

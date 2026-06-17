@@ -4,7 +4,8 @@
 // Plain CSS (not a module) because Tailwind utilities must remain unhashed/global.
 import "../styles/dashboard.css";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Sidebar from "@/features/dashboard/components/Sidebar";
 import PremiumScreenerSection from "@/features/dashboard/components/PremiumScreenerSection";
 import WatchlistSection from "@/features/dashboard/components/WatchlistSection";
@@ -18,41 +19,104 @@ import SubscriptionSection from "@/features/dashboard/components/SubscriptionSec
 import AdminSection from "@/features/dashboard/components/AdminSection";
 import { useAuthStore } from "@/store/auth-store";
 
-function ScreenerAccessGate() {
+const SECTIONS: Record<string, React.ReactNode> = {
+  watchlist:    <WatchlistSection />,
+  alerts:       <SavedAlertsSection />,
+  filters:      <FiltersSettingsSection />,
+  trending:     <TrendingSection />,
+  tools:        <ToolsSection />,
+  bot:          <BotSection />,
+  account:      <AccountSection />,
+  subscription: <SubscriptionSection />,
+};
+
+// ── Payment-success banner (shown briefly after Stripe redirect) ───────────────
+
+function UpgradingBanner() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-      <div className="text-5xl mb-6">🔒</div>
-      <h2 className="text-2xl font-bold text-white mb-3">Screener Access Required</h2>
-      <p className="text-[#94A3B8] max-w-md mb-8 leading-relaxed">
-        The OrcaTrading Flowscreener is available to approved users. Reach out to get access.
-      </p>
-      <a
-        href="mailto:support@tradewithorca.com"
-        className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#00D4FF] text-black font-semibold hover:bg-[#00B8E6] transition-colors"
-      >
-        Request Access
-      </a>
+    <div
+      style={{
+        background: "linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(139,92,246,0.15) 100%)",
+        border: "1px solid rgba(99,102,241,0.4)",
+        borderRadius: "12px",
+        padding: "16px 20px",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        marginBottom: "8px",
+      }}
+    >
+      {/* spinner */}
+      <div
+        style={{
+          width: "18px", height: "18px",
+          border: "2px solid rgba(99,102,241,0.3)",
+          borderTopColor: "#6366F1",
+          borderRadius: "50%",
+          animation: "spin 0.8s linear infinite",
+          flexShrink: 0,
+        }}
+      />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div>
+        <div style={{ color: "#A5B4FC", fontWeight: 600, fontSize: "14px" }}>
+          Payment received — activating your Advanced Screener access…
+        </div>
+        <div style={{ color: "#6366F180", fontSize: "12px", marginTop: "2px" }}>
+          This only takes a moment.
+        </div>
+      </div>
     </div>
   );
 }
 
-const SECTIONS: Record<string, React.ReactNode> = {
-  watchlist: <WatchlistSection />,
-  alerts: <SavedAlertsSection />,
-  filters: <FiltersSettingsSection />,
-  trending: <TrendingSection />,
-  tools: <ToolsSection />,
-  bot: <BotSection />,
-  account: <AccountSection />,
-  subscription: <SubscriptionSection />,
-};
+// ── Free screener layout (no sidebar) ─────────────────────────────────────────
 
-export default function DashboardClient() {
+function FreeScreenerLayout() {
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const refreshAuth  = useAuthStore((s) => s.refreshAuth);
+  const hasAccess    = useAuthStore((s) => s.user?.screenerAccess ?? false);
+
+  const [upgrading, setUpgrading] = useState(false);
+
+  // Detect ?upgraded=1 redirect from Stripe and refresh the JWT
+  useEffect(() => {
+    if (!searchParams.get("upgraded")) return;
+    setUpgrading(true);
+
+    const activate = async () => {
+      // Give the Stripe webhook ~3 s to arrive and update the DB first
+      await new Promise((r) => setTimeout(r, 3000));
+      await refreshAuth();
+      // Clean the URL regardless of whether it worked
+      router.replace("/screener", { scroll: false });
+    };
+
+    activate();
+  }, [searchParams, refreshAuth, router]);
+
+  // If refresh gave us access, the parent will re-render the full layout
+  // (because hasAccess is now true). Nothing else to do here.
+
+  return (
+    <div className="min-h-screen bg-[#0B0F19] text-white pt-[64px]">
+      <main className="p-8 md:p-12">
+        <div className="max-w-[1400px] mx-auto">
+          {upgrading && <UpgradingBanner />}
+          <PremiumScreenerSection freeOnly={true} />
+        </div>
+      </main>
+    </div>
+  );
+}
+
+// ── Full (paid) layout ─────────────────────────────────────────────────────────
+
+function FullScreenerLayout() {
   const [activeSection, setActiveSection] = useState("screener");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const user = useAuthStore((s) => s.user);
-  const hasScreenerAccess = user?.screenerAccess ?? false;
-  const isAdmin = user?.isAdmin ?? false;
+  const isAdmin = useAuthStore((s) => s.user?.isAdmin ?? false);
 
   const renderSection = () => {
     if (activeSection === "admin") {
@@ -61,7 +125,7 @@ export default function DashboardClient() {
     if (activeSection === "screener") {
       return <PremiumScreenerSection />;
     }
-    return SECTIONS[activeSection] ?? <ScreenerAccessGate />;
+    return SECTIONS[activeSection] ?? null;
   };
 
   return (
@@ -82,4 +146,18 @@ export default function DashboardClient() {
       </main>
     </div>
   );
+}
+
+// ── Root component ─────────────────────────────────────────────────────────────
+
+export default function DashboardClient() {
+  const hasScreenerAccess = useAuthStore((s) => s.user?.screenerAccess ?? false);
+  const isAdmin           = useAuthStore((s) => s.user?.isAdmin ?? false);
+
+  // Admins always get the full layout regardless of screener_access
+  if (hasScreenerAccess || isAdmin) {
+    return <FullScreenerLayout />;
+  }
+
+  return <FreeScreenerLayout />;
 }

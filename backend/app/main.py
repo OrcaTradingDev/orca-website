@@ -15,6 +15,7 @@ from app.routers.admin import router as admin_router
 from app.routers.alerts import router as alerts_router
 from app.routers.auth_google import router as auth_google_router
 from app.routers.journal import router as journal_router
+from app.routers.stripe_webhook import router as stripe_router
 
 
 app = FastAPI(
@@ -71,3 +72,4 @@ app.include_router(auth_google_router)
 app.include_router(admin_router)
 app.include_router(alerts_router)
 app.include_router(journal_router)
+app.include_router(stripe_router)

@@ -8,9 +8,11 @@ import jwt
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.db import get_db
 from app.models.user import User
 
@@ -114,3 +116,34 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
         screener_access=screener_access, is_admin=is_admin,
     )
     return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback#token={app_token}")
+
+
+@router.get("/me/refresh")
+async def refresh_token(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """
+    Re-issue a JWT with up-to-date screener_access from the database.
+    Call this after a Stripe payment completes so the user gets instant
+    access without having to log out and back in.
+    """
+    sub   = current_user["sub"]
+    email = current_user["email"]
+
+    result = await db.execute(select(User).where(User.google_sub == sub))
+    db_user = result.scalar_one_or_none()
+
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    is_admin  = email.lower() in ADMIN_EMAILS
+    new_token = _issue_app_jwt(
+        sub=sub,
+        email=email,
+        name=db_user.name or "",
+        picture=db_user.picture,
+        screener_access=db_user.screener_access,
+        is_admin=is_admin,
+    )
+    return {"token": new_token}
