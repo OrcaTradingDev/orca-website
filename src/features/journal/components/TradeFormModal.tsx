@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, AlertCircle, Zap } from "lucide-react";
+import { useState } from "react";
+import { X, AlertCircle, Zap, RotateCcw } from "lucide-react";
 import { useCreateTrade, useUpdateTrade } from "../hooks/useJournal";
+import { calcRR, calcPnL } from "../utils/tradeCalc";
 import type {
   Direction, EmotionalState, Session, Trade, TradeCreatePayload, TradeStatus,
 } from "../types/journal";
@@ -15,22 +16,6 @@ const EMOTION_LABELS: Record<string, string> = {
 };
 
 const today = () => new Date().toISOString().split("T")[0];
-
-/** Auto-calc R:R from entry / SL / TP */
-function calcRR(entry: number | null, sl: number | null, tp: number | null, dir: Direction): number | null {
-  if (entry == null || sl == null || tp == null) return null;
-  const risk   = dir === "LONG" ? entry - sl : sl - entry;
-  const reward = dir === "LONG" ? tp - entry : entry - tp;
-  if (risk <= 0 || reward <= 0) return null;
-  return parseFloat((reward / risk).toFixed(2));
-}
-
-/** Auto-calc PnL from entry / exit / lot_size */
-function calcPnL(entry: number | null, exit: number | null, lot: number | null, dir: Direction): number | null {
-  if (entry == null || exit == null || lot == null || lot <= 0) return null;
-  const raw = (exit - entry) * lot;
-  return parseFloat((dir === "LONG" ? raw : -raw).toFixed(2));
-}
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
@@ -62,26 +47,68 @@ function FormGroup({ label, children, style, hint }: {
     <div style={{ display: "flex", flexDirection: "column", gap: "5px", ...style }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <label style={{ color: "#94A3B8", fontSize: "12px", fontWeight: 500 }}>{label}</label>
-        {hint && <span style={{ color: "#475569", fontSize: "11px" }}>{hint}</span>}
+        {hint && <span style={{ color: "#475569", fontSize: "11px", fontStyle: "italic" }}>{hint}</span>}
       </div>
       {children}
     </div>
   );
 }
 
-// ── Auto-calc badge ───────────────────────────────────────────────────────────
+// ── Live R:R display ──────────────────────────────────────────────────────────
 
-function AutoBadge({ value, label }: { value: string; label: string }) {
+function RRField({
+  autoRR, manualRR, onManualChange, onClear,
+}: {
+  autoRR: number | null;
+  manualRR: number | null;
+  onManualChange: (v: number | null) => void;
+  onClear: () => void;
+}) {
+  const displayValue = manualRR ?? "";
+  const placeholder  = autoRR != null ? `${autoRR} (auto)` : "e.g. 1.5";
+  const isAuto       = manualRR == null && autoRR != null;
+
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: "6px",
-      background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.25)",
-      borderRadius: "8px", padding: "8px 12px",
-    }}>
-      <Zap style={{ width: "13px", height: "13px", color: "#6366F1", flexShrink: 0 }} />
-      <span style={{ color: "#A5B4FC", fontSize: "12px" }}>Auto: </span>
-      <span style={{ color: "white", fontSize: "13px", fontWeight: 700 }}>{value}</span>
-      <span style={{ color: "#475569", fontSize: "11px", marginLeft: "auto" }}>{label}</span>
+    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <label style={{ color: "#94A3B8", fontSize: "12px", fontWeight: 500 }}>R:R Achieved</label>
+        {isAuto && (
+          <span style={{ display: "flex", alignItems: "center", gap: "3px", color: "#6366F1", fontSize: "11px", fontWeight: 600 }}>
+            <Zap style={{ width: "10px", height: "10px" }} /> auto
+          </span>
+        )}
+        {manualRR != null && autoRR != null && (
+          <button
+            type="button"
+            onClick={onClear}
+            title="Reset to auto-calculated value"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#475569", padding: "0", display: "flex", alignItems: "center", gap: "3px", fontSize: "11px" }}
+          >
+            <RotateCcw style={{ width: "10px", height: "10px" }} /> use auto ({autoRR})
+          </button>
+        )}
+      </div>
+      <div style={{ position: "relative" }}>
+        <input
+          type="number" step="any"
+          value={displayValue}
+          placeholder={placeholder}
+          onChange={(e) => onManualChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+          style={{
+            ...inputStyle,
+            borderColor: isAuto ? "#6366F150" : "#1E293B",
+            paddingRight: isAuto ? "52px" : "12px",
+          }}
+        />
+        {isAuto && (
+          <div style={{
+            position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
+            color: "#6366F1", fontWeight: 700, fontSize: "13px", pointerEvents: "none",
+          }}>
+            {autoRR}R
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -116,40 +143,27 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
 
   const [error, setError] = useState<string | null>(null);
 
-  // ── Auto-calculation ───────────────────────────────────────────────────────
-  const autoRR  = calcRR(form.entry_price ?? null, form.stop_loss ?? null, form.take_profit ?? null, form.direction);
-  const autoPnL = calcPnL(form.entry_price ?? null, form.exit_price ?? null, form.lot_size ?? null, form.direction);
-
-  // Fill R:R field when auto value changes and user hasn't manually set it
-  useEffect(() => {
-    if (autoRR != null && form.rr == null) {
-      setForm((f) => ({ ...f, rr: autoRR }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRR]);
-
-  // Fill PnL field when auto value changes and user hasn't manually set it
-  useEffect(() => {
-    if (autoPnL != null && form.pnl == null) {
-      setForm((f) => ({ ...f, pnl: autoPnL }));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPnL]);
-
   const set = <K extends keyof TradeCreatePayload>(k: K, v: TradeCreatePayload[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   const numOrNull = (s: string) => (s === "" ? null : parseFloat(s));
 
+  // ── Live auto-calculations (recompute every render — no stale useEffect) ───
+  const autoRR  = calcRR(form.entry_price ?? null, form.stop_loss ?? null, form.take_profit ?? null, form.direction);
+  const autoPnL = calcPnL(form.entry_price ?? null, form.exit_price ?? null, form.lot_size ?? null, form.direction);
+
+  // The effective values used at submit time
+  const effectiveRR  = form.rr  ?? autoRR;
+  const effectivePnL = form.pnl ?? autoPnL;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!form.market.trim()) { setError("Market is required"); return; }
-    // Snap auto-calculated values in at submit time
     const payload: TradeCreatePayload = {
       ...form,
-      rr:  form.rr  ?? autoRR  ?? null,
-      pnl: form.pnl ?? autoPnL ?? null,
+      rr:  effectiveRR,
+      pnl: effectivePnL,
     };
     try {
       if (initial) {
@@ -178,8 +192,7 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
       <div
         style={{
           background: "#14181F", border: "1px solid #1E293B", borderRadius: "16px",
-          width: "100%", maxWidth: "660px", padding: "28px",
-          margin: "auto",
+          width: "100%", maxWidth: "660px", padding: "28px", margin: "auto",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -240,13 +253,19 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
             </FormGroup>
           </div>
 
-          {/* ── Section: Prices ───────────────────────────────────────── */}
-          <div style={{ borderTop: "1px solid #1E293B", paddingTop: "16px" }}>
-            <div style={{ color: "#475569", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "14px" }}>
+          {/* ── Price Levels ──────────────────────────────────────────── */}
+          <div style={{ background: "#0B0F19", border: "1px solid #1E293B", borderRadius: "12px", padding: "16px" }}>
+            <div style={{ color: "#64748B", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
               Price Levels
+              {autoRR != null && (
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px", color: "#6366F1", fontWeight: 700, fontSize: "12px", letterSpacing: 0 }}>
+                  <Zap style={{ width: "11px", height: "11px" }} />
+                  R:R = {autoRR}
+                </span>
+              )}
             </div>
 
-            {/* Entry / SL / TP */}
+            {/* Entry / SL / TP on one line */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
               <FormGroup label="Entry Price">
                 <input type="number" step="any" placeholder="0.00000"
@@ -254,21 +273,35 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
                   onChange={(e) => set("entry_price", numOrNull(e.target.value))}
                   style={inputStyle} />
               </FormGroup>
-              <FormGroup label="Stop Loss (SL)" hint="risk">
+              <FormGroup label="Stop Loss (SL)" hint="risk level">
                 <input type="number" step="any" placeholder="0.00000"
                   value={form.stop_loss ?? ""}
                   onChange={(e) => set("stop_loss", numOrNull(e.target.value))}
-                  style={{ ...inputStyle, borderColor: form.stop_loss ? "#EF444440" : "#1E293B" }} />
+                  style={{ ...inputStyle, borderColor: form.stop_loss ? "#EF444450" : "#1E293B" }} />
               </FormGroup>
               <FormGroup label="Take Profit (TP)" hint="target">
                 <input type="number" step="any" placeholder="0.00000"
                   value={form.take_profit ?? ""}
                   onChange={(e) => set("take_profit", numOrNull(e.target.value))}
-                  style={{ ...inputStyle, borderColor: form.take_profit ? "#10B98140" : "#1E293B" }} />
+                  style={{ ...inputStyle, borderColor: form.take_profit ? "#10B98150" : "#1E293B" }} />
               </FormGroup>
             </div>
 
-            {/* Exit + Lot Size */}
+            {/* Visual R:R bar — only when autoRR is available */}
+            {autoRR != null && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ display: "flex", gap: "2px", height: "6px", borderRadius: "3px", overflow: "hidden" }}>
+                  <div style={{ flex: 1, background: "#EF4444", opacity: 0.7 }} title="Risk" />
+                  <div style={{ flex: autoRR, background: "#10B981", opacity: 0.7 }} title={`Reward (${autoRR}×)`} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  <span style={{ color: "#EF444490", fontSize: "10px" }}>Risk (1R)</span>
+                  <span style={{ color: "#10B98190", fontSize: "10px" }}>Reward ({autoRR}R)</span>
+                </div>
+              </div>
+            )}
+
+            {/* Exit + Lot size */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <FormGroup label="Exit Price">
                 <input type="number" step="any" placeholder="0.00000"
@@ -283,63 +316,76 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
                   style={inputStyle} />
               </FormGroup>
             </div>
+          </div>
 
-            {/* Auto-calc hints */}
-            {(autoRR != null || autoPnL != null) && (
-              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                {autoRR != null && (
-                  <div style={{ flex: 1 }}>
-                    <AutoBadge value={`${autoRR}R`} label="Planned R:R" />
-                  </div>
+          {/* ── Results ───────────────────────────────────────────────── */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px" }}>
+            {/* PnL */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <label style={{ color: "#94A3B8", fontSize: "12px", fontWeight: 500 }}>PnL ($)</label>
+                {form.pnl == null && autoPnL != null && (
+                  <span style={{ display: "flex", alignItems: "center", gap: "3px", color: "#6366F1", fontSize: "11px", fontWeight: 600 }}>
+                    <Zap style={{ width: "10px", height: "10px" }} /> auto
+                  </span>
                 )}
-                {autoPnL != null && (
-                  <div style={{ flex: 1 }}>
-                    <AutoBadge
-                      value={`${autoPnL >= 0 ? "+" : ""}$${Math.abs(autoPnL).toFixed(2)}`}
-                      label="Est. PnL"
-                    />
+                {form.pnl != null && autoPnL != null && (
+                  <button type="button" onClick={() => set("pnl", null)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#475569", fontSize: "11px", display: "flex", alignItems: "center", gap: "3px", padding: 0 }}>
+                    <RotateCcw style={{ width: "10px", height: "10px" }} /> use auto
+                  </button>
+                )}
+              </div>
+              <div style={{ position: "relative" }}>
+                <input type="number" step="any"
+                  value={form.pnl ?? ""}
+                  placeholder={autoPnL != null ? `${autoPnL > 0 ? "+" : ""}${autoPnL}` : "+150.00"}
+                  onChange={(e) => set("pnl", numOrNull(e.target.value))}
+                  style={{
+                    ...inputStyle,
+                    borderColor: (form.pnl == null && autoPnL != null) ? "#6366F150" : "#1E293B",
+                    paddingRight: (form.pnl == null && autoPnL != null) ? "60px" : "12px",
+                  }}
+                />
+                {form.pnl == null && autoPnL != null && (
+                  <div style={{
+                    position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
+                    color: autoPnL >= 0 ? "#10B981" : "#EF4444", fontWeight: 700, fontSize: "12px", pointerEvents: "none",
+                  }}>
+                    {autoPnL >= 0 ? "+" : ""}${Math.abs(autoPnL).toFixed(2)}
                   </div>
                 )}
               </div>
-            )}
+            </div>
+
+            {/* R:R */}
+            <RRField
+              autoRR={autoRR}
+              manualRR={form.rr ?? null}
+              onManualChange={(v) => set("rr", v)}
+              onClear={() => set("rr", null)}
+            />
+
+            {/* Risk % */}
+            <FormGroup label="Risk %">
+              <input type="number" step="any" placeholder="e.g. 1.0"
+                value={form.risk_pct ?? ""}
+                onChange={(e) => set("risk_pct", numOrNull(e.target.value))}
+                style={inputStyle} />
+            </FormGroup>
+
+            {/* Status */}
+            <FormGroup label="Status">
+              <select value={form.status}
+                onChange={(e) => set("status", e.target.value as TradeStatus)}
+                style={inputStyle}>
+                <option value="CLOSED">Closed</option>
+                <option value="OPEN">Open</option>
+              </select>
+            </FormGroup>
           </div>
 
-          {/* ── Section: Results ──────────────────────────────────────── */}
-          <div style={{ borderTop: "1px solid #1E293B", paddingTop: "16px" }}>
-            <div style={{ color: "#475569", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "14px" }}>
-              Results
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px" }}>
-              <FormGroup label="PnL ($)" hint={autoPnL != null && form.pnl == null ? "auto-filled" : undefined}>
-                <input type="number" step="any" placeholder={autoPnL != null ? String(autoPnL) : "+150.00"}
-                  value={form.pnl ?? ""}
-                  onChange={(e) => set("pnl", numOrNull(e.target.value))}
-                  style={{ ...inputStyle, borderColor: (form.pnl ?? autoPnL) != null ? "#6366F140" : "#1E293B" }} />
-              </FormGroup>
-              <FormGroup label="R:R Achieved" hint={autoRR != null && form.rr == null ? "auto-filled" : undefined}>
-                <input type="number" step="any" placeholder={autoRR != null ? String(autoRR) : "1.5"}
-                  value={form.rr ?? ""}
-                  onChange={(e) => set("rr", numOrNull(e.target.value))}
-                  style={inputStyle} />
-              </FormGroup>
-              <FormGroup label="Risk %">
-                <input type="number" step="any" placeholder="e.g. 1.0"
-                  value={form.risk_pct ?? ""}
-                  onChange={(e) => set("risk_pct", numOrNull(e.target.value))}
-                  style={inputStyle} />
-              </FormGroup>
-              <FormGroup label="Status">
-                <select value={form.status}
-                  onChange={(e) => set("status", e.target.value as TradeStatus)}
-                  style={inputStyle}>
-                  <option value="CLOSED">Closed</option>
-                  <option value="OPEN">Open</option>
-                </select>
-              </FormGroup>
-            </div>
-          </div>
-
-          {/* ── Section: Psychology ───────────────────────────────────── */}
+          {/* ── Psychology ────────────────────────────────────────────── */}
           <div style={{ borderTop: "1px solid #1E293B", paddingTop: "16px" }}>
             <div style={{ color: "#475569", fontSize: "11px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "14px" }}>
               Psychology (optional)
@@ -390,7 +436,6 @@ export function TradeFormModal({ initial, onClose, onSaved }: Props) {
             </div>
           )}
 
-          {/* Actions */}
           <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} style={cancelBtnStyle}>Cancel</button>
             <button type="submit" disabled={busy} style={saveBtnStyle(busy)}>

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Search, ChevronLeft, ChevronRight,
   Edit3, Trash2, X, Check, Upload,
 } from "lucide-react";
-import { useJournalTrades, useDeleteTrade } from "../hooks/useJournal";
+import { useJournalTrades, useDeleteTrade, useUpdateTrade } from "../hooks/useJournal";
+import { calcRR } from "../utils/tradeCalc";
 import ImportCSVModal from "./ImportCSVModal";
-import type { Trade } from "../types/journal";
+import type { Trade, TradeUpdatePayload } from "../types/journal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -106,6 +107,84 @@ function OrcaStatusBadge({ status }: { status: string | null }) {
   );
 }
 
+// ── Inline price cell ─────────────────────────────────────────────────────────
+
+/**
+ * A table cell that shows a price (or "— add") and lets the user click to
+ * edit it inline. Used for SL and TP on imported trades.
+ */
+function InlinePrice({
+  value, color, label, onSave,
+}: {
+  value: number | null;
+  color: string;
+  label: string;
+  onSave: (v: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft]     = useState("");
+  const inputRef              = useRef<HTMLInputElement>(null);
+
+  const open = () => {
+    setDraft(value != null ? String(value) : "");
+    setEditing(true);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  const commit = () => {
+    const n = parseFloat(draft);
+    if (!isNaN(n) && n !== value) onSave(n);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="number"
+        step="any"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(); }
+          if (e.key === "Escape") setEditing(false);
+        }}
+        style={{
+          background: "#0B0F19", border: `1px solid ${color}60`,
+          borderRadius: "5px", padding: "3px 6px", color: "white",
+          fontSize: "11px", width: "72px", outline: "none",
+        }}
+      />
+    );
+  }
+
+  if (value != null) {
+    return (
+      <span
+        onClick={open}
+        title={`Click to edit ${label}`}
+        style={{ color, fontSize: "11px", cursor: "pointer" }}
+      >
+        {value.toFixed(5)}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      onClick={open}
+      title={`Click to add ${label}`}
+      style={{
+        color: "#334155", fontSize: "11px", cursor: "pointer",
+        borderBottom: "1px dashed #334155",
+      }}
+    >
+      + add
+    </span>
+  );
+}
+
 // ── Trade row ─────────────────────────────────────────────────────────────────
 
 const COLS = "80px 1fr 52px 72px 70px 70px 72px 68px 52px 52px 80px 70px";
@@ -121,12 +200,23 @@ function TradeRow({
   onDeleteCancel: () => void;
   deleting: boolean;
 }) {
-  const pnl = trade.pnl != null ? parseFloat(trade.pnl) : null;
-  const rr  = trade.rr  != null ? parseFloat(trade.rr)  : null;
-  const sl  = trade.stop_loss   != null ? parseFloat(trade.stop_loss)   : null;
-  const tp  = trade.take_profit != null ? parseFloat(trade.take_profit) : null;
+  const updateMutation = useUpdateTrade();
 
-  const px = (v: number | null) => v != null ? v.toFixed(5) : "—";
+  const pnl   = trade.pnl        != null ? parseFloat(trade.pnl)        : null;
+  const rr    = trade.rr         != null ? parseFloat(trade.rr)         : null;
+  const sl    = trade.stop_loss   != null ? parseFloat(trade.stop_loss)   : null;
+  const tp    = trade.take_profit != null ? parseFloat(trade.take_profit) : null;
+  const entry = trade.entry_price != null ? parseFloat(trade.entry_price) : null;
+
+  /** Save a single price field and auto-compute R:R if we now have all three */
+  const savePrice = async (field: "stop_loss" | "take_profit", newVal: number) => {
+    const newSL = field === "stop_loss"   ? newVal : sl;
+    const newTP = field === "take_profit" ? newVal : tp;
+    const payload: TradeUpdatePayload = { [field]: newVal };
+    const autoRR = calcRR(entry, newSL, newTP, trade.direction);
+    if (autoRR != null) payload.rr = autoRR;
+    await updateMutation.mutateAsync({ id: trade.id, payload });
+  };
 
   return (
     <div
@@ -165,18 +255,24 @@ function TradeRow({
 
       {/* Entry */}
       <div style={{ color: "#94A3B8", fontSize: "11px" }}>
-        {trade.entry_price ? parseFloat(trade.entry_price).toFixed(5) : "—"}
+        {entry != null ? entry.toFixed(5) : "—"}
       </div>
 
-      {/* SL */}
-      <div style={{ color: "#EF444490", fontSize: "11px" }} title="Stop Loss">
-        {px(sl)}
-      </div>
+      {/* SL — inline editable */}
+      <InlinePrice
+        value={sl}
+        color="#EF4444"
+        label="Stop Loss"
+        onSave={(v) => savePrice("stop_loss", v)}
+      />
 
-      {/* TP */}
-      <div style={{ color: "#10B98190", fontSize: "11px" }} title="Take Profit">
-        {px(tp)}
-      </div>
+      {/* TP — inline editable */}
+      <InlinePrice
+        value={tp}
+        color="#10B981"
+        label="Take Profit"
+        onSave={(v) => savePrice("take_profit", v)}
+      />
 
       {/* Exit */}
       <div style={{ color: "#94A3B8", fontSize: "11px" }}>
