@@ -6,6 +6,7 @@ import {
   Edit3, Trash2, X, Check, Upload,
 } from "lucide-react";
 import { useJournalTrades, useDeleteTrade, useUpdateTrade } from "../hooks/useJournal";
+import { useAccountSize } from "../hooks/useAccountSize";
 import { calcRR } from "../utils/tradeCalc";
 import ImportCSVModal from "./ImportCSVModal";
 import type { Trade, TradeUpdatePayload } from "../types/journal";
@@ -190,9 +191,10 @@ function InlinePrice({
 const COLS = "80px 1fr 52px 72px 70px 70px 72px 68px 52px 52px 80px 70px";
 
 function TradeRow({
-  trade, onEdit, confirmDelete, onDeleteRequest, onDeleteConfirm, onDeleteCancel, deleting,
+  trade, accountSize, onEdit, confirmDelete, onDeleteRequest, onDeleteConfirm, onDeleteCancel, deleting,
 }: {
   trade: Trade;
+  accountSize: number | null;
   onEdit: () => void;
   confirmDelete: boolean;
   onDeleteRequest: () => void;
@@ -279,9 +281,17 @@ function TradeRow({
         {trade.exit_price ? parseFloat(trade.exit_price).toFixed(5) : "—"}
       </div>
 
-      {/* PnL */}
-      <div style={{ color: pnlColor(pnl), fontSize: "12px", fontWeight: 600 }}>
-        {fmt(pnl)}
+      {/* PnL + optional % of account */}
+      <div>
+        <div style={{ color: pnlColor(pnl), fontSize: "12px", fontWeight: 600 }}>
+          {fmt(pnl)}
+        </div>
+        {pnl != null && accountSize != null && accountSize > 0 && (
+          <div style={{ color: pnlColor(pnl), fontSize: "10px", opacity: 0.65, marginTop: "1px" }}>
+            {pnl >= 0 ? "+" : ""}
+            {((pnl / accountSize) * 100).toFixed(2)}%
+          </div>
+        )}
       </div>
 
       {/* R:R */}
@@ -365,7 +375,8 @@ export default function JournalTradesView({ onEdit, onLogTrade }: Props) {
   const [showImport, setShowImport]   = useState(false);
   const [confirmDelete, setConfirm]   = useState<number | null>(null);
 
-  const deleteMutation = useDeleteTrade();
+  const deleteMutation            = useDeleteTrade();
+  const { accountSize }           = useAccountSize();
 
   const { data, isLoading } = useJournalTrades({
     page,
@@ -492,7 +503,7 @@ export default function JournalTradesView({ onEdit, onLogTrade }: Props) {
             borderBottom: "1px solid #1E293B",
             gap: "8px",
           }}>
-            {["Date", "Market", "Dir", "Entry", "SL $", "TP $", "Exit", "PnL", "R:R", "Score", "Status", ""].map((h) => (
+            {["Date", "Market", "Dir", "Entry", "SL $", "TP $", "Exit", accountSize ? "PnL / %" : "PnL", "R:R", "Score", "Status", ""].map((h) => (
               <div key={h} style={{
                 color: "#475569", fontSize: "10px", fontWeight: 600,
                 textTransform: "uppercase", letterSpacing: "0.04em",
@@ -506,6 +517,7 @@ export default function JournalTradesView({ onEdit, onLogTrade }: Props) {
             <TradeRow
               key={trade.id}
               trade={trade}
+              accountSize={accountSize}
               onEdit={() => onEdit(trade)}
               confirmDelete={confirmDelete === trade.id}
               onDeleteRequest={() => setConfirm(trade.id)}

@@ -1,8 +1,110 @@
 "use client";
 
-import { useState } from "react";
-import { Check, Shield, Zap, BookOpen } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, Shield, Zap, BookOpen, DollarSign } from "lucide-react";
 import { useCoachingSettings, useUpdateCoachingSettings } from "../hooks/useJournal";
+import { useAccountSize } from "../hooks/useAccountSize";
+
+// ── Shared input style ────────────────────────────────────────────────────────
+
+const inputStyle: React.CSSProperties = {
+  background: "#0B0F19",
+  border: "1px solid #1E293B",
+  borderRadius: "8px",
+  padding: "10px 12px",
+  color: "white",
+  fontSize: "14px",
+  outline: "none",
+  width: "100%",
+  boxSizing: "border-box" as const,
+};
+
+// ── Account balance card ──────────────────────────────────────────────────────
+
+function AccountBalanceCard() {
+  const { accountSize, setAccountSize } = useAccountSize();
+  const [draft, setDraft] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  // Pre-fill input once localStorage hydrates
+  useEffect(() => {
+    if (accountSize != null) setDraft(String(accountSize));
+  }, [accountSize]);
+
+  const save = () => {
+    const n = parseFloat(draft);
+    if (!isNaN(n) && n > 0) {
+      setAccountSize(n);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
+  };
+
+  return (
+    <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", padding: "24px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+        <div style={{
+          width: "38px", height: "38px", borderRadius: "9px", flexShrink: 0,
+          background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.25)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <DollarSign style={{ width: "18px", height: "18px", color: "#10B981" }} />
+        </div>
+        <div>
+          <div style={{ color: "white", fontSize: "15px", fontWeight: 600 }}>Account Balance</div>
+          <div style={{ color: "#64748B", fontSize: "13px" }}>
+            Used to calculate PnL % per trade and draw your equity curve
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+        <div style={{ position: "relative", flex: 1, maxWidth: "260px" }}>
+          <span style={{
+            position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)",
+            color: "#64748B", fontSize: "14px", pointerEvents: "none",
+          }}>
+            $
+          </span>
+          <input
+            type="number"
+            step="any"
+            min="1"
+            placeholder="e.g. 10000"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && save()}
+            style={{ ...inputStyle, paddingLeft: "26px" }}
+          />
+        </div>
+        <button
+          onClick={save}
+          style={{
+            background: "#10B981", border: "none", borderRadius: "8px",
+            padding: "10px 20px", color: "white", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          Save
+        </button>
+        {saved && (
+          <span style={{ color: "#10B981", fontSize: "13px", display: "flex", alignItems: "center", gap: "4px" }}>
+            <Check style={{ width: "14px", height: "14px" }} /> Saved
+          </span>
+        )}
+      </div>
+
+      {accountSize != null && (
+        <div style={{ marginTop: "12px", fontSize: "12px", color: "#475569" }}>
+          Current:{" "}
+          <span style={{ color: "#10B981", fontWeight: 600 }}>
+            ${accountSize.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Toggle switch ─────────────────────────────────────────────────────────────
 
@@ -60,6 +162,9 @@ export default function JournalSettingsView() {
         <h1 style={{ color: "white", fontSize: "22px", fontWeight: 700, margin: 0 }}>Settings</h1>
         <p style={{ color: "#64748B", fontSize: "13px", margin: "2px 0 0" }}>Manage your journal preferences</p>
       </div>
+
+      {/* Account balance */}
+      <AccountBalanceCard />
 
       {/* Coaching access */}
       <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", padding: "24px" }}>

@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, BarChart2, Target, Award, Brain, Trophy } from "lucide-react";
 import { useJournalStats, useJournalTrades, useEquity, useOrcaAnalytics } from "../hooks/useJournal";
+import { useAccountSize } from "../hooks/useAccountSize";
 import type { Trade } from "../types/journal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -55,22 +56,65 @@ function StatCard({ label, value, sub, color, icon: Icon }: {
 
 function EquityCurve() {
   const { data = [], isLoading } = useEquity();
+  const { accountSize } = useAccountSize();
 
-  const tickColor = "#475569";
-  const gridColor = "#1E293B";
+  const tickColor  = "#475569";
+  const gridColor  = "#1E293B";
 
-  const isProfit = data.length > 0 && data[data.length - 1].cumulative_pnl >= 0;
-  const lineColor = isProfit ? "#10B981" : "#EF4444";
+  const totalPnl   = data.length > 0 ? data[data.length - 1].cumulative_pnl : 0;
+  const isProfit   = totalPnl >= 0;
+  const lineColor  = isProfit ? "#10B981" : "#EF4444";
   const gradientId = isProfit ? "equityGreen" : "equityRed";
+
+  // When account size is known: show absolute equity value (Robinhood style).
+  // Prepend a synthetic "Start" point at accountSize so the line begins flat.
+  // Normalise everything to { date, value } so Recharts has a stable shape.
+  const hasAccount = accountSize != null && accountSize > 0;
+  const chartData: { date: string; value: number }[] = hasAccount
+    ? [
+        { date: "Start", value: accountSize! },
+        ...data.map((pt) => ({ date: pt.date, value: accountSize! + pt.cumulative_pnl })),
+      ]
+    : data.map((pt) => ({ date: pt.date, value: pt.cumulative_pnl }));
+  const currentEquity = hasAccount ? accountSize! + totalPnl : null;
+  const pctChange     = hasAccount && accountSize! > 0 ? (totalPnl / accountSize!) * 100 : null;
+
+  // Y-axis formatter — shows "$10.5k" or "$500" depending on scale
+  const yFmt = (v: number) => {
+    const abs = Math.abs(v);
+    if (abs >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}M`;
+    if (abs >= 1_000)     return `$${(v / 1_000).toFixed(1)}k`;
+    return `$${v.toFixed(0)}`;
+  };
 
   return (
     <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", padding: "20px 22px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "18px" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "18px" }}>
         <div style={{ color: "white", fontSize: "15px", fontWeight: 600 }}>Equity Curve</div>
+
         {data.length > 0 && (
-          <span style={{ color: pnlColor(data[data.length - 1]?.cumulative_pnl), fontSize: "14px", fontWeight: 600 }}>
-            {fmt(data[data.length - 1]?.cumulative_pnl)}
-          </span>
+          hasAccount && currentEquity != null ? (
+            /* Robinhood-style header: big equity value + delta */
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: "white", fontSize: "20px", fontWeight: 700, lineHeight: 1.1 }}>
+                ${currentEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div style={{ color: pnlColor(totalPnl), fontSize: "12px", marginTop: "2px" }}>
+                {totalPnl >= 0 ? "+" : "−"}${Math.abs(totalPnl).toFixed(2)}
+                {pctChange != null && (
+                  <span style={{ marginLeft: "4px", opacity: 0.8 }}>
+                    ({totalPnl >= 0 ? "+" : ""}{pctChange.toFixed(2)}%)
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Fallback: just show cumulative PnL */
+            <span style={{ color: pnlColor(totalPnl), fontSize: "14px", fontWeight: 600 }}>
+              {fmt(totalPnl)}
+            </span>
+          )
         )}
       </div>
 
@@ -80,10 +124,10 @@ function EquityCurve() {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={180}>
-          <AreaChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+          <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={lineColor} stopOpacity={0.25} />
+                <stop offset="5%"  stopColor={lineColor} stopOpacity={0.25} />
                 <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
               </linearGradient>
             </defs>
@@ -93,24 +137,30 @@ function EquityCurve() {
               tick={{ fill: tickColor, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: string) => v.slice(5)} // MM-DD
+              tickFormatter={(v: string) => v === "Start" ? "Start" : v.slice(5)}
               interval="preserveStartEnd"
             />
             <YAxis
               tick={{ fill: tickColor, fontSize: 10 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toFixed(0)}`}
-              width={52}
+              tickFormatter={yFmt}
+              width={58}
+              domain={["auto", "auto"]}
             />
             <Tooltip
               contentStyle={{ background: "#1E293B", border: "1px solid #334155", borderRadius: "8px", fontSize: "12px" }}
               labelStyle={{ color: "#94A3B8" }}
-              formatter={(v: number) => [`$${v.toFixed(2)}`, "Cumulative PnL"]}
+              formatter={(v: number) => [
+                hasAccount
+                  ? `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : `$${v.toFixed(2)}`,
+                hasAccount ? "Account Value" : "Cumulative PnL",
+              ]}
             />
             <Area
               type="monotone"
-              dataKey="cumulative_pnl"
+              dataKey="value"
               stroke={lineColor}
               strokeWidth={2}
               fill={`url(#${gradientId})`}
