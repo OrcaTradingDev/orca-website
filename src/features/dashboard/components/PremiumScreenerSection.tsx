@@ -208,6 +208,9 @@ const getTVSymbol = (symbol: string): string => {
 
 const STRIPE_UPGRADE_URL = "https://buy.stripe.com/00w14neBj8BggG252g6wE03";
 
+/** The one symbol that's shown in full even on the free tier (demo row). */
+const DEMO_SYMBOL = "AUDJPY";
+
 // ═════════════════════════════════════════════════════════════════════════════
 export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?: boolean }) {
   const queryClient = useQueryClient();
@@ -518,6 +521,8 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
 
       {/* Table */}
       <div className="bg-[#14181F] border border-[#1E293B] rounded-lg overflow-hidden">
+        {/* Relative wrapper so the lock overlay can be absolutely positioned over the table only */}
+        <div style={{ position: "relative" }}>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -535,32 +540,30 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                     {dailyTFs.length > 0 ? dailyTFs.join(" | ") : "—"}
                   </div>
                 </th>
-                {!freeOnly && (
-                  <th className="py-4 px-4 text-center text-white">
-                    <div className="mb-1">LONG-TERM</div>
-                    <div className="text-xs text-[#94A3B8]">
-                      {["1D", ...longtermTFs].join(" | ")}
-                    </div>
-                  </th>
-                )}
-                {!freeOnly && (
-                  <th className="py-4 px-4 text-center text-white w-[150px]">
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <Zap className="w-4 h-4 text-[#00D4FF]" />
-                      <span>ORCA STATUS</span>
-                    </div>
-                    <div className="text-xs text-[#94A3B8]">Signal | Score</div>
-                  </th>
-                )}
-                {!freeOnly && (
-                  <th className="py-4 px-4 text-center text-white w-[260px]">
-                    <div className="flex items-center justify-center gap-2 mb-1">
-                      <span>ADVANCED</span>
-                      <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">PRO</Badge>
-                    </div>
-                    <div className="text-xs text-[#94A3B8]">ADX | EMA | VOL</div>
-                  </th>
-                )}
+                <th className="py-4 px-4 text-center text-white">
+                  <div className="mb-1 flex items-center justify-center gap-1.5">
+                    LONG-TERM {freeOnly && <span className="text-[#475569]">🔒</span>}
+                  </div>
+                  <div className="text-xs text-[#94A3B8]">
+                    {["1D", ...longtermTFs].join(" | ")}
+                  </div>
+                </th>
+                <th className="py-4 px-4 text-center text-white w-[150px]">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Zap className="w-4 h-4 text-[#00D4FF]" />
+                    <span>ORCA STATUS</span>
+                    {freeOnly && <span className="text-[#475569]">🔒</span>}
+                  </div>
+                  <div className="text-xs text-[#94A3B8]">Signal | Score</div>
+                </th>
+                <th className="py-4 px-4 text-center text-white w-[260px]">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <span>ADVANCED</span>
+                    <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">PRO</Badge>
+                    {freeOnly && <span className="text-[#475569]">🔒</span>}
+                  </div>
+                  <div className="text-xs text-[#94A3B8]">ADX | EMA | VOL</div>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -568,13 +571,13 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                 <LoadingSkeleton />
               ) : isError ? (
                 <tr>
-                  <td colSpan={freeOnly ? 3 : 6} className="py-12 text-center text-red-400">
+                  <td colSpan={6} className="py-12 text-center text-red-400">
                     Failed to load market data. Please check your connection.
                   </td>
                 </tr>
               ) : filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={freeOnly ? 3 : 6} className="py-12 text-center text-[#94A3B8]">
+                  <td colSpan={6} className="py-12 text-center text-[#94A3B8]">
                     {assets.length === 0
                       ? "No data available. Data may be warming up..."
                       : "No assets found. Try adjusting your filters."}
@@ -585,9 +588,11 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   <tr
                     key={asset.symbol}
                     className={`border-b border-[#1E293B] transition-all duration-200 ${
-                      freeOnly ? "" : "hover:bg-[#1A1F2E] cursor-pointer"
+                      !freeOnly || asset.symbol === DEMO_SYMBOL
+                        ? "hover:bg-[#1A1F2E] cursor-pointer"
+                        : ""
                     } ${asset.signals.is_best && !freeOnly ? "ring-1 ring-inset ring-[#FFD700]/20" : ""}`}
-                    onClick={() => !freeOnly && openModal(asset)}
+                    onClick={() => (!freeOnly || asset.symbol === DEMO_SYMBOL) && openModal(asset)}
                   >
                     {/* SYMBOL */}
                     <td className="py-3 px-4">
@@ -628,91 +633,129 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                       <StackedBar bear={asset.daily.bear} bull={asset.daily.bull} />
                     </td>
 
-                    {/* LONG-TERM — advanced only */}
-                    {!freeOnly && (
-                      <td className="py-3 px-4">
-                        <StackedBar bear={asset.longterm.bear} bull={asset.longterm.bull} />
-                      </td>
-                    )}
-
-                    {/* ORCA STATUS — advanced only */}
-                    {!freeOnly && (
-                      <td className="py-3 px-4">
-                        <div className="flex flex-col items-center gap-1.5">
-                          <Badge className={`${STATUS_STYLES[asset.signals.status]} text-xs font-bold border-0 px-3`}>
-                            {asset.signals.status}
-                          </Badge>
-                          <span className={`text-xs font-medium ${DIRECTION_STYLES[asset.signals.direction]}`}>
-                            {asset.signals.direction}
-                          </span>
-                          <span className="text-[#94A3B8] text-xs">
-                            Score: <span className="text-white font-semibold">{asset.signals.orca_score}</span>
-                          </span>
-                        </div>
-                      </td>
-                    )}
-
-                    {/* ADVANCED — advanced only */}
-                    {!freeOnly && (
-                      <td className="py-3 px-4">
-                      <div className="flex items-center gap-3 text-sm">
-                        {/* ADX */}
-                        <div className="flex items-center gap-1">
-                          <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>
-                            {asset.advanced.adx}
-                          </span>
-                          {asset.advanced.adxTrend === "up" && (
-                            <TrendingUp className="w-3.5 h-3.5 text-[#10B981]" />
-                          )}
-                          {asset.advanced.adxTrend === "down" && (
-                            <TrendingDown className="w-3.5 h-3.5 text-[#EF4444]" />
-                          )}
-                          {asset.advanced.adxTrend === "neutral" && (
-                            <ArrowRight className="w-3.5 h-3.5 text-[#94A3B8]" />
-                          )}
-                        </div>
-
-                        {/* EMA */}
-                        <Badge
-                          className={`${
-                            asset.advanced.emaStatus === "aligned"
-                              ? "bg-[#10B981]/20 text-[#10B981]"
-                              : "bg-[#EF4444]/20 text-[#EF4444]"
-                          } border-0 text-xs`}
-                        >
-                          EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
-                        </Badge>
-
-                        {/* VOL */}
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-8 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
-                            <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.vol}%` }} />
+                    {/* LONG-TERM — blurred for locked free rows */}
+                    {(() => {
+                      const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
+                      return (
+                        <td className="py-3 px-4">
+                          <div style={locked ? { filter: "blur(6px)", userSelect: "none", pointerEvents: "none" } : {}}>
+                            <StackedBar bear={asset.longterm.bear} bull={asset.longterm.bull} />
                           </div>
-                          <span className="text-[#94A3B8] text-xs">{asset.advanced.vol}</span>
-                        </div>
+                        </td>
+                      );
+                    })()}
 
-                        {/* ALERT */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleAlert(asset.symbol);
-                          }}
-                        >
-                          <Bell
-                            className={`w-4 h-4 ${
-                              asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"
-                            }`}
-                          />
-                        </button>
-                      </div>
-                      </td>
-                    )}
+                    {/* ORCA STATUS — blurred for locked free rows */}
+                    {(() => {
+                      const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
+                      return (
+                        <td className="py-3 px-4">
+                          <div
+                            className="flex flex-col items-center gap-1.5"
+                            style={locked ? { filter: "blur(6px)", userSelect: "none", pointerEvents: "none" } : {}}
+                          >
+                            <Badge className={`${STATUS_STYLES[asset.signals.status]} text-xs font-bold border-0 px-3`}>
+                              {asset.signals.status}
+                            </Badge>
+                            <span className={`text-xs font-medium ${DIRECTION_STYLES[asset.signals.direction]}`}>
+                              {asset.signals.direction}
+                            </span>
+                            <span className="text-[#94A3B8] text-xs">
+                              Score: <span className="text-white font-semibold">{asset.signals.orca_score}</span>
+                            </span>
+                          </div>
+                        </td>
+                      );
+                    })()}
+
+                    {/* ADVANCED — blurred for locked free rows */}
+                    {(() => {
+                      const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
+                      return (
+                        <td className="py-3 px-4">
+                          <div
+                            className="flex items-center gap-3 text-sm"
+                            style={locked ? { filter: "blur(6px)", userSelect: "none", pointerEvents: "none" } : {}}
+                          >
+                            {/* ADX */}
+                            <div className="flex items-center gap-1">
+                              <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>
+                                {asset.advanced.adx}
+                              </span>
+                              {asset.advanced.adxTrend === "up" && <TrendingUp className="w-3.5 h-3.5 text-[#10B981]" />}
+                              {asset.advanced.adxTrend === "down" && <TrendingDown className="w-3.5 h-3.5 text-[#EF4444]" />}
+                              {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-3.5 h-3.5 text-[#94A3B8]" />}
+                            </div>
+                            {/* EMA */}
+                            <Badge className={`${asset.advanced.emaStatus === "aligned" ? "bg-[#10B981]/20 text-[#10B981]" : "bg-[#EF4444]/20 text-[#EF4444]"} border-0 text-xs`}>
+                              EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
+                            </Badge>
+                            {/* VOL */}
+                            <div className="flex items-center gap-1.5">
+                              <div className="w-8 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
+                                <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.vol}%` }} />
+                              </div>
+                              <span className="text-[#94A3B8] text-xs">{asset.advanced.vol}</span>
+                            </div>
+                            {/* ALERT */}
+                            {!locked && (
+                              <button onClick={(e) => { e.stopPropagation(); toggleAlert(asset.symbol); }}>
+                                <Bell className={`w-4 h-4 ${asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"}`} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })()}
                   </tr>
                 ))
               )}
             </tbody>
           </table>
-        </div>
+        </div>{/* end overflow-x-auto */}
+
+        {/* Lock overlay — covers ~the last 3 columns with a gradient + upgrade CTA */}
+        {freeOnly && (
+          <div
+            style={{
+              position: "absolute",
+              top: 0, bottom: 0,
+              left: "50%", right: 0,
+              pointerEvents: "none",
+              zIndex: 5,
+              background:
+                "linear-gradient(to right, transparent 0%, rgba(11,15,25,0.92) 20%, rgba(11,15,25,0.97) 100%)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <a
+              href={STRIPE_UPGRADE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                pointerEvents: "all",
+                background: "linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)",
+                color: "white",
+                textDecoration: "none",
+                padding: "14px 28px",
+                borderRadius: "12px",
+                fontWeight: 700,
+                fontSize: "15px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "9px",
+                boxShadow: "0 0 48px rgba(99,102,241,0.55), 0 8px 32px rgba(0,0,0,0.7)",
+                letterSpacing: "0.01em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              🔒 Get Advanced Screener Access
+            </a>
+          </div>
+        )}
+        </div>{/* end relative wrapper */}
 
         {/* Pagination */}
         {!isLoading && filteredAssets.length > 0 && (
