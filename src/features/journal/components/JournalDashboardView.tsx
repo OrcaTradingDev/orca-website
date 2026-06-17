@@ -386,7 +386,8 @@ function ImprovementCard({ emoji, label, title, sub, color }: {
 // ── Recent trades ─────────────────────────────────────────────────────────────
 
 function RecentTrades() {
-  const { data } = useJournalTrades({ pageSize: 8 });
+  const { data }        = useJournalTrades({ pageSize: 8 });
+  const { accountSize } = useAccountSize();
   const trades = data?.trades ?? [];
 
   return (
@@ -412,14 +413,14 @@ function RecentTrades() {
               <div key={h} style={{ color: "#334155", fontSize: "10px", fontWeight: 600, letterSpacing: "0.05em" }}>{h}</div>
             ))}
           </div>
-          {trades.map((t) => <RecentTradeRow key={t.id} trade={t} />)}
+          {trades.map((t) => <RecentTradeRow key={t.id} trade={t} accountSize={accountSize} />)}
         </>
       )}
     </div>
   );
 }
 
-function RecentTradeRow({ trade }: { trade: Trade }) {
+function RecentTradeRow({ trade, accountSize }: { trade: Trade; accountSize: number | null }) {
   const pnl = trade.pnl != null ? parseFloat(trade.pnl) : null;
   const rr  = trade.rr  != null ? parseFloat(trade.rr)  : null;
   const isWin = pnl != null && pnl > 0;
@@ -449,8 +450,15 @@ function RecentTradeRow({ trade }: { trade: Trade }) {
       }}>
         {isWin ? "WIN" : isLoss ? "LOSS" : "—"}
       </span>
-      <div style={{ color: pnl != null ? pnlColor(pnl) : "#64748B", fontSize: "13px", fontWeight: 600 }}>
-        {pnl != null ? (pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`) : "—"}
+      <div>
+        <div style={{ color: pnl != null ? pnlColor(pnl) : "#64748B", fontSize: "13px", fontWeight: 600 }}>
+          {pnl != null ? (pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`) : "—"}
+        </div>
+        {pnl != null && accountSize != null && accountSize > 0 && (
+          <div style={{ color: pnlColor(pnl), fontSize: "10px", opacity: 0.65, marginTop: "1px" }}>
+            {pnl >= 0 ? "+" : ""}{((pnl / accountSize) * 100).toFixed(2)}%
+          </div>
+        )}
       </div>
       <div style={{ color: "#94A3B8", fontSize: "12px" }}>{rr != null ? `${rr.toFixed(2)}R` : "—"}</div>
       <div>
