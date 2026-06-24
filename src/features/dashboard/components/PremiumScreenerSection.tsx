@@ -915,74 +915,34 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
         )}
       </div>
 
-      {/* Detail Modal — single column, pinned header, scrollable body */}
+      {/* Detail Modal — full-page popout: chart dominates, metrics live in a side panel */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-4xl w-[95vw] max-h-[88vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="bg-[#0B0F19] border-none text-white fixed top-0 left-0 translate-x-0 translate-y-0 w-screen h-screen max-w-none max-h-none rounded-none flex flex-col overflow-hidden p-0 gap-0">
 
           {/* Pinned header — X button always visible here */}
-          <div className="px-6 pt-5 pb-4 border-b border-[#1E293B] shrink-0 pr-14">
-            <DialogTitle className="text-xl font-semibold">
-              {selectedAsset?.symbol} – {selectedAsset?.name}
-            </DialogTitle>
-            <DialogDescription className="text-[#94A3B8] text-sm mt-0.5">
-              Full multi-timeframe breakdown &amp; OrcaBot signals
-            </DialogDescription>
+          <div className="px-6 py-4 border-b border-[#1E293B] shrink-0 pr-14 flex items-center justify-between bg-[#0A1628]">
+            <div>
+              <DialogTitle className="text-xl font-semibold">
+                {selectedAsset?.symbol} – {selectedAsset?.name}
+              </DialogTitle>
+              <DialogDescription className="text-[#94A3B8] text-sm mt-0.5">
+                Full multi-timeframe breakdown &amp; OrcaBot signals
+              </DialogDescription>
+            </div>
           </div>
 
-          {/* Scrollable body */}
-          <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          {detailLoading || !detail ? (
+            <div className="flex-1 p-6 space-y-3">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full rounded" />
+              ))}
+            </div>
+          ) : (
+            <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
 
-            {detailLoading || !detail ? (
-              <div className="space-y-3 pt-2">
-                {[...Array(6)].map((_, i) => (
-                  <Skeleton key={i} className="h-8 w-full rounded" />
-                ))}
-              </div>
-            ) : (
-              <>
-                {/* OrcaBot Status banner */}
-                <div className={`flex items-center justify-between rounded-xl px-4 py-3 ${
-                  detail.signals.status === "ON"
-                    ? "bg-[#10B981]/10 border border-[#10B981]/30"
-                    : detail.signals.status === "WATCH"
-                    ? "bg-[#F59E0B]/10 border border-[#F59E0B]/30"
-                    : "bg-[#64748B]/10 border border-[#64748B]/30"
-                }`}>
-                  <div>
-                    <div className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">OrcaBot Status</div>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-2xl font-bold ${
-                        detail.signals.status === "ON" ? "text-[#10B981]"
-                        : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
-                        : "text-[#64748B]"
-                      }`}>{detail.signals.status}</span>
-                      <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
-                        {detail.signals.direction}
-                      </span>
-                    </div>
-                    {detail.signals.status_since && (
-                      <div className="text-[11px] text-[#64748B] mt-1 flex items-center gap-1">
-                        {isFreshSignal(detail.signals.status_since) && <Zap className="w-3 h-3 text-[#00D4FF]" />}
-                        {formatFreshness(detail.signals.status_since)}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <div className="text-xs text-[#94A3B8] mb-1">Orca Score</div>
-                      <ScoreRing score={detail.signals.orca_score} />
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xs text-[#94A3B8] mb-1">Market Phase</div>
-                      <Badge className={`${PHASE_STYLES[detail.signals.market_phase]} border-0 text-xs`}>
-                        {detail.signals.market_phase}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* TradingView chart */}
-                <div className="rounded-lg overflow-hidden border border-[#1E293B]" style={{ height: 220 }}>
+              {/* Main area — chart fills all available space */}
+              <div className="flex-1 min-w-0 p-4 lg:p-6 flex flex-col min-h-[320px]">
+                <div className="flex-1 rounded-lg overflow-hidden border border-[#1E293B]">
                   <iframe
                     key={detail.symbol}
                     src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(detail.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
@@ -990,6 +950,50 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                     allowFullScreen
                     title={`${detail.symbol} chart`}
                   />
+                </div>
+              </div>
+
+              {/* Side panel — signals, breakdown, metrics, actions */}
+              <div className="w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E293B] overflow-y-auto p-4 lg:p-6 space-y-4">
+
+                {/* OrcaBot Status banner */}
+                <div className={`rounded-xl px-4 py-3 ${
+                  detail.signals.status === "ON"
+                    ? "bg-[#10B981]/10 border border-[#10B981]/30"
+                    : detail.signals.status === "WATCH"
+                    ? "bg-[#F59E0B]/10 border border-[#F59E0B]/30"
+                    : "bg-[#64748B]/10 border border-[#64748B]/30"
+                }`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">OrcaBot Status</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-2xl font-bold ${
+                          detail.signals.status === "ON" ? "text-[#10B981]"
+                          : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
+                          : "text-[#64748B]"
+                        }`}>{detail.signals.status}</span>
+                        <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
+                          {detail.signals.direction}
+                        </span>
+                      </div>
+                      {detail.signals.status_since && (
+                        <div className="text-[11px] text-[#64748B] mt-1 flex items-center gap-1">
+                          {isFreshSignal(detail.signals.status_since) && <Zap className="w-3 h-3 text-[#00D4FF]" />}
+                          {formatFreshness(detail.signals.status_since)}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-center shrink-0">
+                      <div className="text-xs text-[#94A3B8] mb-1">Orca Score</div>
+                      <ScoreRing score={detail.signals.orca_score} size={46} />
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <Badge className={`${PHASE_STYLES[detail.signals.market_phase]} border-0 text-xs`}>
+                      {detail.signals.market_phase}
+                    </Badge>
+                  </div>
                 </div>
 
                 {/* MTF Breakdown — center-fill bars, consistent with the main table */}
@@ -1007,8 +1011,8 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   </div>
                 </div>
 
-                {/* Advanced metrics — 4 across now that the dialog is wider */}
-                <div className="grid grid-cols-4 gap-3">
+                {/* Advanced metrics — 2×2, fits the narrower side panel */}
+                <div className="grid grid-cols-2 gap-3">
                   <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                     <div className="text-[#94A3B8] text-sm mb-2">ADX Trend Strength</div>
                     <div className="text-2xl text-white font-bold">{detail.advanced.adx}</div>
@@ -1078,10 +1082,9 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                     {selectedAsset?.inWatchlist ? "Remove from" : "Add to"} Watchlist
                   </Button>
                 </div>
-              </>
-            )}
-
-          </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
