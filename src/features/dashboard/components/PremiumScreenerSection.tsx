@@ -989,7 +989,11 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
 
       {/* Detail Modal — full-page popout: chart dominates, metrics live in a side panel */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="bg-[#0B0F19] border-none text-white fixed top-0 left-0 translate-x-0 translate-y-0 w-screen h-screen max-w-none max-h-none rounded-none flex flex-col overflow-hidden p-0 gap-0">
+        {/* sm:max-w-none below isn't redundant — the base Dialog has sm:max-w-lg, and
+            tailwind-merge treats different responsive modifiers as separate class
+            groups, so a bare max-w-none alone does NOT remove it. Without this, the
+            popout silently caps at 32rem on any screen >=640px wide. */}
+        <DialogContent className="bg-[#0B0F19] border-none text-white fixed top-0 left-0 translate-x-0 translate-y-0 w-screen h-screen max-w-none sm:max-w-none max-h-none rounded-none flex flex-col overflow-hidden p-0 gap-0">
 
           {/* Pinned header — X button always visible here */}
           <div className="px-6 py-4 border-b border-[#1E293B] shrink-0 pr-14 flex items-center justify-between bg-[#0A1628]">
