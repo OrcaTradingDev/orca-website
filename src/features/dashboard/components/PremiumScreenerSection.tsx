@@ -54,11 +54,6 @@ interface Asset extends Omit<ScreenerRow, "advanced"> {
 }
 
 // ── OrcaStatus helpers ────────────────────────────────────────────────────────
-const STATUS_STYLES: Record<OrcaSignals["status"], string> = {
-  ON:    "bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30",
-  WATCH: "bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30",
-  OFF:   "bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30",
-};
 
 const DIRECTION_STYLES: Record<OrcaSignals["direction"], string> = {
   "LONG ONLY":   "text-[#10B981]",
@@ -66,6 +61,18 @@ const DIRECTION_STYLES: Record<OrcaSignals["direction"], string> = {
   "SHORT ONLY":  "text-[#EF4444]",
   "WATCH SHORT": "text-[#F97316]",
   "FLAT":        "text-[#64748B]",
+};
+
+// Badge background/border for the main table's status pill — keyed by DIRECTION,
+// not status. STATUS_STYLES (ON/WATCH/OFF) was being used here even though the
+// badge displays the direction text, so "SHORT ONLY" (status=ON) rendered with
+// the green "ON" color. Direction-aware so bearish signals are always red.
+const DIRECTION_BADGE_STYLES: Record<OrcaSignals["direction"], string> = {
+  "LONG ONLY":   "bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30",
+  "WATCH LONG":  "bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30",
+  "SHORT ONLY":  "bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30",
+  "WATCH SHORT": "bg-[#F97316]/20 text-[#F97316] border border-[#F97316]/30",
+  "FLAT":        "bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30",
 };
 
 const PHASE_STYLES: Record<OrcaSignals["market_phase"], string> = {
@@ -843,7 +850,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                       <td className="py-3 px-4">
                         <div className="flex flex-col items-center gap-1" style={lockedStyle}>
                           <Badge
-                            className={`${STATUS_STYLES[asset.signals.status]} text-xs font-bold border-0 px-3 ${
+                            className={`${DIRECTION_BADGE_STYLES[asset.signals.direction]} text-xs font-bold border-0 px-3 ${
                               fresh ? "ring-2 ring-[#00D4FF]/50" : ""
                             }`}
                           >
