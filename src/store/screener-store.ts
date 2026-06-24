@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export const ALL_ASSET_CLASSES = ["Forex", "Commodities", "Indices", "Crypto"];
+export const ALL_ASSET_CLASSES = ["Forex", "Commodities", "Indices", "Crypto", "Stocks"];
 export const ALL_TIMEFRAMES    = ["5M", "30M", "1H", "4H", "1D"];
 
 export interface ScreenerSettings {
@@ -58,6 +58,20 @@ export const useScreenerStore = create<ScreenerStoreState>()(
       setScreenerSettings: (settings) =>
         set((state) => ({ ...state, ...settings })),
     }),
-    { name: "orca-screener-ui-state" }
+    {
+      name: "orca-screener-ui-state",
+      version: 1,
+      // v0 -> v1: "Stocks" was added to ALL_ASSET_CLASSES after launch.
+      // Existing browsers have an old persisted enabledAssetClasses array
+      // that doesn't include it — add it back in so stocks aren't silently
+      // filtered out for users who already had this store saved.
+      migrate: (persistedState, version) => {
+        const state = persistedState as Partial<ScreenerSettings> & Record<string, unknown>;
+        if (version < 1 && Array.isArray(state?.enabledAssetClasses) && !state.enabledAssetClasses.includes("Stocks")) {
+          state.enabledAssetClasses = [...state.enabledAssetClasses, "Stocks"];
+        }
+        return state;
+      },
+    }
   )
 );
