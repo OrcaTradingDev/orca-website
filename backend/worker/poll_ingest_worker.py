@@ -724,7 +724,10 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
                     )
                     await asyncio.sleep(RATE_LIMIT_BACKOFF_SECONDS)
                     continue
-                raise
+                # A bad/unrecognized symbol must not abort the whole cycle —
+                # skip it and keep ingesting the rest of the universe.
+                logger.warning("[ingest] %s %s failed, skipping: %s", symbol, timeframe, e)
+                continue
 
             cleaned: List[Dict] = []
             for r in ohlc_rows:

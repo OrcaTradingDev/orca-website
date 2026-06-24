@@ -13,29 +13,42 @@ FX_MAJORS = [
     "USDCAD",
     "AUDUSD",
     "NZDUSD",
-    # Crosses (added)
+    # Crosses
     "EURJPY",
     "GBPJPY",
     "EURGBP",
     "AUDJPY",
+    "GBPCHF",
+    "CADJPY",
+    "CHFJPY",
+    "NZDJPY",
+    "EURAUD",
+    "GBPAUD",
 ]
 
-# --- Stocks (daily only for launch) ---
+# --- Stocks ---
 MAJOR_STOCKS_DAILY = [
-    "AMZN", "GOOGL", "META", "TSLA",
-    "JPM", "BAC", "XOM", "CVX", "WMT", "UNH", "JNJ", "V",
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOG", "META", "TSLA", "NFLX",
 ]
 
-# --- Commodities (daily) ---
+# --- Commodities ---
 COMMODITIES_DAILY = [
     "XAUUSD",  # Gold
     "XAGUSD",  # Silver
-    "WTI",     # Oil (verify provider symbol)
+    "XCUUSD",  # Copper
+    "XPTUSD",  # Platinum
+    "WTI",     # WTI Crude Oil (verify provider symbol)
+    "UKOIL",   # Brent Crude Oil (verify provider symbol)
 ]
 
-# --- Indices (optional / stretch) ---
+# --- Indices ---
 INDICES_DAILY = [
+    "US100",
     "US500",
     "US30",
+    "GER40",  # verify provider symbol
+    "UK100",  # verify provider symbol
+    "JP225",  # verify provider symbol
+    "EU50",   # verify provider symbol
 ]
 
