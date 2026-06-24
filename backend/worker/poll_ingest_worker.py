@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -13,7 +14,9 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import settings
 from app.core.db import AsyncSessionLocal
-from app.domain.config import load_screener_config
+from app.domain.config import load_orca_mc_config, load_screener_config
+from app.domain.indicators import _adx_wilder, _atr_wilder, _ema, _rsi_wilder, _sma
+from app.domain.orca_mc import OrcaMCConfig, OrcaMCInputs, OrcaMCResult, compute_orca_mc, tf_bias
 from app.domain.signals import adx_dir_from_di, build_signals, ema_state
 from app.models.fx_universe import FXUniverse
 from app.models.market_indicators_latest import MarketIndicatorsLatest
@@ -40,7 +43,9 @@ def _parse_timeframes() -> List[str]:
 
 
 POLL_SECONDS = int(os.getenv("INGEST_POLL_SECONDS", "60"))
-LIMIT_PER_REQUEST = int(os.getenv("INGEST_LIMIT", "200"))
+# 300+ candles needed for EMA(200) to actually converge (200 gives it zero
+# recursion runway) and for the Orca MC engine's full EMA/ADX/ATR stack.
+LIMIT_PER_REQUEST = int(os.getenv("INGEST_LIMIT", "300"))
 
 # Drop candles that are too far ahead of DB/server time (protects from timezone/provider weirdness)
 MAX_FUTURE_SKEW_SECONDS = int(os.getenv("INGEST_MAX_FUTURE_SKEW_SECONDS", "120"))
@@ -51,171 +56,6 @@ RATE_LIMIT_BACKOFF_SECONDS = int(os.getenv("INGEST_RATE_LIMIT_BACKOFF_SECONDS", 
 
 def normalize_symbol(sym: str) -> str:
     return (sym or "").strip().upper().replace("/", "")
-
-
-# ----------------------------
-# Indicator math (no pandas)
-# ----------------------------
-def _ema(values: List[float], period: int) -> List[Optional[float]]:
-    if len(values) < period:
-        return [None] * len(values)
-    k = 2.0 / (period + 1.0)
-    out: List[Optional[float]] = [None] * len(values)
-    sma = sum(values[:period]) / period
-    out[period - 1] = sma
-    prev = sma
-    for i in range(period, len(values)):
-        prev = values[i] * k + prev * (1.0 - k)
-        out[i] = prev
-    return out
-
-
-def _rsi_wilder(closes: List[float], period: int = 14) -> List[Optional[float]]:
-    if len(closes) < period + 1:
-        return [None] * len(closes)
-
-    out: List[Optional[float]] = [None] * len(closes)
-
-    gains = 0.0
-    losses = 0.0
-    for i in range(1, period + 1):
-        ch = closes[i] - closes[i - 1]
-        if ch >= 0:
-            gains += ch
-        else:
-            losses += -ch
-
-    avg_gain = gains / period
-    avg_loss = losses / period
-
-    def rsi_from(avgg, avgl) -> float:
-        if avgl == 0:
-            return 100.0
-        rs = avgg / avgl
-        return 100.0 - (100.0 / (1.0 + rs))
-
-    out[period] = rsi_from(avg_gain, avg_loss)
-
-    for i in range(period + 1, len(closes)):
-        ch = closes[i] - closes[i - 1]
-        gain = ch if ch > 0 else 0.0
-        loss = (-ch) if ch < 0 else 0.0
-        avg_gain = (avg_gain * (period - 1) + gain) / period
-        avg_loss = (avg_loss * (period - 1) + loss) / period
-        out[i] = rsi_from(avg_gain, avg_loss)
-
-    return out
-
-
-def _atr_wilder(highs: List[float], lows: List[float], closes: List[float], period: int = 14) -> List[Optional[float]]:
-    n = len(closes)
-    if n < period + 1:
-        return [None] * n
-
-    tr: List[float] = []
-    tr.append(highs[0] - lows[0])
-    for i in range(1, n):
-        tr_val = max(
-            highs[i] - lows[i],
-            abs(highs[i] - closes[i - 1]),
-            abs(lows[i] - closes[i - 1]),
-        )
-        tr.append(tr_val)
-
-    out: List[Optional[float]] = [None] * n
-
-    first_atr = sum(tr[1 : period + 1]) / period
-    out[period] = first_atr
-    prev = first_atr
-
-    for i in range(period + 1, n):
-        prev = (prev * (period - 1) + tr[i]) / period
-        out[i] = prev
-
-    return out
-
-
-def _adx_wilder(
-    highs: List[float], lows: List[float], closes: List[float], period: int = 14
-) -> Tuple[List[Optional[float]], List[Optional[float]], List[Optional[float]]]:
-    """
-    Returns (adx, plus_di, minus_di) lists aligned to input length.
-    """
-    n = len(closes)
-    if n < period * 2 + 1:
-        return ([None] * n, [None] * n, [None] * n)
-
-    plus_dm: List[float] = [0.0]
-    minus_dm: List[float] = [0.0]
-    tr: List[float] = [highs[0] - lows[0]]
-
-    for i in range(1, n):
-        up_move = highs[i] - highs[i - 1]
-        down_move = lows[i - 1] - lows[i]
-
-        pdm = up_move if (up_move > down_move and up_move > 0) else 0.0
-        mdm = down_move if (down_move > up_move and down_move > 0) else 0.0
-
-        plus_dm.append(pdm)
-        minus_dm.append(mdm)
-
-        tr_val = max(
-            highs[i] - lows[i],
-            abs(highs[i] - closes[i - 1]),
-            abs(lows[i] - closes[i - 1]),
-        )
-        tr.append(tr_val)
-
-    # Wilder smoothing
-    def wilder_smooth(vals: List[float], p: int) -> List[Optional[float]]:
-        out: List[Optional[float]] = [None] * len(vals)
-        initial = sum(vals[1 : p + 1])  # start from 1
-        out[p] = initial
-        prev = initial
-        for i in range(p + 1, len(vals)):
-            prev = prev - (prev / p) + vals[i]
-            out[i] = prev
-        return out
-
-    sm_tr = wilder_smooth(tr, period)
-    sm_pdm = wilder_smooth(plus_dm, period)
-    sm_mdm = wilder_smooth(minus_dm, period)
-
-    plus_di: List[Optional[float]] = [None] * n
-    minus_di: List[Optional[float]] = [None] * n
-    dx: List[Optional[float]] = [None] * n
-
-    for i in range(n):
-        if sm_tr[i] is None or sm_tr[i] == 0 or sm_pdm[i] is None or sm_mdm[i] is None:
-            continue
-        pdi = 100.0 * (sm_pdm[i] / sm_tr[i])
-        mdi = 100.0 * (sm_mdm[i] / sm_tr[i])
-        plus_di[i] = pdi
-        minus_di[i] = mdi
-        denom = pdi + mdi
-        if denom == 0:
-            dx[i] = 0.0
-        else:
-            dx[i] = 100.0 * abs(pdi - mdi) / denom
-
-    # ADX: Wilder average of DX
-    adx: List[Optional[float]] = [None] * n
-    start = period * 2
-    dx_window = [d for d in dx[period + 1 : start + 1] if d is not None]
-    if len(dx_window) < period:
-        return (adx, plus_di, minus_di)
-
-    first_adx = sum(dx_window[:period]) / period
-    adx[start] = first_adx
-    prev = first_adx
-
-    for i in range(start + 1, n):
-        if dx[i] is None:
-            continue
-        prev = ((prev * (period - 1)) + dx[i]) / period
-        adx[i] = prev
-
-    return (adx, plus_di, minus_di)
 
 
 def compute_latest_indicators(ohlc_rows: List[Dict]) -> Optional[Dict]:
@@ -231,6 +71,7 @@ def compute_latest_indicators(ohlc_rows: List[Dict]) -> Optional[Dict]:
     lows = [float(r["low"]) for r in ohlc_rows]
 
     ema9 = _ema(closes, 9)
+    ema20 = _ema(closes, 20)
     ema21 = _ema(closes, 21)
     ema50 = _ema(closes, 50)
     ema200 = _ema(closes, 200)
@@ -255,6 +96,10 @@ def compute_latest_indicators(ohlc_rows: List[Dict]) -> Optional[Dict]:
 
     atr14 = _atr_wilder(highs, lows, closes, 14)
     adx14, plus_di14, minus_di14 = _adx_wilder(highs, lows, closes, 14)
+    # SMA(20) of the ATR(14) series itself — used by the Orca MC engine's
+    # expansion/compression volatility classification. NOT a 20-period ATR.
+    atr14_filled = [v if v is not None else 0.0 for v in atr14]
+    atr_sma20 = _sma(atr14_filled, 20)
 
     i = len(ohlc_rows) - 1
     last_ts = ohlc_rows[i]["timestamp"]
@@ -262,6 +107,7 @@ def compute_latest_indicators(ohlc_rows: List[Dict]) -> Optional[Dict]:
     return {
         "last_timestamp": last_ts,
         "ema_9": ema9[i],
+        "ema_20": ema20[i],
         "ema_21": ema21[i],
         "ema_50": ema50[i],
         "ema_200": ema200[i],
@@ -273,6 +119,7 @@ def compute_latest_indicators(ohlc_rows: List[Dict]) -> Optional[Dict]:
         "plus_di_14": plus_di14[i],
         "minus_di_14": minus_di14[i],
         "atr_14": atr14[i],
+        "atr_sma_20": atr_sma20[i],
     }
 
 
@@ -714,18 +561,18 @@ async def upsert_latest_indicators(symbol: str, timeframe: str, ind: Dict) -> No
                 """
                 INSERT INTO market_indicators_latest (
                     symbol, timeframe, last_timestamp,
-                    ema_9, ema_21, ema_50, ema_200,
+                    ema_9, ema_20, ema_21, ema_50, ema_200,
                     rsi_14,
                     macd, macd_signal, macd_hist,
                     adx_14, plus_di_14, minus_di_14,
-                    atr_14
+                    atr_14, atr_sma_20
                 ) VALUES (
                     :symbol, :timeframe, :last_timestamp,
-                    :ema_9, :ema_21, :ema_50, :ema_200,
+                    :ema_9, :ema_20, :ema_21, :ema_50, :ema_200,
                     :rsi_14,
                     :macd, :macd_signal, :macd_hist,
                     :adx_14, :plus_di_14, :minus_di_14,
-                    :atr_14
+                    :atr_14, :atr_sma_20
                 )
                 """
             ),
@@ -734,6 +581,7 @@ async def upsert_latest_indicators(symbol: str, timeframe: str, ind: Dict) -> No
                 "timeframe": timeframe,
                 "last_timestamp": ind["last_timestamp"],
                 "ema_9": ind["ema_9"],
+                "ema_20": ind["ema_20"],
                 "ema_21": ind["ema_21"],
                 "ema_50": ind["ema_50"],
                 "ema_200": ind["ema_200"],
@@ -745,6 +593,7 @@ async def upsert_latest_indicators(symbol: str, timeframe: str, ind: Dict) -> No
                 "plus_di_14": ind["plus_di_14"],
                 "minus_di_14": ind["minus_di_14"],
                 "atr_14": ind["atr_14"],
+                "atr_sma_20": ind["atr_sma_20"],
             },
         )
         await db.commit()
@@ -767,6 +616,206 @@ def _filter_future_rows(rows: List[Dict]) -> List[Dict]:
     now = datetime.now(timezone.utc)
     max_ok = now + timedelta(seconds=MAX_FUTURE_SKEW_SECONDS)
     return [r for r in rows if r["timestamp"] <= max_ok]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  ORCA MC v3.0 ENGINE — Phase A (no POI). See app/domain/orca_mc.py.
+#  Timeframe mapping: LTF/current=5min, HTF=1h, MTF panel=5min/30min/1h/4h.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def _fetch_indicator_series(symbol: str, timeframe: str, limit: int) -> Optional[Dict[str, Any]]:
+    """
+    Read the last `limit` candles for (symbol, timeframe) from market_prices and
+    compute the EMA(20/50/200)/ADX/ATR series Orca MC needs. Returns None if
+    there isn't enough history yet.
+    """
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT open, high, low, close, timestamp FROM (
+                    SELECT open, high, low, close, timestamp
+                    FROM market_prices
+                    WHERE symbol = :s AND timeframe = :tf
+                    ORDER BY timestamp DESC
+                    LIMIT :lim
+                ) sub
+                ORDER BY timestamp ASC
+                """
+            ),
+            {"s": symbol, "tf": timeframe, "lim": limit},
+        )
+        rows = result.all()
+
+    if len(rows) < 30:
+        return None
+
+    opens = [float(r[0]) for r in rows]
+    highs = [float(r[1]) for r in rows]
+    lows = [float(r[2]) for r in rows]
+    closes = [float(r[3]) for r in rows]
+    timestamps = [r[4] for r in rows]
+
+    ema20 = _ema(closes, 20)
+    ema50 = _ema(closes, 50)
+    ema200 = _ema(closes, 200)
+    adx, plus_di, minus_di = _adx_wilder(highs, lows, closes, 14)
+    atr = _atr_wilder(highs, lows, closes, 14)
+    atr_filled = [v if v is not None else 0.0 for v in atr]
+    atr_sma20 = _sma(atr_filled, 20)
+
+    i = len(rows) - 1
+    candles = list(zip(opens[-6:], highs[-6:], lows[-6:], closes[-6:]))
+
+    return {
+        "close": closes[i],
+        "ema20": ema20[i], "ema50": ema50[i], "ema200": ema200[i],
+        "ema20_prev2": ema20[i - 2] if i >= 2 else None,
+        "adx": adx[i], "adx_prev": adx[i - 1] if i >= 1 else None,
+        "plus_di": plus_di[i], "minus_di": minus_di[i],
+        "atr": atr[i], "atr_sma20": atr_sma20[i],
+        "candles": candles,
+        "last_timestamp": timestamps[i],
+    }
+
+
+async def upsert_orca_mc_latest(symbol: str, result: OrcaMCResult) -> None:
+    """
+    One row per symbol, delete+insert (matching upsert_symbol_aggregates_latest's
+    pattern). status_since only advances when orca_status actually changes.
+    """
+    async with AsyncSessionLocal() as db:
+        prev_row = (await db.execute(
+            text("SELECT orca_status, status_since FROM market_orca_mc_latest WHERE symbol=:s"),
+            {"s": symbol},
+        )).first()
+
+        now = datetime.now(timezone.utc)
+        if prev_row and prev_row[0] == result.status.orca_status and prev_row[1] is not None:
+            status_since = prev_row[1]
+        else:
+            status_since = now
+
+        await db.execute(text("DELETE FROM market_orca_mc_latest WHERE symbol=:s"), {"s": symbol})
+        await db.execute(
+            text(
+                """
+                INSERT INTO market_orca_mc_latest (
+                    symbol,
+                    htf_bull, htf_bear, htf_neut, ltf_bull, ltf_bear,
+                    ema_full_bull, ema_full_bear, ema_flat,
+                    adx_strong, adx_very_strong, adx_rising, adx_falling,
+                    di_conf_bull, di_conf_bear, di_sep,
+                    atr_exp, vol_extreme, vol_compr, vol_state,
+                    clean_candles, choppy_candles, body_ratio, recent_overlap,
+                    phase, trend_struct, pb_status,
+                    is_exhaustion, is_expansion, is_cont, is_pb, is_comp_final, is_chop,
+                    mtf_bull_count, mtf_bear_count, mtf_align_str,
+                    p_htf, p_adx, p_ema, p_phase, p_vol, orca_score, score_qual,
+                    orca_status, pref_dir, status_since,
+                    trig_c1, trig_c2, trig_c3, trig_c4, trig_met_count, trig_result,
+                    suitability, suit_reason, act_conf, conf_tier,
+                    readiness, ready_tier, ready_reason, expected_next,
+                    why_bullets, opportunity_timeline,
+                    ltf_last_timestamp, htf_last_timestamp, poi_pending, updated_at
+                ) VALUES (
+                    :symbol,
+                    :htf_bull, :htf_bear, :htf_neut, :ltf_bull, :ltf_bear,
+                    :ema_full_bull, :ema_full_bear, :ema_flat,
+                    :adx_strong, :adx_very_strong, :adx_rising, :adx_falling,
+                    :di_conf_bull, :di_conf_bear, :di_sep,
+                    :atr_exp, :vol_extreme, :vol_compr, :vol_state,
+                    :clean_candles, :choppy_candles, :body_ratio, :recent_overlap,
+                    :phase, :trend_struct, :pb_status,
+                    :is_exhaustion, :is_expansion, :is_cont, :is_pb, :is_comp_final, :is_chop,
+                    :mtf_bull_count, :mtf_bear_count, :mtf_align_str,
+                    :p_htf, :p_adx, :p_ema, :p_phase, :p_vol, :orca_score, :score_qual,
+                    :orca_status, :pref_dir, :status_since,
+                    :trig_c1, :trig_c2, :trig_c3, :trig_c4, :trig_met_count, :trig_result,
+                    :suitability, :suit_reason, :act_conf, :conf_tier,
+                    :readiness, :ready_tier, :ready_reason, :expected_next,
+                    :why_bullets, :opportunity_timeline,
+                    :ltf_last_timestamp, :htf_last_timestamp, :poi_pending, NOW()
+                )
+                """
+            ),
+            {
+                "symbol": symbol,
+                "htf_bull": result.chain.htf_bull, "htf_bear": result.chain.htf_bear, "htf_neut": result.chain.htf_neut,
+                "ltf_bull": result.chain.ltf_bull, "ltf_bear": result.chain.ltf_bear,
+                "ema_full_bull": result.chain.ema_full_bull, "ema_full_bear": result.chain.ema_full_bear,
+                "ema_flat": result.chain.ema_flat,
+                "adx_strong": result.chain.adx_strong, "adx_very_strong": result.chain.adx_very_strong,
+                "adx_rising": result.chain.adx_rising, "adx_falling": result.chain.adx_falling,
+                "di_conf_bull": result.chain.di_conf_bull, "di_conf_bear": result.chain.di_conf_bear,
+                "di_sep": result.chain.di_sep,
+                "atr_exp": result.chain.atr_exp, "vol_extreme": result.chain.vol_extreme,
+                "vol_compr": result.chain.vol_compr, "vol_state": result.chain.vol_state,
+                "clean_candles": result.chain.clean_candles, "choppy_candles": result.chain.choppy_candles,
+                "body_ratio": result.chain.body_ratio, "recent_overlap": result.chain.recent_overlap,
+                "phase": result.phase.phase, "trend_struct": result.phase.trend_struct, "pb_status": result.phase.pb_status,
+                "is_exhaustion": result.phase.is_exhaustion, "is_expansion": result.phase.is_expansion,
+                "is_cont": result.phase.is_cont, "is_pb": result.phase.is_pb,
+                "is_comp_final": result.phase.is_comp_final, "is_chop": result.phase.is_chop,
+                "mtf_bull_count": result.mtf.bull_count, "mtf_bear_count": result.mtf.bear_count,
+                "mtf_align_str": result.mtf.align_str,
+                "p_htf": result.score.p_htf, "p_adx": result.score.p_adx, "p_ema": result.score.p_ema,
+                "p_phase": result.score.p_phase, "p_vol": result.score.p_vol,
+                "orca_score": result.score.orca_score, "score_qual": result.score.score_qual,
+                "orca_status": result.status.orca_status, "pref_dir": result.status.pref_dir,
+                "status_since": status_since,
+                "trig_c1": result.trigger.c1_met, "trig_c2": result.trigger.c2_met,
+                "trig_c3": result.trigger.c3_met, "trig_c4": result.trigger.c4_met,
+                "trig_met_count": result.trigger.met_count, "trig_result": result.trigger.result,
+                "suitability": result.suitability.rating, "suit_reason": result.suitability.reason,
+                "act_conf": result.confidence.score, "conf_tier": result.confidence.tier,
+                "readiness": result.readiness.score, "ready_tier": result.readiness.tier,
+                "ready_reason": result.readiness.reason, "expected_next": result.expected_next,
+                "why_bullets": json.dumps(result.why_bullets),
+                "opportunity_timeline": json.dumps(result.opportunity_timeline),
+                "ltf_last_timestamp": result.ltf_last_timestamp, "htf_last_timestamp": result.htf_last_timestamp,
+                "poi_pending": result.poi_pending,
+            },
+        )
+        await db.commit()
+
+
+async def compute_and_store_orca_mc(symbol: str, cfg: OrcaMCConfig) -> None:
+    ltf = await _fetch_indicator_series(symbol, "5min", LIMIT_PER_REQUEST)
+    htf = await _fetch_indicator_series(symbol, "1h", LIMIT_PER_REQUEST)
+    if ltf is None or htf is None:
+        logger.info("[orca-mc] %s skipped (insufficient 5min/1h history)", symbol)
+        return
+
+    mtf_30m = await _fetch_indicator_series(symbol, "30min", LIMIT_PER_REQUEST)
+    mtf_4h = await _fetch_indicator_series(symbol, "4h", LIMIT_PER_REQUEST)
+
+    mtf_biases = [
+        tf_bias(ltf["close"], ltf["ema20"], ltf["ema50"]),
+        tf_bias(mtf_30m["close"], mtf_30m["ema20"], mtf_30m["ema50"]) if mtf_30m else 0,
+        tf_bias(htf["close"], htf["ema20"], htf["ema50"]),
+        tf_bias(mtf_4h["close"], mtf_4h["ema20"], mtf_4h["ema50"]) if mtf_4h else 0,
+    ]
+
+    inputs = OrcaMCInputs(
+        ltf_close=ltf["close"], ltf_ema20=ltf["ema20"], ltf_ema50=ltf["ema50"], ltf_ema200=ltf["ema200"],
+        ltf_candles=ltf["candles"],
+        htf_close=htf["close"], htf_ema20=htf["ema20"], htf_ema50=htf["ema50"], htf_ema200=htf["ema200"],
+        htf_ema20_prev2=htf["ema20_prev2"],
+        adx_value=ltf["adx"], adx_prev=ltf["adx_prev"],
+        plus_di=ltf["plus_di"], minus_di=ltf["minus_di"],
+        atr_value=ltf["atr"], atr_sma20=ltf["atr_sma20"],
+        mtf_biases=mtf_biases,
+        ltf_last_timestamp=ltf["last_timestamp"],
+        htf_last_timestamp=htf["last_timestamp"],
+    )
+    result = compute_orca_mc(inputs, cfg)
+    await upsert_orca_mc_latest(symbol, result)
+    logger.info(
+        "[orca-mc] %s status=%s score=%d phase=%s readiness=%d",
+        symbol, result.status.orca_status, result.score.orca_score,
+        result.phase.phase, result.readiness.score,
+    )
 
 
 async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
@@ -900,6 +949,23 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
                     )
             except Exception:
                 logger.exception("[agg] failed computing/upserting aggregates for %s", symbol)
+
+    # Orca MC needs candles from multiple timeframes at once (5min/30min/1h/4h),
+    # so it runs as a second pass after the main ingest loop, once all
+    # timeframes' market_prices/indicators are fresh for this cycle.
+    orca_cfg = await load_orca_mc_config_safe()
+    for symbol in symbols:
+        try:
+            await compute_and_store_orca_mc(symbol, orca_cfg)
+        except Exception:
+            logger.exception("[orca-mc] failed for %s", symbol)
+
+
+async def load_orca_mc_config_safe() -> OrcaMCConfig:
+    """load_orca_mc_config needs a DB session — small wrapper so ingest_once
+    doesn't need to manage one just for this."""
+    async with AsyncSessionLocal() as db:
+        return await load_orca_mc_config(db)
 
 
 async def main():

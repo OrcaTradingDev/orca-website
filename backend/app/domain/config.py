@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.domain.orca_mc import OrcaMCConfig
+
 # ── Config schema ─────────────────────────────────────────────────────────────
 
 class ScreenerConfigData(BaseModel):
@@ -106,4 +108,45 @@ async def load_screener_config(db: AsyncSession) -> ScreenerConfigData:
         cfg = ScreenerConfigData()
 
     _cache = (cfg, now)
+    return cfg
+
+
+# ── Orca MC config (separate key on the same screener_config table) ───────────
+
+_orca_mc_cache: Optional[tuple[OrcaMCConfig, float]] = None
+
+
+def invalidate_orca_mc_config_cache() -> None:
+    """Call after admin saves new Orca MC config so the next request loads fresh data."""
+    global _orca_mc_cache
+    _orca_mc_cache = None
+
+
+async def load_orca_mc_config(db: AsyncSession) -> OrcaMCConfig:
+    """
+    Load Orca MC engine config from DB with a 60-second in-memory cache.
+    Reuses the screener_config table (key='orca_mc') rather than a new table —
+    falls back to all-defaults if no row exists yet.
+    """
+    global _orca_mc_cache
+    from app.models.screener_config import ScreenerConfigModel  # local to avoid circular
+
+    now = time.monotonic()
+    if _orca_mc_cache is not None and (now - _orca_mc_cache[1]) < _CACHE_TTL:
+        return _orca_mc_cache[0]
+
+    result = await db.execute(
+        select(ScreenerConfigModel).where(ScreenerConfigModel.key == "orca_mc")
+    )
+    record = result.scalar_one_or_none()
+
+    if record and record.config:
+        try:
+            cfg = OrcaMCConfig.model_validate(record.config)
+        except Exception:
+            cfg = OrcaMCConfig()
+    else:
+        cfg = OrcaMCConfig()
+
+    _orca_mc_cache = (cfg, now)
     return cfg

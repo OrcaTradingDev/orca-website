@@ -2,6 +2,8 @@
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
+from app.schemas.orca_mc import OrcaMarketConditions
+
 # --- Type Definitions ---
 TrendDir = Literal["up", "down", "flat"]
 OrcaStatus = Literal["ON", "WATCH", "OFF"]
@@ -64,3 +66,4 @@ class SymbolDetail(BaseModel):
     timeframes: List[TimeframeBar]
     signals: OrcaSignals
     advanced: AdvancedMetrics
+    orca_mc: Optional[OrcaMarketConditions] = None

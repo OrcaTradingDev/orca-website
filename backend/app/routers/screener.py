@@ -33,7 +33,18 @@ from app.domain.signals import (
     vol_score_from_atr,
     build_signals,
 )
-from app.domain.config import load_screener_config
+from app.domain.config import load_screener_config, load_orca_mc_config
+from app.domain.orca_mc import MTFAlignment, StatusResult, compute_long_side_focus, trigger_labels
+from app.schemas.orca_mc import (
+    Confidence,
+    MTFAlignmentOut,
+    NextTrigger,
+    OpportunityTimelineStep,
+    OrcaMarketConditions,
+    Readiness,
+    ScoreBreakdown,
+    Suitability,
+)
 
 router = APIRouter(prefix="/screener", tags=["screener"])
 
@@ -239,6 +250,49 @@ async def get_screener_rows(
     )
 
 
+# ── Orca MC mapper (DB row -> API schema) ───────────────────────────────────────
+
+def _build_orca_mc_schema(row, on_thresh: int) -> Optional[OrcaMarketConditions]:
+    """row is a SQLAlchemy Row/Mapping from market_orca_mc_latest, or None."""
+    if row is None:
+        return None
+
+    mtf = MTFAlignment(bull_count=row["mtf_bull_count"], bear_count=row["mtf_bear_count"], align_str=row["mtf_align_str"])
+    status = StatusResult(orca_status=row["orca_status"], pref_dir=row["pref_dir"])
+    long_side_focus = compute_long_side_focus(status, mtf)
+    c1_label, c2_label, c3_label, c4_label = trigger_labels(long_side_focus, on_thresh)
+
+    return OrcaMarketConditions(
+        phase=row["phase"],
+        trend_struct=row["trend_struct"],
+        pb_status=row["pb_status"],
+        mtf=MTFAlignmentOut(bull_count=row["mtf_bull_count"], bear_count=row["mtf_bear_count"], align_str=row["mtf_align_str"]),
+        score=ScoreBreakdown(
+            p_htf=row["p_htf"], p_adx=row["p_adx"], p_ema=row["p_ema"], p_phase=row["p_phase"], p_vol=row["p_vol"],
+            orca_score=row["orca_score"], score_qual=row["score_qual"],
+        ),
+        status=row["orca_status"],
+        pref_dir=row["pref_dir"],
+        next_trigger=NextTrigger(
+            c1_label=c1_label, c1_met=row["trig_c1"],
+            c2_label=c2_label, c2_met=row["trig_c2"],
+            c3_label=c3_label, c3_met=row["trig_c3"],
+            c4_label=c4_label, c4_met=row["trig_c4"],
+            met_count=row["trig_met_count"], result=row["trig_result"],
+        ),
+        readiness=Readiness(
+            score=row["readiness"], tier=row["ready_tier"], reason=row["ready_reason"],
+            expected_next=row["expected_next"],
+        ),
+        suitability=Suitability(rating=row["suitability"], reason=row["suit_reason"]),
+        confidence=Confidence(score=row["act_conf"], tier=row["conf_tier"]),
+        why=row["why_bullets"] or [],
+        opportunity_timeline=[OpportunityTimelineStep(**step) for step in (row["opportunity_timeline"] or [])],
+        poi_pending=row["poi_pending"],
+        status_since=row["status_since"].isoformat() if row["status_since"] else None,
+    )
+
+
 # ── Symbol detail endpoint ────────────────────────────────────────────────────
 
 @router.get("/symbol/{symbol}/detail", response_model=SymbolDetail)
@@ -252,6 +306,7 @@ async def get_symbol_detail(
     Used to populate the detail modal.
     """
     cfg = await load_screener_config(db)
+    orca_mc_cfg = await load_orca_mc_config(db)
     symbol = symbol.upper()
 
     # Fetch FXUniverse name
@@ -351,11 +406,17 @@ async def get_symbol_detail(
     )
     signals.status_since = status_since.isoformat() if status_since else None
 
+    orca_mc_row = (await db.execute(
+        text("SELECT * FROM market_orca_mc_latest WHERE symbol = :s"), {"s": symbol}
+    )).mappings().first()
+    orca_mc = _build_orca_mc_schema(orca_mc_row, orca_mc_cfg.on_thresh)
+
     return SymbolDetail(
         symbol=symbol,
         name=name,
         timeframes=timeframes,
         signals=signals,
+        orca_mc=orca_mc,
         advanced=AdvancedMetrics(
             adx=adx,
             adx_dir=adx_dir,

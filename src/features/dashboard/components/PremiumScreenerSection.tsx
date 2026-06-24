@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useScreener } from "@/features/dashboard/hooks/useScreener";
 import { useSymbolDetail } from "@/features/dashboard/hooks/useSymbolDetail";
-import { ScreenerRow, OrcaSignals } from "@/features/dashboard/types/screener";
+import { ScreenerRow, OrcaSignals, OrcaMarketConditions } from "@/features/dashboard/types/screener";
 import { queryKeys } from "@/lib/query/keys";
 import { useScreenerStore } from "@/store/screener-store";
 import { useUserAlerts } from "@/features/dashboard/hooks/useUserAlerts";
@@ -20,6 +20,8 @@ import {
   ArrowRight,
   Trophy,
   Zap,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -161,6 +163,76 @@ const Sparkline = ({ data }: { data: number[] }) => {
     </svg>
   );
 };
+
+// ── Orca MC — score breakdown bar (0 → cap, single direction, not bull/bear signed) ──
+const ScoreBreakdownBar = ({ label, value, cap }: { label: string; value: number; cap: number }) => {
+  const pct = cap > 0 ? Math.min(100, (value / cap) * 100) : 0;
+  const color = pct >= 75 ? "#10B981" : pct >= 40 ? "#F59E0B" : "#64748B";
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-[#94A3B8] text-xs w-20 shrink-0">{label}</span>
+      <div className="flex-1 h-[6px] bg-[#1E293B] rounded-full overflow-hidden">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="text-xs font-semibold tabular-nums w-12 text-right shrink-0" style={{ color }}>
+        {value}/{cap}
+      </span>
+    </div>
+  );
+};
+
+// ── Orca MC — opportunity timeline stepper ───────────────────────────────────────
+const OpportunityTimeline = ({ steps }: { steps: { state: string; is_current: boolean; is_next: boolean }[] }) => (
+  <div className="flex items-center gap-1">
+    {steps.map((step, i) => (
+      <div key={step.state} className="flex items-center flex-1 last:flex-none">
+        <div className="flex flex-col items-center gap-1 min-w-0">
+          <div
+            className="w-2.5 h-2.5 rounded-full shrink-0"
+            style={{
+              background: step.is_current ? "#00D4FF" : step.is_next ? "#F59E0B" : "#334155",
+              boxShadow: step.is_current ? "0 0 6px #00D4FF" : "none",
+            }}
+          />
+          <span
+            className="text-[10px] text-center leading-tight"
+            style={{ color: step.is_current ? "#00D4FF" : step.is_next ? "#F59E0B" : "#64748B" }}
+          >
+            {step.state}
+          </span>
+        </div>
+        {i < steps.length - 1 && <div className="flex-1 h-px bg-[#1E293B] mx-1" />}
+      </div>
+    ))}
+  </div>
+);
+
+// ── Orca MC style maps ────────────────────────────────────────────────────────
+const ORCA_MC_STATUS_STYLES: Record<string, string> = {
+  "ON LONG":     "bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30",
+  "ON SHORT":    "bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/30",
+  "WATCH LONG":  "bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30",
+  "WATCH SHORT": "bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30",
+  "CAUTION":     "bg-[#F97316]/20 text-[#F97316] border border-[#F97316]/30",
+  "OFF":         "bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30",
+};
+
+const SUITABILITY_STYLES: Record<string, string> = {
+  "Excellent": "bg-[#10B981]/15 text-[#10B981]",
+  "Good":      "bg-[#34D399]/15 text-[#34D399]",
+  "Average":   "bg-[#F59E0B]/15 text-[#F59E0B]",
+  "Avoid":     "bg-[#EF4444]/15 text-[#EF4444]",
+  "Poor":      "bg-[#F97316]/15 text-[#F97316]",
+};
+
+const triggerResultColor = (metCount: number): string =>
+  metCount >= 3 ? "#10B981" : metCount === 2 ? "#F59E0B" : "#64748B";
+
+// Reuses the existing PHASE_STYLES map — Orca MC's 6 phase names are a subset
+// of OrcaSignals["market_phase"]'s 7 (missing only "Healthy Trend"), so the
+// same colors apply; fallback covers any unexpected value defensively.
+const phaseStyle = (phase: string): string =>
+  (PHASE_STYLES as Record<string, string>)[phase] ?? "bg-[#64748B]/15 text-[#64748B]";
 
 // ── Signal freshness ───────────────────────────────────────────────────────────
 const FRESH_WINDOW_MIN = 60; // "just changed" highlight window
@@ -1059,6 +1131,140 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                     <div className="text-sm text-[#64748B] mt-1">+DI vs −DI comparison</div>
                   </div>
                 </div>
+
+                {/* ── Orca MC v3.0 — Market Conditions engine (Phase A, no POI yet) ── */}
+                {detail.orca_mc && (
+                  <>
+                    {/* OrcaBot status (Orca MC's richer 6-state status, separate from the OrcaSignals pill above) */}
+                    <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[#94A3B8] text-sm font-medium">Orca MC Status</span>
+                        <Badge className={`${ORCA_MC_STATUS_STYLES[detail.orca_mc.status] ?? ORCA_MC_STATUS_STYLES.OFF} text-xs font-bold border-0 px-3`}>
+                          {detail.orca_mc.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`${phaseStyle(detail.orca_mc.phase)} border-0 text-xs`}>{detail.orca_mc.phase}</Badge>
+                        <span className="text-[#64748B] text-xs">{detail.orca_mc.trend_struct} · {detail.orca_mc.mtf.align_str}</span>
+                      </div>
+                    </div>
+
+                    {/* Score Breakdown */}
+                    <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[#94A3B8] text-sm font-medium">Score Breakdown</span>
+                        <span className="text-white text-sm font-bold tabular-nums">{detail.orca_mc.score.orca_score}/100</span>
+                      </div>
+                      <div className="space-y-2">
+                        <ScoreBreakdownBar label="HTF Bias" value={detail.orca_mc.score.p_htf} cap={detail.orca_mc.score.cap_htf} />
+                        <ScoreBreakdownBar label="ADX Strength" value={detail.orca_mc.score.p_adx} cap={detail.orca_mc.score.cap_adx} />
+                        <ScoreBreakdownBar label="EMA Structure" value={detail.orca_mc.score.p_ema} cap={detail.orca_mc.score.cap_ema} />
+                        <ScoreBreakdownBar label="Market Phase" value={detail.orca_mc.score.p_phase} cap={detail.orca_mc.score.cap_phase} />
+                        <ScoreBreakdownBar label="Volatility" value={detail.orca_mc.score.p_vol} cap={detail.orca_mc.score.cap_vol} />
+                      </div>
+                    </div>
+
+                    {/* Next Trigger checklist */}
+                    <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[#94A3B8] text-sm font-medium">Next Trigger</span>
+                        <span className="text-xs font-semibold" style={{ color: triggerResultColor(detail.orca_mc.next_trigger.met_count) }}>
+                          {detail.orca_mc.next_trigger.met_count}/4 met
+                        </span>
+                      </div>
+                      <div className="space-y-2 mb-3">
+                        {[
+                          [detail.orca_mc.next_trigger.c1_label, detail.orca_mc.next_trigger.c1_met],
+                          [detail.orca_mc.next_trigger.c2_label, detail.orca_mc.next_trigger.c2_met],
+                          [detail.orca_mc.next_trigger.c3_label, detail.orca_mc.next_trigger.c3_met],
+                          [detail.orca_mc.next_trigger.c4_label, detail.orca_mc.next_trigger.c4_met],
+                        ].map(([label, met], idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            {met ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981] shrink-0" />
+                            ) : (
+                              <Circle className="w-3.5 h-3.5 text-[#475569] shrink-0" />
+                            )}
+                            <span className={`text-xs ${met ? "text-white" : "text-[#64748B]"}`}>{label as string}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div
+                        className="text-xs font-medium px-2.5 py-1.5 rounded text-center"
+                        style={{
+                          color: triggerResultColor(detail.orca_mc.next_trigger.met_count),
+                          background: `${triggerResultColor(detail.orca_mc.next_trigger.met_count)}1A`,
+                        }}
+                      >
+                        {detail.orca_mc.next_trigger.result}
+                      </div>
+                    </div>
+
+                    {/* Readiness */}
+                    <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                      <div className="flex items-center gap-4">
+                        <ScoreRing score={detail.orca_mc.readiness.score} size={46} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-white text-sm font-bold">{detail.orca_mc.readiness.tier}</span>
+                          </div>
+                          <div className="text-[#64748B] text-xs">{detail.orca_mc.readiness.reason}</div>
+                        </div>
+                      </div>
+                      <div className="text-[#64748B] text-xs mt-3 pt-3 border-t border-[#1E293B]">
+                        Expected next: <span className="text-white font-medium">{detail.orca_mc.readiness.expected_next}</span>
+                      </div>
+                    </div>
+
+                    {/* Suitability + Confidence */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                        <div className="text-[#94A3B8] text-sm mb-2">Suitability</div>
+                        <Badge className={`${SUITABILITY_STYLES[detail.orca_mc.suitability.rating] ?? SUITABILITY_STYLES.Poor} border-0 text-sm font-bold`}>
+                          {detail.orca_mc.suitability.rating}
+                        </Badge>
+                        <div className="text-[#64748B] text-xs mt-2">{detail.orca_mc.suitability.reason}</div>
+                      </div>
+                      <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                        <div className="text-[#94A3B8] text-sm mb-2">Confidence</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex-1 h-2 bg-[#1E293B] rounded-full overflow-hidden">
+                            <div className="h-full bg-[#00D4FF]" style={{ width: `${detail.orca_mc.confidence.score}%` }} />
+                          </div>
+                          <span className="text-white font-bold text-sm">{detail.orca_mc.confidence.score}%</span>
+                        </div>
+                        <div className="text-[#64748B] text-xs mt-2">{detail.orca_mc.confidence.tier}</div>
+                      </div>
+                    </div>
+
+                    {/* Why */}
+                    {detail.orca_mc.why.length > 0 && (
+                      <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                        <div className="text-[#94A3B8] text-sm font-medium mb-2">Why?</div>
+                        <ul className="space-y-1.5">
+                          {detail.orca_mc.why.map((bullet, idx) => (
+                            <li key={idx} className="text-sm text-white flex items-start gap-2">
+                              <span className="text-[#00D4FF] mt-0.5">•</span>
+                              <span>{bullet}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Opportunity Timeline */}
+                    <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                      <div className="text-[#94A3B8] text-sm font-medium mb-3">Opportunity Timeline</div>
+                      <OpportunityTimeline steps={detail.orca_mc.opportunity_timeline} />
+                    </div>
+
+                    {detail.orca_mc.poi_pending && (
+                      <div className="text-[10px] text-[#475569] text-center -mt-1">
+                        Supply/demand zone (POI) engine coming soon
+                      </div>
+                    )}
+                  </>
+                )}
 
                 {/* Action buttons */}
                 <div className="flex gap-3 pb-2">

@@ -63,6 +63,83 @@ export interface TimeframeBar {
   score: number;
 }
 
+// ── Orca MC v3.0 engine port (Phase A, no POI) — matches app/schemas/orca_mc.py ──
+
+export interface ScoreBreakdown {
+  p_htf: number;
+  p_adx: number;
+  p_ema: number;
+  p_phase: number;
+  p_vol: number;
+  cap_htf: number;
+  cap_adx: number;
+  cap_ema: number;
+  cap_phase: number;
+  cap_vol: number;
+  orca_score: number;
+  score_qual: string; // "Excellent" | "Good" | "Caution" | "Poor"
+}
+
+export interface NextTrigger {
+  c1_label: string;
+  c1_met: boolean;
+  c2_label: string;
+  c2_met: boolean;
+  c3_label: string;
+  c3_met: boolean;
+  c4_label: string;
+  c4_met: boolean;
+  met_count: number;
+  result: string;
+}
+
+export interface Readiness {
+  score: number;
+  tier: string; // "Near Activation" | "Building" | "Developing" | "Low"
+  reason: string;
+  expected_next: string;
+}
+
+export interface Suitability {
+  rating: string; // "Excellent" | "Good" | "Average" | "Avoid" | "Poor"
+  reason: string;
+}
+
+export interface Confidence {
+  score: number;
+  tier: string; // "High" | "Medium" | "Low"
+}
+
+export interface OpportunityTimelineStep {
+  state: string;
+  is_current: boolean;
+  is_next: boolean;
+}
+
+export interface MTFAlignmentOut {
+  bull_count: number;
+  bear_count: number;
+  align_str: string;
+}
+
+export interface OrcaMarketConditions {
+  phase: string;
+  trend_struct: string;
+  pb_status: string;
+  mtf: MTFAlignmentOut;
+  score: ScoreBreakdown;
+  status: string; // "ON LONG" | "ON SHORT" | "WATCH LONG" | "WATCH SHORT" | "CAUTION" | "OFF"
+  pref_dir: string; // "LONG" | "SHORT" | "NEUTRAL"
+  next_trigger: NextTrigger;
+  readiness: Readiness;
+  suitability: Suitability;
+  confidence: Confidence;
+  why: string[];
+  opportunity_timeline: OpportunityTimelineStep[];
+  poi_pending: boolean;
+  status_since: string | null;
+}
+
 // Matches Pydantic "SymbolDetail"
 export interface SymbolDetail {
   symbol: string;
@@ -70,4 +147,5 @@ export interface SymbolDetail {
   timeframes: TimeframeBar[];
   signals: OrcaSignals;
   advanced: AdvancedMetrics;
+  orca_mc: OrcaMarketConditions | null;
 }
