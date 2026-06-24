@@ -25,5 +25,11 @@ class MarketTrendAggregatesLatest(Base):
     longterm_bullish_pct = Column(Integer)
     longterm_bearish_pct = Column(Integer)
 
+    # Signal freshness — tracks when OrcaBot status/direction last changed,
+    # so the UI can show "WATCH SHORT · 2h ago" instead of an undated pill.
+    orca_status = Column(Text)
+    orca_direction = Column(Text)
+    status_since = Column(TIMESTAMP(timezone=True))
+
     updated_at = Column(TIMESTAMP(timezone=True))
 

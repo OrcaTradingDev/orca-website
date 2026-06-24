@@ -83,39 +83,119 @@ const PULLBACK_STYLES: Record<NonNullable<OrcaSignals["pullback"]>, string> = {
   "Failed":  "bg-[#DC2626]/15 text-[#DC2626]",
 };
 
-// ── Stacked bar ───────────────────────────────────────────────────────────────
-const StackedBar = ({
-  bear,
-  bull,
-  compact = false,
+// ── Center-fill bar ───────────────────────────────────────────────────────────
+// Signed value = bull − bear. Fills from center: right/green = bullish lean,
+// left/red = bearish lean. Near-50/50 readings are squashed into a near-invisible
+// sliver so neutral rows visually recede and strong leans pop.
+const CenterFillBar = ({
+  bull, bear, layout = "stacked",
 }: {
-  bear: number;
-  bull: number;
-  compact?: boolean;
-}) => (
-  <div
-    className={`relative w-full ${compact ? "h-6" : "h-9"} bg-[#1A1F2E] rounded-md overflow-hidden flex`}
-  >
-    <div
-      className="h-full bg-gradient-to-r from-[#DC2626] via-[#EF4444] to-[#DC2626] flex items-center justify-center relative"
-      style={{ width: `${bear}%` }}
-    >
-      {bear > 15 && (
-        <span className="text-white text-xs z-10 drop-shadow-lg">{bear}%</span>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50" />
+  bull: number; bear: number; layout?: "stacked" | "inline";
+}) => {
+  const signed = bull - bear; // -100..100
+  const magnitude = Math.abs(signed);
+  const deadZoned = magnitude < 10 ? magnitude * 0.15 : magnitude;
+  const color = signed > 0 ? "#10B981" : signed < 0 ? "#EF4444" : "#64748B";
+
+  const track = (
+    <div className="relative w-full h-[5px] bg-[#1E293B] rounded-full overflow-hidden">
+      <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#334155]" />
+      <div
+        className="absolute top-0 bottom-0 rounded-full"
+        style={
+          signed >= 0
+            ? { left: "50%", width: `${deadZoned / 2}%`, background: color }
+            : { right: "50%", width: `${deadZoned / 2}%`, background: color }
+        }
+      />
     </div>
-    <div
-      className="h-full bg-gradient-to-r from-[#059669] via-[#10B981] to-[#059669] flex items-center justify-center relative"
-      style={{ width: `${bull}%` }}
-    >
-      {bull > 15 && (
-        <span className="text-white text-xs z-10 drop-shadow-lg">{bull}%</span>
-      )}
-      <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-50" />
+  );
+  const label = (
+    <span className="text-xs font-semibold tabular-nums shrink-0" style={{ color }}>
+      {signed > 0 ? `+${signed}` : signed}
+    </span>
+  );
+
+  if (layout === "inline") {
+    return (
+      <div className="flex items-center gap-3 w-full">
+        <div className="flex-1">{track}</div>
+        <span className="w-9 text-right">{label}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-1 w-full min-w-[64px]">
+      {track}
+      {label}
     </div>
-  </div>
-);
+  );
+};
+
+// ── Sparkline (last 30 1H closes) ──────────────────────────────────────────────
+const Sparkline = ({ data }: { data: number[] }) => {
+  if (!data || data.length < 2) {
+    return <div className="h-7 flex items-center justify-center text-[#334155] text-xs">—</div>;
+  }
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const w = 90;
+  const h = 28;
+  const points = data
+    .map((v, i) => {
+      const x = (i / (data.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x},${y}`;
+    })
+    .join(" ");
+  const isUp = data[data.length - 1] >= data[0];
+  const color = isUp ? "#10B981" : "#EF4444";
+  const areaPoints = `0,${h} ${points} ${w},${h}`;
+
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block">
+      <polyline points={areaPoints} fill={`${color}22`} stroke="none" />
+      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+};
+
+// ── Signal freshness ───────────────────────────────────────────────────────────
+const FRESH_WINDOW_MIN = 60; // "just changed" highlight window
+
+const formatFreshness = (iso: string | null): string => {
+  if (!iso) return "";
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+};
+
+const isFreshSignal = (iso: string | null): boolean => {
+  if (!iso) return false;
+  const mins = (Date.now() - new Date(iso).getTime()) / 60000;
+  return mins < FRESH_WINDOW_MIN;
+};
+
+// ── Timeframe alignment ────────────────────────────────────────────────────────
+// "We already compute intraday/daily/long-term — just count how many of the 3 lean the same way."
+const getAlignment = (
+  intraday: { bull: number }, daily: { bull: number }, longterm: { bull: number }
+): { count: number; lean: "bull" | "bear" | "neutral" } => {
+  const leans = [intraday, daily, longterm].map((tb) =>
+    tb.bull > 50 ? "bull" : tb.bull < 50 ? "bear" : "neutral"
+  );
+  const bullCount = leans.filter((l) => l === "bull").length;
+  const bearCount = leans.filter((l) => l === "bear").length;
+  if (bullCount === 0 && bearCount === 0) return { count: 0, lean: "neutral" };
+  return bullCount >= bearCount ? { count: bullCount, lean: "bull" } : { count: bearCount, lean: "bear" };
+};
 
 // ── Score ring ────────────────────────────────────────────────────────────────
 const ScoreRing = ({ score, size = 52 }: { score: number; size?: number }) => {
@@ -170,21 +250,14 @@ const LoadingSkeleton = () => (
             </div>
           </div>
         </td>
-        <td className="py-4 px-4">
-          <Skeleton className="h-9 w-full rounded-md" />
-        </td>
-        <td className="py-4 px-4">
-          <Skeleton className="h-9 w-full rounded-md" />
-        </td>
-        <td className="py-4 px-4">
-          <Skeleton className="h-9 w-full rounded-md" />
-        </td>
-        <td className="py-4 px-4">
-          <Skeleton className="h-8 w-24 rounded" />
-        </td>
-        <td className="py-4 px-4">
-          <Skeleton className="h-6 w-full rounded" />
-        </td>
+        <td className="py-4 px-4"><Skeleton className="h-7 w-full rounded-md" /></td>
+        <td className="py-4 px-4"><Skeleton className="h-7 w-full rounded-md" /></td>
+        <td className="py-4 px-4"><Skeleton className="h-7 w-full rounded-md" /></td>
+        <td className="py-4 px-4"><Skeleton className="h-7 w-full rounded-md" /></td>
+        <td className="py-4 px-4"><Skeleton className="h-6 w-12 rounded mx-auto" /></td>
+        <td className="py-4 px-4"><Skeleton className="h-8 w-24 rounded mx-auto" /></td>
+        <td className="py-4 px-4"><Skeleton className="h-6 w-10 rounded ml-auto" /></td>
+        <td className="py-4 px-4"><Skeleton className="h-6 w-full rounded" /></td>
       </tr>
     ))}
   </>
@@ -221,6 +294,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [scoreSort, setScoreSort] = useState<"desc" | "asc" | null>(null);
 
   // Shared persisted state — also consumed by Watchlist + Alerts tabs
   const watchedSymbols       = useScreenerStore((s) => s.watchedSymbols);
@@ -309,6 +383,16 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
     });
   }, [assets, searchQuery, assetClassFilter, trendFilter, enabledAssetClasses]);
 
+  const sortedAssets = useMemo(() => {
+    if (!scoreSort) return filteredAssets;
+    const sorted = [...filteredAssets].sort((a, b) => a.signals.orca_score - b.signals.orca_score);
+    return scoreSort === "desc" ? sorted.reverse() : sorted;
+  }, [filteredAssets, scoreSort]);
+
+  const toggleScoreSort = useCallback(() => {
+    setScoreSort((prev) => (prev === "desc" ? "asc" : prev === "asc" ? null : "desc"));
+  }, []);
+
   // Best market (visible on current page)
   const bestAsset = useMemo(
     () => filteredAssets.find((a) => a.signals.is_best) ?? null,
@@ -364,12 +448,12 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
   }, [queryClient]);
 
   const handleExport = useCallback(() => {
-    if (!filteredAssets.length) return;
+    if (!sortedAssets.length) return;
     const headers = [
       "Symbol","Name","Asset Class","Intraday Bull%","Daily Bull%",
       "Long-Term Bull%","ADX","EMA Status","Orca Status","Orca Score",
     ];
-    const rows = filteredAssets.map((a) => [
+    const rows = sortedAssets.map((a) => [
       a.symbol, a.name, a.assetClass,
       a.intraday.bull, a.daily.bull, a.longterm.bull,
       a.advanced.adx, a.advanced.emaStatus,
@@ -381,7 +465,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
     a.download = `screener-${new Date().toISOString().split("T")[0]}.csv`;
     a.click();
     URL.revokeObjectURL(a.href);
-  }, [filteredAssets]);
+  }, [sortedAssets]);
 
   const openModal = useCallback((asset: Asset) => {
     setSelectedAsset(asset);
@@ -527,7 +611,8 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#1E293B] bg-[#0A1628]">
-                <th className="py-4 px-4 text-left text-white w-[220px]">SYMBOL</th>
+                <th className="py-4 px-4 text-left text-white w-[200px]">SYMBOL</th>
+                <th className="py-4 px-4 text-center text-white w-[100px]">TREND 1H</th>
                 <th className="py-4 px-4 text-center text-white">
                   <div className="mb-1">INTRADAY</div>
                   <div className="text-xs text-[#94A3B8]">
@@ -545,8 +630,11 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                     LONG-TERM {freeOnly && <span className="text-[#475569]">🔒</span>}
                   </div>
                   <div className="text-xs text-[#94A3B8]">
-                    {["1D", ...longtermTFs].join(" | ")}
+                    {["1D", "1W", ...longtermTFs].join(" | ")}
                   </div>
+                </th>
+                <th className="py-4 px-4 text-center text-white w-[70px]">
+                  ALIGN {freeOnly && <span className="text-[#475569]">🔒</span>}
                 </th>
                 <th className="py-4 px-4 text-center text-white w-[150px]">
                   <div className="flex items-center justify-center gap-2 mb-1">
@@ -554,9 +642,20 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                     <span>ORCA STATUS</span>
                     {freeOnly && <span className="text-[#475569]">🔒</span>}
                   </div>
-                  <div className="text-xs text-[#94A3B8]">Signal | Score</div>
                 </th>
-                <th className="py-4 px-4 text-center text-white w-[260px]">
+                <th
+                  className="py-4 px-4 text-right text-white w-[90px] cursor-pointer select-none"
+                  onClick={toggleScoreSort}
+                  title="Sort by score"
+                >
+                  <div className="flex items-center justify-end gap-1">
+                    SCORE
+                    {scoreSort === "desc" && <span className="text-[#00D4FF]">▾</span>}
+                    {scoreSort === "asc" && <span className="text-[#00D4FF]">▴</span>}
+                    {freeOnly && <span className="text-[#475569]">🔒</span>}
+                  </div>
+                </th>
+                <th className="py-4 px-4 text-center text-white w-[220px]">
                   <div className="flex items-center justify-center gap-2 mb-1">
                     <span>ADVANCED</span>
                     <Badge className="bg-[#FFD700] text-black text-xs px-2 py-0">PRO</Badge>
@@ -571,156 +670,184 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                 <LoadingSkeleton />
               ) : isError ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-red-400">
+                  <td colSpan={9} className="py-12 text-center text-red-400">
                     Failed to load market data. Please check your connection.
                   </td>
                 </tr>
               ) : filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-[#94A3B8]">
+                  <td colSpan={9} className="py-12 text-center text-[#94A3B8]">
                     {assets.length === 0
                       ? "No data available. Data may be warming up..."
                       : "No assets found. Try adjusting your filters."}
                   </td>
                 </tr>
               ) : (
-                filteredAssets.map((asset) => (
-                  <tr
-                    key={asset.symbol}
-                    className={`border-b border-[#1E293B] transition-all duration-200 ${
-                      !freeOnly || asset.symbol === DEMO_SYMBOL
-                        ? "hover:bg-[#1A1F2E] cursor-pointer"
-                        : ""
-                    } ${asset.signals.is_best && !freeOnly ? "ring-1 ring-inset ring-[#FFD700]/20" : ""}`}
-                    onClick={() => (!freeOnly || asset.symbol === DEMO_SYMBOL) && openModal(asset)}
-                  >
-                    {/* SYMBOL */}
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleWatchlist(asset.symbol);
-                          }}
-                        >
-                          <Star
-                            className={`w-4 h-4 ${
-                              asset.inWatchlist
-                                ? "fill-[#00D4FF] text-[#00D4FF]"
-                                : "text-[#64748B]"
-                            }`}
-                          />
-                        </button>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-white font-medium">{asset.symbol}</span>
-                            {asset.signals.is_best && (
-                              <Trophy className="w-3 h-3 text-[#FFD700]" />
-                            )}
-                          </div>
-                          <div className="text-[#94A3B8] text-xs">{asset.name}</div>
-                        </div>
-                      </div>
-                    </td>
+                sortedAssets.map((asset) => {
+                  const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
+                  const lockedStyle = locked ? { filter: "blur(6px)", userSelect: "none" as const, pointerEvents: "none" as const } : {};
+                  const alignment = getAlignment(asset.intraday, asset.daily, asset.longterm);
+                  const fresh = isFreshSignal(asset.signals.status_since);
 
-                    {/* INTRADAY */}
-                    <td className="py-3 px-4">
-                      <StackedBar bear={asset.intraday.bear} bull={asset.intraday.bull} />
-                    </td>
-
-                    {/* DAILY */}
-                    <td className="py-3 px-4">
-                      <StackedBar bear={asset.daily.bear} bull={asset.daily.bull} />
-                    </td>
-
-                    {/* LONG-TERM — blurred for locked free rows */}
-                    {(() => {
-                      const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
-                      return (
-                        <td className="py-3 px-4">
-                          <div style={locked ? { filter: "blur(6px)", userSelect: "none", pointerEvents: "none" } : {}}>
-                            <StackedBar bear={asset.longterm.bear} bull={asset.longterm.bull} />
-                          </div>
-                        </td>
-                      );
-                    })()}
-
-                    {/* ORCA STATUS — blurred for locked free rows */}
-                    {(() => {
-                      const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
-                      return (
-                        <td className="py-3 px-4">
-                          <div
-                            className="flex flex-col items-center gap-1.5"
-                            style={locked ? { filter: "blur(6px)", userSelect: "none", pointerEvents: "none" } : {}}
+                  return (
+                    <tr
+                      key={asset.symbol}
+                      className={`border-b border-[#1E293B] transition-all duration-200 ${
+                        !locked ? "hover:bg-[#1A1F2E] cursor-pointer" : ""
+                      } ${asset.signals.is_best && !freeOnly ? "ring-1 ring-inset ring-[#FFD700]/20" : ""}`}
+                      onClick={() => !locked && openModal(asset)}
+                    >
+                      {/* SYMBOL */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleWatchlist(asset.symbol);
+                            }}
                           >
-                            <Badge className={`${STATUS_STYLES[asset.signals.status]} text-xs font-bold border-0 px-3`}>
-                              {asset.signals.status}
-                            </Badge>
-                            <span className={`text-xs font-medium ${DIRECTION_STYLES[asset.signals.direction]}`}>
-                              {asset.signals.direction}
-                            </span>
-                            <span className="text-[#94A3B8] text-xs">
-                              Score: <span className="text-white font-semibold">{asset.signals.orca_score}</span>
-                            </span>
-                          </div>
-                        </td>
-                      );
-                    })()}
-
-                    {/* ADVANCED — blurred for locked free rows */}
-                    {(() => {
-                      const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
-                      return (
-                        <td className="py-3 px-4">
-                          <div
-                            className="flex items-center gap-3 text-sm"
-                            style={locked ? { filter: "blur(6px)", userSelect: "none", pointerEvents: "none" } : {}}
-                          >
-                            {/* ADX */}
-                            <div className="flex items-center gap-1">
-                              <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>
-                                {asset.advanced.adx}
-                              </span>
-                              {asset.advanced.adxTrend === "up" && <TrendingUp className="w-3.5 h-3.5 text-[#10B981]" />}
-                              {asset.advanced.adxTrend === "down" && <TrendingDown className="w-3.5 h-3.5 text-[#EF4444]" />}
-                              {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-3.5 h-3.5 text-[#94A3B8]" />}
-                            </div>
-                            {/* EMA */}
-                            <Badge className={`${asset.advanced.emaStatus === "aligned" ? "bg-[#10B981]/20 text-[#10B981]" : "bg-[#EF4444]/20 text-[#EF4444]"} border-0 text-xs`}>
-                              EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
-                            </Badge>
-                            {/* VOL */}
+                            <Star
+                              className={`w-4 h-4 ${
+                                asset.inWatchlist
+                                  ? "fill-[#00D4FF] text-[#00D4FF]"
+                                  : "text-[#64748B]"
+                              }`}
+                            />
+                          </button>
+                          <div>
                             <div className="flex items-center gap-1.5">
-                              <div className="w-8 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
-                                <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.vol}%` }} />
-                              </div>
-                              <span className="text-[#94A3B8] text-xs">{asset.advanced.vol}</span>
+                              <span className="text-white font-medium">{asset.symbol}</span>
+                              {asset.signals.is_best && (
+                                <Trophy className="w-3 h-3 text-[#FFD700]" />
+                              )}
                             </div>
-                            {/* ALERT */}
-                            {!locked && (
-                              <button onClick={(e) => { e.stopPropagation(); toggleAlert(asset.symbol); }}>
-                                <Bell className={`w-4 h-4 ${asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"}`} />
-                              </button>
-                            )}
+                            <div className="text-[#94A3B8] text-xs">{asset.name}</div>
                           </div>
-                        </td>
-                      );
-                    })()}
-                  </tr>
-                ))
+                        </div>
+                      </td>
+
+                      {/* TREND 1H — sparkline */}
+                      <td className="py-3 px-4">
+                        <div className="flex justify-center">
+                          <Sparkline data={asset.sparkline} />
+                        </div>
+                      </td>
+
+                      {/* INTRADAY */}
+                      <td className="py-3 px-4">
+                        <CenterFillBar bear={asset.intraday.bear} bull={asset.intraday.bull} />
+                      </td>
+
+                      {/* DAILY */}
+                      <td className="py-3 px-4">
+                        <CenterFillBar bear={asset.daily.bear} bull={asset.daily.bull} />
+                      </td>
+
+                      {/* LONG-TERM — blurred for locked free rows */}
+                      <td className="py-3 px-4">
+                        <div style={lockedStyle}>
+                          <CenterFillBar bear={asset.longterm.bear} bull={asset.longterm.bull} />
+                        </div>
+                      </td>
+
+                      {/* ALIGN — blurred for locked free rows */}
+                      <td className="py-3 px-4 text-center">
+                        <div style={lockedStyle}>
+                          {alignment.lean === "neutral" ? (
+                            <span className="text-[#64748B] text-xs">—</span>
+                          ) : (
+                            <span
+                              className={`text-xs font-semibold ${
+                                alignment.lean === "bull" ? "text-[#10B981]" : "text-[#EF4444]"
+                              }`}
+                            >
+                              {alignment.count}/3 {alignment.lean}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* ORCA STATUS — pill (direction) + freshness, blurred for locked free rows */}
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col items-center gap-1" style={lockedStyle}>
+                          <Badge
+                            className={`${STATUS_STYLES[asset.signals.status]} text-xs font-bold border-0 px-3 ${
+                              fresh ? "ring-2 ring-[#00D4FF]/50" : ""
+                            }`}
+                          >
+                            {asset.signals.direction}
+                          </Badge>
+                          {asset.signals.status_since && (
+                            <span className="text-[10px] text-[#64748B] flex items-center gap-1">
+                              {fresh && <Zap className="w-2.5 h-2.5 text-[#00D4FF]" />}
+                              {formatFreshness(asset.signals.status_since)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* SCORE — own sortable column, blurred for locked free rows */}
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2" style={lockedStyle}>
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{
+                              background:
+                                asset.signals.orca_score >= 70 ? "#10B981"
+                                : asset.signals.orca_score >= 40 ? "#F59E0B"
+                                : "#64748B",
+                            }}
+                          />
+                          <span className="text-white font-semibold tabular-nums">{asset.signals.orca_score}</span>
+                        </div>
+                      </td>
+
+                      {/* ADVANCED — blurred for locked free rows */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-3 text-sm" style={lockedStyle}>
+                          {/* ADX */}
+                          <div className="flex items-center gap-1">
+                            <span className={asset.advanced.adx >= 25 ? "text-[#10B981]" : "text-[#94A3B8]"}>
+                              {asset.advanced.adx}
+                            </span>
+                            {asset.advanced.adxTrend === "up" && <TrendingUp className="w-3.5 h-3.5 text-[#10B981]" />}
+                            {asset.advanced.adxTrend === "down" && <TrendingDown className="w-3.5 h-3.5 text-[#EF4444]" />}
+                            {asset.advanced.adxTrend === "neutral" && <ArrowRight className="w-3.5 h-3.5 text-[#94A3B8]" />}
+                          </div>
+                          {/* EMA */}
+                          <Badge className={`${asset.advanced.emaStatus === "aligned" ? "bg-[#10B981]/20 text-[#10B981]" : "bg-[#EF4444]/20 text-[#EF4444]"} border-0 text-xs`}>
+                            EMA {asset.advanced.emaStatus === "aligned" ? "✓" : "✗"}
+                          </Badge>
+                          {/* VOL */}
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-8 h-1.5 bg-[#1E293B] rounded-full overflow-hidden">
+                              <div className="h-full bg-[#00D4FF]" style={{ width: `${asset.advanced.vol}%` }} />
+                            </div>
+                            <span className="text-[#94A3B8] text-xs">{asset.advanced.vol}</span>
+                          </div>
+                          {/* ALERT */}
+                          {!locked && (
+                            <button onClick={(e) => { e.stopPropagation(); toggleAlert(asset.symbol); }}>
+                              <Bell className={`w-4 h-4 ${asset.advanced.hasAlert ? "text-[#FFD700]" : "text-[#64748B]"}`} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>{/* end overflow-x-auto */}
 
-        {/* Lock overlay — covers ~the last 3 columns with a gradient + upgrade CTA */}
+        {/* Lock overlay — covers the locked columns (Long-Term, Align, Status, Score, Advanced) with a gradient + upgrade CTA */}
         {freeOnly && (
           <div
             style={{
               position: "absolute",
               top: 0, bottom: 0,
-              left: "50%", right: 0,
+              left: "48%", right: 0,
               pointerEvents: "none",
               zIndex: 5,
               background:
@@ -790,7 +917,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
 
       {/* Detail Modal — single column, pinned header, scrollable body */}
       <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
-        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-2xl w-[95vw] max-h-[88vh] flex flex-col overflow-hidden p-0 gap-0">
+        <DialogContent className="bg-[#14181F] border-[#1E293B] text-white max-w-4xl w-[95vw] max-h-[88vh] flex flex-col overflow-hidden p-0 gap-0">
 
           {/* Pinned header — X button always visible here */}
           <div className="px-6 pt-5 pb-4 border-b border-[#1E293B] shrink-0 pr-14">
@@ -833,6 +960,12 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                         {detail.signals.direction}
                       </span>
                     </div>
+                    {detail.signals.status_since && (
+                      <div className="text-[11px] text-[#64748B] mt-1 flex items-center gap-1">
+                        {isFreshSignal(detail.signals.status_since) && <Zap className="w-3 h-3 text-[#00D4FF]" />}
+                        {formatFreshness(detail.signals.status_since)}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-center">
@@ -859,7 +992,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   />
                 </div>
 
-                {/* MTF Breakdown */}
+                {/* MTF Breakdown — center-fill bars, consistent with the main table */}
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                   <div className="text-[#94A3B8] text-sm font-medium mb-3">Multi-Timeframe Breakdown</div>
                   <div className="space-y-2">
@@ -867,20 +1000,15 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                       <div key={tf.timeframe} className="flex items-center gap-3">
                         <span className="text-[#64748B] text-xs w-8 shrink-0 text-right">{tf.label}</span>
                         <div className="flex-1">
-                          <StackedBar bear={tf.bear} bull={tf.bull} compact />
+                          <CenterFillBar bear={tf.bear} bull={tf.bull} layout="inline" />
                         </div>
-                        <span className={`text-xs w-9 text-right shrink-0 font-medium ${
-                          tf.bull > tf.bear ? "text-[#10B981]" : tf.bear > tf.bull ? "text-[#EF4444]" : "text-[#94A3B8]"
-                        }`}>
-                          {tf.bull > tf.bear ? `+${tf.bull}` : `-${tf.bear}`}
-                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Advanced metrics 2×2 grid */}
-                <div className="grid grid-cols-2 gap-3">
+                {/* Advanced metrics — 4 across now that the dialog is wider */}
+                <div className="grid grid-cols-4 gap-3">
                   <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                     <div className="text-[#94A3B8] text-sm mb-2">ADX Trend Strength</div>
                     <div className="text-2xl text-white font-bold">{detail.advanced.adx}</div>

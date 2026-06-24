@@ -30,6 +30,7 @@ export interface OrcaSignals {
   pullback: "Shallow" | "Healthy" | "Deep" | "Failed" | null;
   orca_score: number;
   is_best: boolean;
+  status_since: string | null; // ISO timestamp — when status/direction last changed
 }
 
 // Matches Pydantic "ScreenerRow"
@@ -41,6 +42,7 @@ export interface ScreenerRow {
   longterm: TrendBreakdown;
   advanced: AdvancedMetrics;
   signals: OrcaSignals;
+  sparkline: number[]; // last 30 1H closes, chronological
 }
 
 // Matches Pydantic "ScreenerPage"

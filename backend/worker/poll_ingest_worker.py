@@ -13,7 +13,10 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import settings
 from app.core.db import AsyncSessionLocal
+from app.domain.config import load_screener_config
+from app.domain.signals import adx_dir_from_di, build_signals, ema_state
 from app.models.fx_universe import FXUniverse
+from app.models.market_indicators_latest import MarketIndicatorsLatest
 from app.models.market_prices import MarketPrice
 from app.services.twelve_data import TwelveDataService
 
@@ -30,8 +33,9 @@ def _handle_signal(sig, frame):
 
 
 def _parse_timeframes() -> List[str]:
-    # Your desired set
-    raw = os.getenv("INGEST_TIMEFRAMES", "5min,30min,1h,4h,1day")
+    # Your desired set — 1week is required so LONGTERM_TIMEFRAMES ("1day","1week")
+    # actually has weekly data to blend in (it always supported it, just never received it).
+    raw = os.getenv("INGEST_TIMEFRAMES", "5min,30min,1h,4h,1day,1week")
     return [t.strip() for t in raw.split(",") if t.strip()]
 
 
@@ -517,6 +521,40 @@ async def compute_symbol_aggregate(symbol: str, tfs: Tuple[str, ...]) -> Optiona
     }
 
 
+async def _compute_current_signal(db, symbol: str, daily_bull: int, intraday_bull: int, longterm_bull: int):
+    """
+    Reuses the same shared signal logic as screener.py / alert_checker.py so
+    freshness-tracking never drifts from what's actually displayed.
+    """
+    cfg = await load_screener_config(db)
+
+    ind_row = (await db.execute(
+        select(
+            MarketIndicatorsLatest.ema_9,
+            MarketIndicatorsLatest.ema_21,
+            MarketIndicatorsLatest.ema_50,
+            MarketIndicatorsLatest.adx_14,
+            MarketIndicatorsLatest.plus_di_14,
+            MarketIndicatorsLatest.minus_di_14,
+        ).where(
+            MarketIndicatorsLatest.symbol == symbol,
+            MarketIndicatorsLatest.timeframe == "1day",
+        )
+    )).first()
+
+    if ind_row:
+        ema9, ema21, ema50, adx_14, plus_di, minus_di = ind_row
+    else:
+        ema9 = ema21 = ema50 = adx_14 = plus_di = minus_di = None
+
+    adx = int(max(0, min(100, round(adx_14)))) if adx_14 is not None else 0
+    adx_dir = adx_dir_from_di(plus_di, minus_di)
+    ema_aligned = ema_state(ema9, ema21, ema50) == "aligned"
+
+    signals = build_signals(daily_bull, intraday_bull, longterm_bull, adx, ema_aligned, adx_dir, cfg=cfg)
+    return signals.status, signals.direction
+
+
 async def upsert_symbol_aggregates_latest(
     symbol: str,
     intraday: Optional[Dict[str, Any]],
@@ -525,8 +563,32 @@ async def upsert_symbol_aggregates_latest(
 ) -> None:
     """
     One row per symbol. Keep the same "delete + insert" approach (no uniqueness assumptions).
+    Also tracks signal freshness: status_since only advances when status/direction
+    actually changes, so the UI can show "WATCH SHORT · 2h ago".
     """
+    daily_bull    = 50 if daily is None    else daily["bullish_pct"]
+    intraday_bull = 50 if intraday is None else intraday["bullish_pct"]
+    longterm_bull = 50 if longterm is None else longterm["bullish_pct"]
+
     async with AsyncSessionLocal() as db:
+        prev_row = (await db.execute(
+            text(
+                "SELECT orca_status, orca_direction, status_since "
+                "FROM market_trend_aggregates_latest WHERE symbol=:s"
+            ),
+            {"s": symbol},
+        )).first()
+
+        new_status, new_direction = await _compute_current_signal(
+            db, symbol, daily_bull, intraday_bull, longterm_bull
+        )
+
+        now = datetime.now(timezone.utc)
+        if prev_row and prev_row[0] == new_status and prev_row[1] == new_direction and prev_row[2] is not None:
+            status_since = prev_row[2]
+        else:
+            status_since = now
+
         await db.execute(text("DELETE FROM market_trend_aggregates_latest WHERE symbol=:s"), {"s": symbol})
         await db.execute(
             text(
@@ -536,12 +598,14 @@ async def upsert_symbol_aggregates_latest(
                   intraday_last_timestamp, intraday_score, intraday_bullish_pct, intraday_bearish_pct,
                   daily_last_timestamp, daily_score, daily_bullish_pct, daily_bearish_pct,
                   longterm_last_timestamp, longterm_score, longterm_bullish_pct, longterm_bearish_pct,
+                  orca_status, orca_direction, status_since,
                   updated_at
                 ) VALUES (
                   :symbol,
                   :intraday_last_timestamp, :intraday_score, :intraday_bullish_pct, :intraday_bearish_pct,
                   :daily_last_timestamp, :daily_score, :daily_bullish_pct, :daily_bearish_pct,
                   :longterm_last_timestamp, :longterm_score, :longterm_bullish_pct, :longterm_bearish_pct,
+                  :orca_status, :orca_direction, :status_since,
                   NOW()
                 )
                 """
@@ -560,6 +624,9 @@ async def upsert_symbol_aggregates_latest(
                 "longterm_score": None if longterm is None else longterm["score"],
                 "longterm_bullish_pct": None if longterm is None else longterm["bullish_pct"],
                 "longterm_bearish_pct": None if longterm is None else longterm["bearish_pct"],
+                "orca_status": new_status,
+                "orca_direction": new_direction,
+                "status_since": status_since,
             },
         )
         await db.commit()

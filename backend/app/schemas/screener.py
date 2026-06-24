@@ -28,6 +28,7 @@ class OrcaSignals(BaseModel):
     pullback: Optional[PullbackType] = None
     orca_score: int = Field(..., ge=0, le=100)
     is_best: bool = False
+    status_since: Optional[str] = None  # ISO timestamp — when status/direction last changed
 
 class ScreenerRow(BaseModel):
     symbol: str
@@ -37,6 +38,7 @@ class ScreenerRow(BaseModel):
     longterm: TrendBreakdown
     advanced: AdvancedMetrics
     signals: OrcaSignals
+    sparkline: List[float] = Field(default_factory=list)  # last 30 1H closes, chronological
 
 class ScreenerPage(BaseModel):
     rows: List[ScreenerRow]

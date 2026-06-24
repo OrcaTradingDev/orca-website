@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy import func, select, outerjoin, and_
+from sqlalchemy import func, select, outerjoin, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
@@ -55,6 +55,39 @@ _adx_dir_from_di  = adx_dir_from_di
 _ema_state        = ema_state
 _vol_score_from_atr = vol_score_from_atr
 _build_signals    = build_signals
+
+
+# ── Sparkline helper ────────────────────────────────────────────────────────────
+
+async def _fetch_sparklines(db: AsyncSession, symbols: List[str]) -> Dict[str, List[float]]:
+    """
+    Last 30 1H closes per symbol, chronological order, for the given page of symbols.
+    1H candles are already ingested for every symbol — no new data collection needed.
+    """
+    if not symbols:
+        return {}
+
+    result = await db.execute(
+        text(
+            """
+            SELECT symbol, close
+            FROM (
+                SELECT symbol, close, timestamp,
+                       ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY timestamp DESC) AS rn
+                FROM market_prices
+                WHERE timeframe = '1h' AND symbol = ANY(:symbols)
+            ) ranked
+            WHERE rn <= 30
+            ORDER BY symbol, timestamp ASC
+            """
+        ),
+        {"symbols": symbols},
+    )
+
+    sparklines: Dict[str, List[float]] = {}
+    for symbol, close in result.all():
+        sparklines.setdefault(symbol, []).append(float(close))
+    return sparklines
 
 
 # ── Screener rows endpoint ────────────────────────────────────────────────────
@@ -111,6 +144,7 @@ async def get_screener_rows(
             MarketTrendAggregatesLatest.intraday_score,
             MarketTrendAggregatesLatest.daily_score,
             MarketTrendAggregatesLatest.updated_at,
+            MarketTrendAggregatesLatest.status_since,
             MarketIndicatorsLatest.ema_9,
             MarketIndicatorsLatest.ema_21,
             MarketIndicatorsLatest.ema_50,
@@ -135,6 +169,9 @@ async def get_screener_rows(
     result = await db.execute(stmt)
     rows_db = result.all()
 
+    page_symbols = [r[0] for r in rows_db]
+    sparklines = await _fetch_sparklines(db, page_symbols)
+
     rows: List[ScreenerRow] = []
     last_updated: Optional[datetime] = None
 
@@ -143,7 +180,7 @@ async def get_screener_rows(
         intraday_bull, intraday_bear,
         daily_bull, daily_bear,
         longterm_bull, longterm_bear,
-        intraday_score, daily_score, updated_at,
+        intraday_score, daily_score, updated_at, status_since,
         ema_9, ema_21, ema_50,
         adx_14, plus_di_14, minus_di_14, atr_14,
     ) in rows_db:
@@ -163,6 +200,7 @@ async def get_screener_rows(
         signals = _build_signals(
             daily_bull, intraday_bull, longterm_bull, adx, ema_aligned, adx_dir, cfg=cfg
         )
+        signals.status_since = status_since.isoformat() if status_since else None
 
         rows.append(
             ScreenerRow(
@@ -179,6 +217,7 @@ async def get_screener_rows(
                     alert=False,
                 ),
                 signals=signals,
+                sparkline=sparklines.get(symbol, []),
             )
         )
 
@@ -293,6 +332,7 @@ async def get_symbol_detail(
             MarketTrendAggregatesLatest.intraday_bullish_pct,
             MarketTrendAggregatesLatest.daily_bullish_pct,
             MarketTrendAggregatesLatest.longterm_bullish_pct,
+            MarketTrendAggregatesLatest.status_since,
         )
         .where(MarketTrendAggregatesLatest.symbol == symbol)
     )
@@ -301,12 +341,15 @@ async def get_symbol_detail(
         intraday_bull = int(agg_row[0]) if agg_row[0] is not None else 50
         daily_bull    = int(agg_row[1]) if agg_row[1] is not None else 50
         longterm_bull = int(agg_row[2]) if agg_row[2] is not None else 50
+        status_since  = agg_row[3]
     else:
         intraday_bull = daily_bull = longterm_bull = 50
+        status_since  = None
 
     signals = _build_signals(
         daily_bull, intraday_bull, longterm_bull, adx, ema_aligned, adx_dir
     )
+    signals.status_since = status_since.isoformat() if status_since else None
 
     return SymbolDetail(
         symbol=symbol,

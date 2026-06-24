@@ -18,6 +18,7 @@ _TIMEFRAME_ALIASES: Dict[str, str] = {
     "1h": "1h",
     "4h": "4h",
     "1day": "1day",
+    "1week": "1week",
     # shorthand aliases
     "5m": "5min",
     "30m": "30min",
@@ -25,6 +26,9 @@ _TIMEFRAME_ALIASES: Dict[str, str] = {
     "1d": "1day",
     "daily": "1day",
     "day": "1day",
+    "1w": "1week",
+    "weekly": "1week",
+    "week": "1week",
 }
 
 
