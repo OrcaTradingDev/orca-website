@@ -8,7 +8,9 @@ import JournalImportView from "./JournalImportView";
 import JournalSettingsView from "./JournalSettingsView";
 import { TradeFormModal } from "./TradeFormModal";
 import type { Trade } from "../types/journal";
-import "../../dashboard/styles/dashboard.css";
+// Live Tailwind v4 source — see DashboardClient.tsx for why this replaced the
+// frozen dashboard.css snapshot.
+import "../../dashboard/styles/dashboard-tw.css";
 
 export type JournalSection =
   | "dashboard"

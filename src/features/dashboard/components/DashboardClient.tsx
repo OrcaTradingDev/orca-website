@@ -1,8 +1,12 @@
 "use client";
 
-// Pre-compiled Tailwind v4 output — provides all utility classes for dashboard components.
+// Live Tailwind v4 source — @tailwindcss/postcss regenerates this on every build,
+// so new utility classes used anywhere in the dashboard always get compiled in.
+// (Previously imported a frozen, manually-generated snapshot — dashboard.css —
+// that silently stopped picking up new classes after May 25; switched back to
+// the live source per dashboard-tw.css's own intended usage.)
 // Plain CSS (not a module) because Tailwind utilities must remain unhashed/global.
-import "../styles/dashboard.css";
+import "../styles/dashboard-tw.css";
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
