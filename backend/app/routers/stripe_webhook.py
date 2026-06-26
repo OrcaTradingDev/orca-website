@@ -54,7 +54,10 @@ async def stripe_webhook(
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
+        # .to_dict() is required: stripe-python's StripeObject supports `obj["key"]`
+        # and `obj.key` but NOT `obj.get("key")` (no .get method at all — calling it
+        # raises AttributeError). Every .get() below assumes a plain dict.
+        session = event["data"]["object"].to_dict()
 
         # Stripe puts the buyer's email in customer_details.email
         customer_email: str | None = (
@@ -94,11 +97,11 @@ async def stripe_webhook(
             log.info("screener_access granted to user id=%s (%s)", matched[0], customer_email)
 
     elif event["type"] == "customer.subscription.updated":
-        sub = event["data"]["object"]
+        sub = event["data"]["object"].to_dict()
         await _sync_subscription_state(db, sub)
 
     elif event["type"] == "customer.subscription.deleted":
-        sub = event["data"]["object"]
+        sub = event["data"]["object"].to_dict()
         customer_id = sub.get("customer")
         if not customer_id:
             log.warning("customer.subscription.deleted received with no customer id")
@@ -203,7 +206,7 @@ async def cancel_subscription(
         raise HTTPException(status_code=400, detail="No active subscription found")
 
     try:
-        sub = stripe.Subscription.modify(sub_id, cancel_at_period_end=True)
+        sub = stripe.Subscription.modify(sub_id, cancel_at_period_end=True).to_dict()
     except stripe.error.StripeError as e:
         log.exception("Stripe cancel failed for user id=%s, subscription=%s", user_id, sub_id)
         raise HTTPException(status_code=502, detail=f"Stripe error: {e.user_message or str(e)}")
