@@ -224,6 +224,28 @@ const ORCA_MC_STATUS_STYLES: Record<string, string> = {
   "OFF":         "bg-[#64748B]/20 text-[#64748B] border border-[#64748B]/30",
 };
 
+// Same color choices as ORCA_MC_STATUS_STYLES, but plain hex for contexts
+// that just need colored text (no badge bg/border) — e.g. the Best Market banner.
+const orcaMcStatusTextColor = (status: string): string => {
+  if (status === "ON LONG") return "#10B981";
+  if (status === "ON SHORT") return "#EF4444";
+  if (status === "WATCH LONG" || status === "WATCH SHORT") return "#F59E0B";
+  if (status === "CAUTION") return "#F97316";
+  return "#64748B"; // OFF
+};
+
+// Subtle background tint for the detail view's top status banner — same
+// color scheme as ORCA_MC_STATUS_STYLES, /10 opacity to match what the old
+// (now-removed) OrcaSignals-based banner used.
+const ORCA_MC_BANNER_BG: Record<string, string> = {
+  "ON LONG":     "bg-[#10B981]/10 border border-[#10B981]/30",
+  "ON SHORT":    "bg-[#EF4444]/10 border border-[#EF4444]/30",
+  "WATCH LONG":  "bg-[#F59E0B]/10 border border-[#F59E0B]/30",
+  "WATCH SHORT": "bg-[#F59E0B]/10 border border-[#F59E0B]/30",
+  "CAUTION":     "bg-[#F97316]/10 border border-[#F97316]/30",
+  "OFF":         "bg-[#64748B]/10 border border-[#64748B]/30",
+};
+
 const SUITABILITY_STYLES: Record<string, string> = {
   "Excellent": "bg-[#10B981]/15 text-[#10B981]",
   "Good":      "bg-[#34D399]/15 text-[#34D399]",
@@ -275,6 +297,12 @@ const getAlignment = (
   if (bullCount === 0 && bearCount === 0) return { count: 0, lean: "neutral" };
   return bullCount >= bearCount ? { count: bullCount, lean: "bull" } : { count: bearCount, lean: "bear" };
 };
+
+// Prefer Orca MC's score (the authoritative engine) when present, falling
+// back to the old signals-based score only for symbols Orca MC hasn't
+// computed yet. Used for sorting/export/best-market display, not just the
+// table cell, so they all agree with what's actually shown in the column.
+const effectiveScore = (asset: Asset): number => asset.orca_mc?.orca_score ?? asset.signals.orca_score;
 
 // ── Score ring ────────────────────────────────────────────────────────────────
 const ScoreRing = ({ score, size = 52 }: { score: number; size?: number }) => {
@@ -464,7 +492,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
 
   const sortedAssets = useMemo(() => {
     if (!scoreSort) return filteredAssets;
-    const sorted = [...filteredAssets].sort((a, b) => a.signals.orca_score - b.signals.orca_score);
+    const sorted = [...filteredAssets].sort((a, b) => effectiveScore(a) - effectiveScore(b));
     return scoreSort === "desc" ? sorted.reverse() : sorted;
   }, [filteredAssets, scoreSort]);
 
@@ -536,7 +564,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
       a.symbol, a.name, a.assetClass,
       a.intraday.bull, a.daily.bull, a.longterm.bull,
       a.advanced.adx, a.advanced.emaStatus,
-      a.signals.status, a.signals.orca_score,
+      a.orca_mc?.status ?? a.signals.status, effectiveScore(a),
     ]);
     const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
     const a = document.createElement("a");
@@ -598,17 +626,25 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <span
-              className={`text-sm font-semibold ${
-                DIRECTION_STYLES[bestAsset.signals.direction]
-              }`}
-            >
-              {bestAsset.signals.direction}
-            </span>
-            <ScoreRing score={bestAsset.signals.orca_score} />
-            <Badge className={`${PHASE_STYLES[bestAsset.signals.market_phase]} border-0 text-xs`}>
-              {bestAsset.signals.market_phase}
-            </Badge>
+            {bestAsset.orca_mc ? (
+              <span className="text-sm font-semibold" style={{ color: orcaMcStatusTextColor(bestAsset.orca_mc.status) }}>
+                {bestAsset.orca_mc.status}
+              </span>
+            ) : (
+              <span className={`text-sm font-semibold ${DIRECTION_STYLES[bestAsset.signals.direction]}`}>
+                {bestAsset.signals.direction}
+              </span>
+            )}
+            <ScoreRing score={effectiveScore(bestAsset)} />
+            {bestAsset.orca_mc ? (
+              <Badge className={`${phaseStyle(bestAsset.orca_mc.phase)} border-0 text-xs`}>
+                {bestAsset.orca_mc.phase}
+              </Badge>
+            ) : (
+              <Badge className={`${PHASE_STYLES[bestAsset.signals.market_phase]} border-0 text-xs`}>
+                {bestAsset.signals.market_phase}
+              </Badge>
+            )}
           </div>
         </div>
       )}
@@ -765,8 +801,14 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                 sortedAssets.map((asset) => {
                   const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
                   const lockedStyle = locked ? { filter: "blur(6px)", userSelect: "none" as const, pointerEvents: "none" as const } : {};
+                  // Status/Score/Align prefer Orca MC (the authoritative engine) when
+                  // present, falling back to the old signals-based system only for
+                  // symbols Orca MC hasn't computed yet — this fallback chain is what
+                  // prevents the main table from going blank right after this shipped.
                   const alignment = getAlignment(asset.intraday, asset.daily, asset.longterm);
-                  const fresh = isFreshSignal(asset.signals.status_since);
+                  const displayScore = effectiveScore(asset);
+                  const displayStatusSince = asset.orca_mc?.status_since ?? asset.signals.status_since;
+                  const fresh = isFreshSignal(displayStatusSince);
 
                   return (
                     <tr
@@ -832,7 +874,17 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                       {/* ALIGN — blurred for locked free rows */}
                       <td className="py-3 px-4 text-center">
                         <div style={lockedStyle}>
-                          {alignment.lean === "neutral" ? (
+                          {asset.orca_mc ? (
+                            <span
+                              className={`text-xs font-semibold ${
+                                asset.orca_mc.mtf_bull_count > asset.orca_mc.mtf_bear_count ? "text-[#10B981]"
+                                : asset.orca_mc.mtf_bear_count > asset.orca_mc.mtf_bull_count ? "text-[#EF4444]"
+                                : "text-[#64748B]"
+                              }`}
+                            >
+                              {asset.orca_mc.mtf_align_str}
+                            </span>
+                          ) : alignment.lean === "neutral" ? (
                             <span className="text-[#64748B] text-xs">—</span>
                           ) : (
                             <span
@@ -846,20 +898,22 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                         </div>
                       </td>
 
-                      {/* ORCA STATUS — pill (direction) + freshness, blurred for locked free rows */}
+                      {/* ORCA STATUS — pill + freshness, blurred for locked free rows */}
                       <td className="py-3 px-4">
                         <div className="flex flex-col items-center gap-1" style={lockedStyle}>
                           <Badge
-                            className={`${DIRECTION_BADGE_STYLES[asset.signals.direction]} text-xs font-bold border-0 px-3 ${
-                              fresh ? "ring-2 ring-[#00D4FF]/50" : ""
-                            }`}
+                            className={`${
+                              asset.orca_mc
+                                ? (ORCA_MC_STATUS_STYLES[asset.orca_mc.status] ?? ORCA_MC_STATUS_STYLES.OFF)
+                                : DIRECTION_BADGE_STYLES[asset.signals.direction]
+                            } text-xs font-bold border-0 px-3 ${fresh ? "ring-2 ring-[#00D4FF]/50" : ""}`}
                           >
-                            {asset.signals.direction}
+                            {asset.orca_mc ? asset.orca_mc.status : asset.signals.direction}
                           </Badge>
-                          {asset.signals.status_since && (
+                          {displayStatusSince && (
                             <span className="text-[10px] text-[#64748B] flex items-center gap-1">
                               {fresh && <Zap className="w-2.5 h-2.5 text-[#00D4FF]" />}
-                              {formatFreshness(asset.signals.status_since)}
+                              {formatFreshness(displayStatusSince)}
                             </span>
                           )}
                         </div>
@@ -872,12 +926,12 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                             className="w-1.5 h-1.5 rounded-full shrink-0"
                             style={{
                               background:
-                                asset.signals.orca_score >= 70 ? "#10B981"
-                                : asset.signals.orca_score >= 40 ? "#F59E0B"
+                                displayScore >= 70 ? "#10B981"
+                                : displayScore >= 40 ? "#F59E0B"
                                 : "#64748B",
                             }}
                           />
-                          <span className="text-white font-semibold tabular-nums">{asset.signals.orca_score}</span>
+                          <span className="text-white font-semibold tabular-nums">{displayScore}</span>
                         </div>
                       </td>
 
@@ -1039,45 +1093,40 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               {/* Side panel — signals, breakdown, metrics, actions */}
               <div className="w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E293B] overflow-y-auto p-4 lg:p-6 space-y-4">
 
-                {/* OrcaBot Status banner */}
-                <div className={`rounded-xl px-4 py-3 ${
-                  detail.signals.status === "ON"
-                    ? "bg-[#10B981]/10 border border-[#10B981]/30"
-                    : detail.signals.status === "WATCH"
-                    ? "bg-[#F59E0B]/10 border border-[#F59E0B]/30"
-                    : "bg-[#64748B]/10 border border-[#64748B]/30"
-                }`}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">OrcaBot Status</div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-2xl font-bold ${
-                          detail.signals.status === "ON" ? "text-[#10B981]"
-                          : detail.signals.status === "WATCH" ? "text-[#F59E0B]"
-                          : "text-[#64748B]"
-                        }`}>{detail.signals.status}</span>
-                        <span className={`text-sm font-semibold ${DIRECTION_STYLES[detail.signals.direction]}`}>
-                          {detail.signals.direction}
-                        </span>
-                      </div>
-                      {detail.signals.status_since && (
-                        <div className="text-[11px] text-[#64748B] mt-1 flex items-center gap-1">
-                          {isFreshSignal(detail.signals.status_since) && <Zap className="w-3 h-3 text-[#00D4FF]" />}
-                          {formatFreshness(detail.signals.status_since)}
+                {/* OrcaBot Status — the one and only status banner (Orca MC v3.0 engine) */}
+                {detail.orca_mc ? (
+                  <div className={`rounded-xl px-4 py-3 ${ORCA_MC_BANNER_BG[detail.orca_mc.status] ?? ORCA_MC_BANNER_BG.OFF}`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">OrcaBot Status</div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-2xl font-bold" style={{ color: orcaMcStatusTextColor(detail.orca_mc.status) }}>
+                            {detail.orca_mc.status}
+                          </span>
                         </div>
-                      )}
+                        {detail.orca_mc.status_since && (
+                          <div className="text-[11px] text-[#64748B] mt-1 flex items-center gap-1">
+                            {isFreshSignal(detail.orca_mc.status_since) && <Zap className="w-3 h-3 text-[#00D4FF]" />}
+                            {formatFreshness(detail.orca_mc.status_since)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-center shrink-0">
+                        <div className="text-xs text-[#94A3B8] mb-1">Orca Score</div>
+                        <ScoreRing score={detail.orca_mc.score.orca_score} size={46} />
+                      </div>
                     </div>
-                    <div className="text-center shrink-0">
-                      <div className="text-xs text-[#94A3B8] mb-1">Orca Score</div>
-                      <ScoreRing score={detail.signals.orca_score} size={46} />
+                    <div className="mt-3 flex items-center gap-2">
+                      <Badge className={`${phaseStyle(detail.orca_mc.phase)} border-0 text-xs`}>{detail.orca_mc.phase}</Badge>
+                      <span className="text-[#64748B] text-xs">{detail.orca_mc.trend_struct} · {detail.orca_mc.mtf.align_str}</span>
                     </div>
                   </div>
-                  <div className="mt-3">
-                    <Badge className={`${PHASE_STYLES[detail.signals.market_phase]} border-0 text-xs`}>
-                      {detail.signals.market_phase}
-                    </Badge>
+                ) : (
+                  <div className="rounded-xl px-4 py-6 bg-[#0A1628] border border-[#1E293B] text-center">
+                    <div className="text-[#64748B] text-sm">Market Conditions data not yet available for this symbol</div>
+                    <div className="text-[#475569] text-xs mt-1">Check back after the next data refresh</div>
                   </div>
-                </div>
+                )}
 
                 {/* MTF Breakdown — center-fill bars, consistent with the main table */}
                 <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
@@ -1146,20 +1195,6 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                 {/* ── Orca MC v3.0 — Market Conditions engine (Phase A, no POI yet) ── */}
                 {detail.orca_mc && (
                   <>
-                    {/* OrcaBot status (Orca MC's richer 6-state status, separate from the OrcaSignals pill above) */}
-                    <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-[#94A3B8] text-sm font-medium">Orca MC Status</span>
-                        <Badge className={`${ORCA_MC_STATUS_STYLES[detail.orca_mc.status] ?? ORCA_MC_STATUS_STYLES.OFF} text-xs font-bold border-0 px-3`}>
-                          {detail.orca_mc.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={`${phaseStyle(detail.orca_mc.phase)} border-0 text-xs`}>{detail.orca_mc.phase}</Badge>
-                        <span className="text-[#64748B] text-xs">{detail.orca_mc.trend_struct} · {detail.orca_mc.mtf.align_str}</span>
-                      </div>
-                    </div>
-
                     {/* Score Breakdown */}
                     <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
                       <div className="flex items-center justify-between mb-3">

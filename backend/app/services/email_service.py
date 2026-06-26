@@ -21,11 +21,16 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 FROM_EMAIL     = os.getenv("FROM_EMAIL", "OrcaBot Alerts <alerts@tradewithorca.com>")
 FRONTEND_URL   = os.getenv("FRONTEND_URL", "https://tradewithorca.com")
 
-# Status → colour mapping (inline styles for email clients)
+# Status → colour mapping (inline styles for email clients).
+# Orca MC v3.0's 6-state status (alert_checker.py now reads from it directly,
+# not the old 3-state ON/WATCH/OFF system).
 _STATUS_COLOR = {
-    "ON":    "#10B981",
-    "WATCH": "#F59E0B",
-    "OFF":   "#64748B",
+    "ON LONG":     "#10B981",
+    "ON SHORT":    "#EF4444",
+    "WATCH LONG":  "#F59E0B",
+    "WATCH SHORT": "#F59E0B",
+    "CAUTION":     "#F97316",
+    "OFF":         "#64748B",
 }
 
 

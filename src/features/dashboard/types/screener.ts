@@ -33,6 +33,20 @@ export interface OrcaSignals {
   status_since: string | null; // ISO timestamp — when status/direction last changed
 }
 
+// Matches Pydantic "OrcaMCRowSummary" — the main table's Status/Score/Align
+// columns prefer this over `signals` when present (see PremiumScreenerSection.tsx).
+export interface OrcaMCRowSummary {
+  status: string; // "ON LONG" | "ON SHORT" | "WATCH LONG" | "WATCH SHORT" | "CAUTION" | "OFF"
+  pref_dir: string; // "LONG" | "SHORT" | "NEUTRAL"
+  phase: string;
+  orca_score: number;
+  score_qual: string;
+  mtf_bull_count: number;
+  mtf_bear_count: number;
+  mtf_align_str: string;
+  status_since: string | null;
+}
+
 // Matches Pydantic "ScreenerRow"
 export interface ScreenerRow {
   symbol: string;
@@ -43,6 +57,7 @@ export interface ScreenerRow {
   advanced: AdvancedMetrics;
   signals: OrcaSignals;
   sparkline: number[]; // last 30 1H closes, chronological
+  orca_mc: OrcaMCRowSummary | null;
 }
 
 // Matches Pydantic "ScreenerPage"

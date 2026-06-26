@@ -90,3 +90,23 @@ class OrcaMarketConditions(BaseModel):
     opportunity_timeline: List[OpportunityTimelineStep]
     poi_pending: bool = True
     status_since: Optional[str] = None
+
+
+class OrcaMCRowSummary(BaseModel):
+    """
+    Lean Orca MC summary for the paginated main table (/screener/rows) —
+    the full OrcaMarketConditions is sized for the single-symbol detail
+    endpoint, not a 50-row page. This is now THE status/score/alignment
+    shown on the main table, replacing the old signals-based one (the two
+    systems disagreeing was the actual bug being fixed).
+    """
+
+    status: str
+    pref_dir: str
+    phase: str
+    orca_score: int
+    score_qual: str
+    mtf_bull_count: int
+    mtf_bear_count: int
+    mtf_align_str: str
+    status_since: Optional[str] = None

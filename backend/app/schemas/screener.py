@@ -2,7 +2,7 @@
 from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
-from app.schemas.orca_mc import OrcaMarketConditions
+from app.schemas.orca_mc import OrcaMarketConditions, OrcaMCRowSummary
 
 # --- Type Definitions ---
 TrendDir = Literal["up", "down", "flat"]
@@ -41,6 +41,10 @@ class ScreenerRow(BaseModel):
     advanced: AdvancedMetrics
     signals: OrcaSignals
     sparkline: List[float] = Field(default_factory=list)  # last 30 1H closes, chronological
+    # The Status/Score/Align columns now prefer this over `signals` — see
+    # PremiumScreenerSection.tsx. `signals` stays for is_best fallback and
+    # because intraday/daily/longterm/advanced are still its data.
+    orca_mc: Optional[OrcaMCRowSummary] = None
 
 class ScreenerPage(BaseModel):
     rows: List[ScreenerRow]

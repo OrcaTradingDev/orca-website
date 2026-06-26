@@ -41,6 +41,7 @@ from app.schemas.orca_mc import (
     NextTrigger,
     OpportunityTimelineStep,
     OrcaMarketConditions,
+    OrcaMCRowSummary,
     Readiness,
     ScoreBreakdown,
     Suitability,
@@ -99,6 +100,50 @@ async def _fetch_sparklines(db: AsyncSession, symbols: List[str]) -> Dict[str, L
     for symbol, close in result.all():
         sparklines.setdefault(symbol, []).append(float(close))
     return sparklines
+
+
+# ── Orca MC row summary helper ───────────────────────────────────────────────────
+
+async def _fetch_orca_mc_summaries(db: AsyncSession, symbols: List[str]) -> Dict[str, OrcaMCRowSummary]:
+    """
+    Bulk-fetch the lean Orca MC summary for the given page of symbols. This is
+    now THE status/score/alignment shown on the main table (see ScreenerRow.orca_mc
+    and the frontend's fallback chain) — replaces the old signals-based one,
+    which is what caused the main table and detail view to show contradictory
+    statuses (two independent scoring systems disagreeing).
+    """
+    if not symbols:
+        return {}
+
+    result = await db.execute(
+        text(
+            """
+            SELECT symbol, orca_status, pref_dir, phase, orca_score, score_qual,
+                   mtf_bull_count, mtf_bear_count, mtf_align_str, status_since
+            FROM market_orca_mc_latest
+            WHERE symbol = ANY(:symbols)
+            """
+        ),
+        {"symbols": symbols},
+    )
+
+    summaries: Dict[str, OrcaMCRowSummary] = {}
+    for (
+        symbol, status, pref_dir, phase, score, score_qual,
+        bull_count, bear_count, align_str, status_since,
+    ) in result.all():
+        summaries[symbol] = OrcaMCRowSummary(
+            status=status,
+            pref_dir=pref_dir,
+            phase=phase,
+            orca_score=score,
+            score_qual=score_qual,
+            mtf_bull_count=bull_count,
+            mtf_bear_count=bear_count,
+            mtf_align_str=align_str,
+            status_since=status_since.isoformat() if status_since else None,
+        )
+    return summaries
 
 
 # ── Screener rows endpoint ────────────────────────────────────────────────────
@@ -182,6 +227,7 @@ async def get_screener_rows(
 
     page_symbols = [r[0] for r in rows_db]
     sparklines = await _fetch_sparklines(db, page_symbols)
+    orca_mc_summaries = await _fetch_orca_mc_summaries(db, page_symbols)
 
     rows: List[ScreenerRow] = []
     last_updated: Optional[datetime] = None
@@ -229,16 +275,25 @@ async def get_screener_rows(
                 ),
                 signals=signals,
                 sparkline=sparklines.get(symbol, []),
+                orca_mc=orca_mc_summaries.get(symbol),
             )
         )
 
         if updated_at and (last_updated is None or updated_at > last_updated):
             last_updated = updated_at
 
-    # Mark the single best active opportunity
-    active = [r for r in rows if r.signals.status != "OFF"]
+    # Mark the single best active opportunity — prefer Orca MC's status/score
+    # (the authoritative system) when available, fall back to the old
+    # signals-based one only for symbols Orca MC hasn't computed yet.
+    def _row_status(r: ScreenerRow) -> str:
+        return r.orca_mc.status if r.orca_mc else r.signals.status
+
+    def _row_score(r: ScreenerRow) -> int:
+        return r.orca_mc.orca_score if r.orca_mc else r.signals.orca_score
+
+    active = [r for r in rows if _row_status(r) != "OFF"]
     if active:
-        best = max(active, key=lambda r: r.signals.orca_score)
+        best = max(active, key=_row_score)
         best.signals.is_best = True
 
     return ScreenerPage(
