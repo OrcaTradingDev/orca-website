@@ -799,7 +799,9 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               ) : (
                 sortedAssets.map((asset) => {
                   const locked = freeOnly && asset.symbol !== DEMO_SYMBOL;
-                  const lockedStyle = locked ? { filter: "blur(6px)", userSelect: "none" as const, pointerEvents: "none" as const } : {};
+                  // A light blur (not pitch-dark) so free users still get a sense of
+                  // what's there — the shape/color of the data is the upsell.
+                  const lockedStyle = locked ? { filter: "blur(3px)", userSelect: "none" as const, pointerEvents: "none" as const } : {};
                   // Status/Score/Align prefer Orca MC (the authoritative engine) when
                   // present, falling back to the old signals-based system only for
                   // symbols Orca MC hasn't computed yet — this fallback chain is what
@@ -853,14 +855,18 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                         </div>
                       </td>
 
-                      {/* INTRADAY */}
+                      {/* INTRADAY — blurred for locked free rows */}
                       <td className="py-3 px-4">
-                        <CenterFillBar bear={asset.intraday.bear} bull={asset.intraday.bull} />
+                        <div style={lockedStyle}>
+                          <CenterFillBar bear={asset.intraday.bear} bull={asset.intraday.bull} />
+                        </div>
                       </td>
 
-                      {/* DAILY */}
+                      {/* DAILY — blurred for locked free rows */}
                       <td className="py-3 px-4">
-                        <CenterFillBar bear={asset.daily.bear} bull={asset.daily.bull} />
+                        <div style={lockedStyle}>
+                          <CenterFillBar bear={asset.daily.bear} bull={asset.daily.bull} />
+                        </div>
                       </td>
 
                       {/* LONG-TERM — blurred for locked free rows */}
