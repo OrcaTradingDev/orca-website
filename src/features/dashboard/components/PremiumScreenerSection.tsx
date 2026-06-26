@@ -9,6 +9,7 @@ import { queryKeys } from "@/lib/query/keys";
 import { useScreenerStore } from "@/store/screener-store";
 import { useUserAlerts } from "@/features/dashboard/hooks/useUserAlerts";
 import { subscribeAlert, unsubscribeAlert } from "@/features/dashboard/services/alerts";
+import { STRIPE_UPGRADE_URL } from "@/features/dashboard/constants";
 import {
   Search,
   RefreshCw,
@@ -385,8 +386,6 @@ const getTVSymbol = (symbol: string): string => {
   if (/^[A-Z]{6}$/.test(symbol)) return `FX:${symbol}`;
   return symbol;
 };
-
-const STRIPE_UPGRADE_URL = "https://buy.stripe.com/00w14neBj8BggG252g6wE03";
 
 /** The one symbol that's shown in full even on the free tier (demo row). */
 const DEMO_SYMBOL = "AUDJPY";

@@ -16,4 +16,10 @@ export const queryKeys = {
     detail: (symbol: string) =>
       [...queryKeys.screener.all, "detail", symbol] as const,
   },
+
+  // Domain: Subscription (Stripe billing state)
+  subscription: {
+    all: ["subscription"] as const,
+    status: () => [...queryKeys.subscription.all, "status"] as const,
+  },
 };
