@@ -155,8 +155,20 @@ function FullScreenerLayout() {
 // ── Root component ─────────────────────────────────────────────────────────────
 
 export default function DashboardClient() {
+  const token             = useAuthStore((s) => s.token);
   const hasScreenerAccess = useAuthStore((s) => s.user?.screenerAccess ?? false);
   const isAdmin           = useAuthStore((s) => s.user?.isAdmin ?? false);
+  const refreshAuth       = useAuthStore((s) => s.refreshAuth);
+
+  // screener_access/is_admin are baked into the JWT at login and otherwise
+  // sit stale for up to 30 days — an admin flipping someone's access in the
+  // admin panel (or a Stripe webhook landing outside the upgraded=1 redirect
+  // flow below) has no way to reach an already-logged-in session. Refreshing
+  // once per dashboard load closes that gap without polling.
+  useEffect(() => {
+    if (token) refreshAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Admins always get the full layout regardless of screener_access
   if (hasScreenerAccess || isAdmin) {
