@@ -46,7 +46,29 @@ def _is_fx_symbol(canonical: str) -> bool:
     return bool(re.fullmatch(r"[A-Z]{6}", canonical))
 
 
+# Our canonical (display) symbol -> the actual symbol Twelve Data needs.
+# Verified live against api.twelvedata.com on 2026-06-26 (see chat history for
+# the exact requests) — these retail/broker-style codes (US30, GER40, UK100,
+# JP225, EU50) either 404 outright or silently match an unrelated instrument
+# with implausible price levels on Twelve Data's catalog. Where Twelve Data
+# doesn't carry the raw index at all (common for non-US/intraday index data
+# on this plan tier), the override is a liquid, real ETF proxy instead —
+# confirmed sane price/volume for every entry below before adding it here.
+_PROVIDER_SYMBOL_OVERRIDES: Dict[str, str] = {
+    "US30":  "DIA",      # Dow Jones -> SPDR Dow Jones Industrial Average ETF
+    "US100": "QQQ",      # Nasdaq 100 -> Invesco QQQ Trust
+    "US500": "SPY",       # S&P 500 -> SPDR S&P 500 ETF
+    "GER40": "EWG",       # DAX -> iShares MSCI Germany ETF
+    "UK100": "EWU",       # FTSE 100 -> iShares MSCI United Kingdom ETF
+    "JP225": "EWJ",       # Nikkei 225 -> iShares MSCI Japan ETF
+    "EU50":  "FEZ",       # Euro Stoxx 50 -> SPDR EURO STOXX 50 ETF
+    "UKOIL": "XBR/USD",  # Brent Crude -> Twelve Data's commodity spot symbol
+}
+
+
 def _to_provider_symbol(canonical: str) -> str:
+    if canonical in _PROVIDER_SYMBOL_OVERRIDES:
+        return _PROVIDER_SYMBOL_OVERRIDES[canonical]
     # EURUSD -> EUR/USD (required by Twelve Data for FX)
     if _is_fx_symbol(canonical):
         return canonical[:3] + "/" + canonical[3:]
