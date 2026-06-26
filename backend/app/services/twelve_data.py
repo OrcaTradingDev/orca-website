@@ -63,6 +63,7 @@ _PROVIDER_SYMBOL_OVERRIDES: Dict[str, str] = {
     "JP225": "EWJ",       # Nikkei 225 -> iShares MSCI Japan ETF
     "EU50":  "FEZ",       # Euro Stoxx 50 -> SPDR EURO STOXX 50 ETF
     "UKOIL": "XBR/USD",  # Brent Crude -> Twelve Data's commodity spot symbol
+    "XCUUSD": "CPER",    # Copper -> United States Copper Index Fund ETF (XCU/USD 404s — copper isn't an FX-style spot pair on this catalog)
 }
 
 
@@ -147,6 +148,7 @@ class TwelveDataService:
         interval = _TIMEFRAME_ALIASES[tf_norm]
 
         canonical = symbol.strip().upper().replace("/", "")
+        is_overridden = canonical in _PROVIDER_SYMBOL_OVERRIDES
         provider_symbol = _to_provider_symbol(canonical)
 
         params: Dict[str, Any] = {
@@ -158,8 +160,11 @@ class TwelveDataService:
             "timezone": "UTC",
         }
 
-        # Twelve Data expects FX requests to include exchange=FX (your earlier constraint)
-        if _is_fx_symbol(canonical):
+        # Twelve Data expects FX requests to include exchange=FX (your earlier constraint).
+        # Skip this for overridden symbols even if the canonical code happens to be
+        # 6 letters (e.g. XCUUSD -> CPER) — the override target is a US ETF, not an
+        # FX pair, and "exchange=FX" on a non-FX symbol 404s.
+        if not is_overridden and _is_fx_symbol(canonical):
             params["exchange"] = "FX"
 
         url = f"{self.base_url}/time_series"
