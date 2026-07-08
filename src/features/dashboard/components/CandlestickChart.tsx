@@ -26,9 +26,14 @@ const TF_LABELS: Record<Timeframe, string> = {
   "5min": "5M", "30min": "30M", "1h": "1H", "4h": "4H", "1day": "1D", "1week": "1W",
 };
 
-// Distinct from candle green/red — cyan above, amber below
-const COLOR_ABOVE = "#00D4FF";
-const COLOR_BELOW = "#F59E0B";
+const COLOR_BULL = "#10B981"; // bullish FVG / session low
+const COLOR_BEAR = "#EF4444"; // bearish FVG / session high
+
+function magnetColor(m: MagnetTarget): string {
+  return m.structure_type === "fvg_bull" || m.structure_type === "session_low"
+    ? COLOR_BULL
+    : COLOR_BEAR;
+}
 
 function structureLabel(m: MagnetTarget): string {
   if (m.structure_type === "fvg_bull") return "Bull FVG";
@@ -76,8 +81,8 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
       if (maxY > minY) result.push({ topY: minY, height: maxY - minY, color });
     };
 
-    if (magnetAboveRef.current) push(magnetAboveRef.current, COLOR_ABOVE);
-    if (magnetBelowRef.current) push(magnetBelowRef.current, COLOR_BELOW);
+    if (magnetAboveRef.current) push(magnetAboveRef.current, magnetColor(magnetAboveRef.current));
+    if (magnetBelowRef.current) push(magnetBelowRef.current, magnetColor(magnetBelowRef.current));
     setZones(result);
   }, []);
 
@@ -116,6 +121,9 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
       borderDownColor: "#EF4444",
       wickUpColor: "#10B981",
       wickDownColor: "#EF4444",
+      priceLineColor: "#A78BFA",
+      priceLineWidth: 1,
+      priceLineStyle: LineStyle.Dashed,
     });
 
     chartRef.current = chart;
@@ -158,25 +166,15 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
         const addLine = (opts: Parameters<typeof series.createPriceLine>[0]) =>
           priceLinesRef.current.push(series.createPriceLine(opts));
 
-        if (magnet_above) {
-          const c = COLOR_ABOVE;
+        for (const m of [magnet_above, magnet_below]) {
+          if (!m) continue;
+          const c = magnetColor(m);
           const style = { color: c, lineWidth: 1 as const, lineStyle: LineStyle.Dashed };
-          if (isZone(magnet_above)) {
-            addLine({ ...style, price: magnet_above.price_top, axisLabelVisible: true, title: structureLabel(magnet_above) });
-            addLine({ ...style, price: magnet_above.price_bottom, axisLabelVisible: false, title: "" });
+          if (isZone(m)) {
+            addLine({ ...style, price: m.price_top, axisLabelVisible: true, title: structureLabel(m) });
+            addLine({ ...style, price: m.price_bottom, axisLabelVisible: false, title: "" });
           } else {
-            addLine({ ...style, price: magnet_above.price_top, axisLabelVisible: true, title: structureLabel(magnet_above) });
-          }
-        }
-
-        if (magnet_below) {
-          const c = COLOR_BELOW;
-          const style = { color: c, lineWidth: 1 as const, lineStyle: LineStyle.Dashed };
-          if (isZone(magnet_below)) {
-            addLine({ ...style, price: magnet_below.price_top, axisLabelVisible: false, title: "" });
-            addLine({ ...style, price: magnet_below.price_bottom, axisLabelVisible: true, title: structureLabel(magnet_below) });
-          } else {
-            addLine({ ...style, price: magnet_below.price_bottom, axisLabelVisible: true, title: structureLabel(magnet_below) });
+            addLine({ ...style, price: m.price_top, axisLabelVisible: true, title: structureLabel(m) });
           }
         }
 
@@ -250,22 +248,17 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
       {/* Legend */}
       {(magnet_above || magnet_below) && (
         <div className="flex items-center gap-4 px-3 py-1.5 border-t border-[#1E293B] shrink-0">
-          {magnet_above && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-px border-t-2 border-dashed" style={{ borderColor: COLOR_ABOVE }} />
-              <span className="text-[10px]" style={{ color: COLOR_ABOVE }}>
-                {structureLabel(magnet_above)} ({magnet_above.atr_distance?.toFixed(1)} ATR)
-              </span>
-            </div>
-          )}
-          {magnet_below && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-4 h-px border-t-2 border-dashed" style={{ borderColor: COLOR_BELOW }} />
-              <span className="text-[10px]" style={{ color: COLOR_BELOW }}>
-                {structureLabel(magnet_below)} ({magnet_below.atr_distance?.toFixed(1)} ATR)
-              </span>
-            </div>
-          )}
+          {[magnet_above, magnet_below].filter(Boolean).map((m) => {
+            const color = magnetColor(m!);
+            return (
+              <div key={m!.structure_type + m!.formed_at} className="flex items-center gap-1.5">
+                <div className="w-4 h-px border-t-2 border-dashed" style={{ borderColor: color }} />
+                <span className="text-[10px]" style={{ color }}>
+                  {structureLabel(m!)} ({m!.atr_distance?.toFixed(1)} ATR)
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
