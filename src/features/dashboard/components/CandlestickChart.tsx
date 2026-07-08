@@ -129,10 +129,16 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
     chartRef.current = chart;
     seriesRef.current = series;
 
-    // Reposition zone shading whenever the user pans or zooms
+    // Reposition zone shading on pan/zoom
     chart.timeScale().subscribeVisibleLogicalRangeChange(refreshZones);
 
+    // Also reposition when the container resizes (covers modal open animation
+    // where the container grows from 0 → full size after data is already loaded)
+    const resizeObserver = new ResizeObserver(refreshZones);
+    resizeObserver.observe(container);
+
     return () => {
+      resizeObserver.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -147,6 +153,7 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
     if (!series || !chart) return;
 
     let cancelled = false;
+    let rafId: number | undefined;
     setLoading(true);
     setError(null);
 
@@ -179,14 +186,18 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
         }
 
         chart.timeScale().fitContent();
-        refreshZones(); // initial zone positions after data loads
+        // Defer one frame so the chart applies its layout before we read coordinates
+        rafId = requestAnimationFrame(refreshZones);
         setLoading(false);
       })
       .catch(() => {
         if (!cancelled) { setError("Failed to load chart data"); setLoading(false); }
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (rafId !== undefined) cancelAnimationFrame(rafId);
+    };
   }, [symbol, timeframe, magnet_above, magnet_below, refreshZones]);
 
   return (
