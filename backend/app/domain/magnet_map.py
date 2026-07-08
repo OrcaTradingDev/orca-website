@@ -62,10 +62,10 @@ def detect_fvgs(
 
     raw: list[dict] = []
     for i in range(2, len(candles)):
-        h0 = candles[i - 2][1]
-        l0 = candles[i - 2][2]
-        h2 = candles[i][1]
-        l2 = candles[i][2]
+        h0 = float(candles[i - 2][1])
+        l0 = float(candles[i - 2][2])
+        h2 = float(candles[i][1])
+        l2 = float(candles[i][2])
         ts  = candles[i][4]
 
         # Bullish FVG
@@ -86,10 +86,10 @@ def detect_fvgs(
         filled = False
         for j in range(fvg["idx"] + 1, len(candles)):
             c = candles[j]
-            if fvg["type"] == "fvg_bull" and c[2] <= fvg["top"]:
+            if fvg["type"] == "fvg_bull" and float(c[2]) <= fvg["top"]:
                 filled = True
                 break
-            if fvg["type"] == "fvg_bear" and c[1] >= fvg["bottom"]:
+            if fvg["type"] == "fvg_bear" and float(c[1]) >= fvg["bottom"]:
                 filled = True
                 break
         if not filled:
@@ -139,8 +139,8 @@ def detect_session_levels(
         return []
 
     prev = daily_candles[-2]
-    prev_high = prev[1]
-    prev_low  = prev[2]
+    prev_high = float(prev[1])
+    prev_low  = float(prev[2])
     prev_ts   = prev[4]
 
     structures: List[MagnetStructure] = []
