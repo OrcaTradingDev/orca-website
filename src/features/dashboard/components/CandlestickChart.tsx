@@ -20,9 +20,11 @@ interface CandlestickChartProps {
   magnet_below: MagnetTarget | null;
 }
 
-const TIMEFRAMES = ["1h", "4h", "1day"] as const;
+const TIMEFRAMES = ["5min", "30min", "1h", "4h", "1day", "1week"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
-const TF_LABELS: Record<Timeframe, string> = { "1h": "1H", "4h": "4H", "1day": "1D" };
+const TF_LABELS: Record<Timeframe, string> = {
+  "5min": "5M", "30min": "30M", "1h": "1H", "4h": "4H", "1day": "1D", "1week": "1W",
+};
 
 function structureLabel(m: MagnetTarget): string {
   if (m.structure_type === "fvg_bull") return "Bull FVG";

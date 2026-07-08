@@ -555,7 +555,7 @@ async def get_symbol_detail(
 
 # ── Candles endpoint ──────────────────────────────────────────────────────────
 
-ALLOWED_TIMEFRAMES = {"5min", "30min", "1h", "4h", "1day"}
+ALLOWED_TIMEFRAMES = {"5min", "30min", "1h", "4h", "1day", "1week"}
 
 @router.get("/candles/{symbol}", response_model=CandlesResponse)
 async def get_candles(
