@@ -377,7 +377,7 @@ const getTVSymbol = (symbol: string): string => {
   if (symbol === "XAGUSD") return "TVC:SILVER";
   if (symbol === "WTI")    return "TVC:USOIL";
   if (symbol === "US500")  return "FOREXCOM:SPXUSD";
-  if (symbol === "US100")  return "NASDAQ:NDX";
+  if (symbol === "US100")  return "TVC:NDX";
   if (symbol === "US30")   return "FOREXCOM:DJUSD";
   if (symbol.includes("/")) {
     const base = symbol.split("/")[0];
