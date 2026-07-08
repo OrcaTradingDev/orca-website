@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createChart,
   ColorType,
@@ -26,6 +26,10 @@ const TF_LABELS: Record<Timeframe, string> = {
   "5min": "5M", "30min": "30M", "1h": "1H", "4h": "4H", "1day": "1D", "1week": "1W",
 };
 
+// Distinct from candle green/red — cyan above, amber below
+const COLOR_ABOVE = "#00D4FF";
+const COLOR_BELOW = "#F59E0B";
+
 function structureLabel(m: MagnetTarget): string {
   if (m.structure_type === "fvg_bull") return "Bull FVG";
   if (m.structure_type === "fvg_bear") return "Bear FVG";
@@ -37,16 +41,47 @@ function isZone(m: MagnetTarget): boolean {
   return Math.abs(m.price_top - m.price_bottom) > 0.000001;
 }
 
+interface ZoneRect { topY: number; height: number; color: string; }
+
 export default function CandlestickChart({ symbol, magnet_above, magnet_below }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const priceLinesRef = useRef<IPriceLine[]>([]);
+
+  // Stable refs so refreshZones can read latest props without being in deps
+  const magnetAboveRef = useRef(magnet_above);
+  const magnetBelowRef = useRef(magnet_below);
+  useEffect(() => { magnetAboveRef.current = magnet_above; }, [magnet_above]);
+  useEffect(() => { magnetBelowRef.current = magnet_below; }, [magnet_below]);
+
   const [timeframe, setTimeframe] = useState<Timeframe>("4h");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [zones, setZones] = useState<ZoneRect[]>([]);
 
-  // Create/destroy chart when container mounts
+  // Recomputes zone overlay positions from current price scale — stable, reads refs
+  const refreshZones = useCallback(() => {
+    const s = seriesRef.current;
+    if (!s) return;
+    const result: ZoneRect[] = [];
+
+    const push = (m: MagnetTarget, color: string) => {
+      if (!isZone(m)) return;
+      const topY = s.priceToCoordinate(m.price_top);
+      const botY = s.priceToCoordinate(m.price_bottom);
+      if (topY == null || botY == null) return;
+      const minY = Math.min(topY, botY);
+      const maxY = Math.max(topY, botY);
+      if (maxY > minY) result.push({ topY: minY, height: maxY - minY, color });
+    };
+
+    if (magnetAboveRef.current) push(magnetAboveRef.current, COLOR_ABOVE);
+    if (magnetBelowRef.current) push(magnetBelowRef.current, COLOR_BELOW);
+    setZones(result);
+  }, []);
+
+  // Create chart once on mount
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -86,14 +121,18 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
     chartRef.current = chart;
     seriesRef.current = series;
 
+    // Reposition zone shading whenever the user pans or zooms
+    chart.timeScale().subscribeVisibleLogicalRangeChange(refreshZones);
+
     return () => {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      setZones([]);
     };
-  }, []);
+  }, [refreshZones]);
 
-  // Fetch candles + draw magnet lines whenever symbol/timeframe/magnets change
+  // Fetch candles + draw price lines when symbol/timeframe/magnets change
   useEffect(() => {
     const series = seriesRef.current;
     const chart = chartRef.current;
@@ -110,54 +149,47 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
       )
       .then(({ data }) => {
         if (cancelled) return;
-        series.setData(
-          data.candles.map((c) => ({ ...c, time: c.time as UTCTimestamp }))
-        );
+        series.setData(data.candles.map((c) => ({ ...c, time: c.time as UTCTimestamp })));
 
-        // Remove any previously drawn price lines before adding new ones
-        for (const line of priceLinesRef.current) {
-          series.removePriceLine(line);
-        }
+        // Remove old price lines, redraw with new colors
+        for (const line of priceLinesRef.current) series.removePriceLine(line);
         priceLinesRef.current = [];
 
-        const addLine = (opts: Parameters<typeof series.createPriceLine>[0]) => {
+        const addLine = (opts: Parameters<typeof series.createPriceLine>[0]) =>
           priceLinesRef.current.push(series.createPriceLine(opts));
-        };
 
         if (magnet_above) {
-          const color = "#10B981";
+          const c = COLOR_ABOVE;
+          const style = { color: c, lineWidth: 1 as const, lineStyle: LineStyle.Dashed };
           if (isZone(magnet_above)) {
-            addLine({ price: magnet_above.price_top, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: structureLabel(magnet_above) });
-            addLine({ price: magnet_above.price_bottom, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
+            addLine({ ...style, price: magnet_above.price_top, axisLabelVisible: true, title: structureLabel(magnet_above) });
+            addLine({ ...style, price: magnet_above.price_bottom, axisLabelVisible: false, title: "" });
           } else {
-            addLine({ price: magnet_above.price_top, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: structureLabel(magnet_above) });
+            addLine({ ...style, price: magnet_above.price_top, axisLabelVisible: true, title: structureLabel(magnet_above) });
           }
         }
 
         if (magnet_below) {
-          const color = "#EF4444";
+          const c = COLOR_BELOW;
+          const style = { color: c, lineWidth: 1 as const, lineStyle: LineStyle.Dashed };
           if (isZone(magnet_below)) {
-            addLine({ price: magnet_below.price_top, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: "" });
-            addLine({ price: magnet_below.price_bottom, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: structureLabel(magnet_below) });
+            addLine({ ...style, price: magnet_below.price_top, axisLabelVisible: false, title: "" });
+            addLine({ ...style, price: magnet_below.price_bottom, axisLabelVisible: true, title: structureLabel(magnet_below) });
           } else {
-            addLine({ price: magnet_below.price_bottom, color, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true, title: structureLabel(magnet_below) });
+            addLine({ ...style, price: magnet_below.price_bottom, axisLabelVisible: true, title: structureLabel(magnet_below) });
           }
         }
 
         chart.timeScale().fitContent();
+        refreshZones(); // initial zone positions after data loads
         setLoading(false);
       })
       .catch(() => {
-        if (!cancelled) {
-          setError("Failed to load chart data");
-          setLoading(false);
-        }
+        if (!cancelled) { setError("Failed to load chart data"); setLoading(false); }
       });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [symbol, timeframe, magnet_above, magnet_below]);
+    return () => { cancelled = true; };
+  }, [symbol, timeframe, magnet_above, magnet_below, refreshZones]);
 
   return (
     <div className="relative w-full h-full flex flex-col bg-[#0A1628]">
@@ -181,35 +213,55 @@ export default function CandlestickChart({ symbol, magnet_above, magnet_below }:
         </div>
       </div>
 
-      {/* Chart container */}
-      <div ref={containerRef} className="flex-1 relative min-h-0">
+      {/* Chart + zone overlay wrapper */}
+      <div className="flex-1 relative min-h-0">
+        {/* Lightweight Charts canvas host */}
+        <div ref={containerRef} className="absolute inset-0" />
+
+        {/* FVG zone shading — pointer-events-none so chart stays interactive */}
+        <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
+          {zones.map((z, i) => (
+            <div
+              key={i}
+              className="absolute left-0 right-0"
+              style={{
+                top: z.topY,
+                height: z.height,
+                background: z.color + "1A", // ~10% opacity fill
+                borderTop: `1px dashed ${z.color}55`,
+                borderBottom: `1px dashed ${z.color}55`,
+              }}
+            />
+          ))}
+        </div>
+
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0A1628]/80 z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A1628]/80" style={{ zIndex: 2 }}>
             <span className="text-[#64748B] text-sm">Loading chart...</span>
           </div>
         )}
         {error && !loading && (
-          <div className="absolute inset-0 flex items-center justify-center z-10">
+          <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 2 }}>
             <span className="text-[#EF4444] text-sm">{error}</span>
           </div>
         )}
       </div>
 
-      {/* Magnet legend */}
+      {/* Legend */}
       {(magnet_above || magnet_below) && (
         <div className="flex items-center gap-4 px-3 py-1.5 border-t border-[#1E293B] shrink-0">
           {magnet_above && (
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-px border-t-2 border-dashed border-[#10B981]" />
-              <span className="text-[10px] text-[#10B981]">
+              <div className="w-4 h-px border-t-2 border-dashed" style={{ borderColor: COLOR_ABOVE }} />
+              <span className="text-[10px]" style={{ color: COLOR_ABOVE }}>
                 {structureLabel(magnet_above)} ({magnet_above.atr_distance?.toFixed(1)} ATR)
               </span>
             </div>
           )}
           {magnet_below && (
             <div className="flex items-center gap-1.5">
-              <div className="w-4 h-px border-t-2 border-dashed border-[#EF4444]" />
-              <span className="text-[10px] text-[#EF4444]">
+              <div className="w-4 h-px border-t-2 border-dashed" style={{ borderColor: COLOR_BELOW }} />
+              <span className="text-[10px]" style={{ color: COLOR_BELOW }}>
                 {structureLabel(magnet_below)} ({magnet_below.atr_distance?.toFixed(1)} ATR)
               </span>
             </div>
