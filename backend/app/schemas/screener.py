@@ -82,6 +82,8 @@ class SymbolDetail(BaseModel):
     orca_mc: Optional[OrcaMarketConditions] = None
     magnet_above: Optional[MagnetTarget] = None
     magnet_below: Optional[MagnetTarget] = None
+    magnet_structures: List[MagnetTarget] = []  # all unfilled structures, sorted by atr_distance
+    magnet_bias: Optional[float] = None          # -100 (max downside pull) to +100 (max upside pull)
 
 class CandleOut(BaseModel):
     time: int   # Unix seconds

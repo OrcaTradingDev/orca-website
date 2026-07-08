@@ -30,6 +30,7 @@ from app.schemas.screener import (
     MarketPhase,
     PullbackType,
 )
+from app.domain.magnet_map import compute_bias as _compute_bias
 from app.domain.signals import (
     adx_dir_from_di,
     ema_state,
@@ -353,12 +354,11 @@ def _build_orca_mc_schema(row, on_thresh: int) -> Optional[OrcaMarketConditions]
 
 # ── Magnet Map helper ─────────────────────────────────────────────────────────
 
-async def _fetch_magnet_targets(
+async def _fetch_magnet_data(
     db: AsyncSession, symbol: str, current_price: float
-) -> tuple[Optional[MagnetTarget], Optional[MagnetTarget]]:
+) -> tuple[Optional[MagnetTarget], Optional[MagnetTarget], list[MagnetTarget], Optional[float]]:
     """
-    Return the single nearest unfilled structure above and the single nearest
-    one below current price, across all timeframes in market_magnet_structures.
+    Returns (nearest_above, nearest_below, all_structures_sorted, bias_score).
     """
     result = await db.execute(
         text(
@@ -374,30 +374,46 @@ async def _fetch_magnet_targets(
     )
     rows = result.all()
 
-    above: Optional[MagnetTarget] = None
-    below: Optional[MagnetTarget] = None
-
+    all_targets: list[MagnetTarget] = []
     for stype, top, bottom, tf, atr_dist, mag, formed_at in rows:
-        top = float(top)
-        bottom = float(bottom)
-        midpoint = (top + bottom) / 2
-        target = MagnetTarget(
+        all_targets.append(MagnetTarget(
             structure_type=stype,
-            price_top=top,
-            price_bottom=bottom,
+            price_top=float(top),
+            price_bottom=float(bottom),
             timeframe=tf,
             atr_distance=float(atr_dist) if atr_dist is not None else None,
             magnitude=float(mag) if mag is not None else None,
             formed_at=formed_at.isoformat() if formed_at else "",
-        )
+        ))
+
+    above: Optional[MagnetTarget] = None
+    below: Optional[MagnetTarget] = None
+    for t in all_targets:
+        midpoint = (t.price_top + t.price_bottom) / 2
         if midpoint > current_price and above is None:
-            above = target
+            above = t
         elif midpoint <= current_price and below is None:
-            below = target
+            below = t
         if above and below:
             break
 
-    return above, below
+    # Bias: use domain function via lightweight dataclass conversion
+    from app.domain.magnet_map import MagnetStructure as _MS
+    pseudo = [
+        _MS(
+            symbol="", timeframe="",
+            structure_type=t.structure_type,
+            price_top=t.price_top,
+            price_bottom=t.price_bottom,
+            formed_at=None,
+            atr_distance=t.atr_distance,
+            magnitude=t.magnitude,
+        )
+        for t in all_targets
+    ]
+    bias = _compute_bias(pseudo, current_price) if pseudo else None
+
+    return above, below, all_targets, bias
 
 
 # ── Symbol detail endpoint ────────────────────────────────────────────────────
@@ -532,8 +548,10 @@ async def get_symbol_detail(
     current_price = float(price_row[0]) if price_row else None
 
     magnet_above = magnet_below = None
+    magnet_structures: list[MagnetTarget] = []
+    magnet_bias: Optional[float] = None
     if current_price is not None:
-        magnet_above, magnet_below = await _fetch_magnet_targets(db, symbol, current_price)
+        magnet_above, magnet_below, magnet_structures, magnet_bias = await _fetch_magnet_data(db, symbol, current_price)
 
     return SymbolDetail(
         symbol=symbol,
@@ -550,6 +568,8 @@ async def get_symbol_detail(
         ),
         magnet_above=magnet_above,
         magnet_below=magnet_below,
+        magnet_structures=magnet_structures,
+        magnet_bias=magnet_bias,
     )
 
 

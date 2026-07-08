@@ -176,4 +176,6 @@ export interface SymbolDetail {
   orca_mc: OrcaMarketConditions | null;
   magnet_above: MagnetTarget | null;
   magnet_below: MagnetTarget | null;
+  magnet_structures: MagnetTarget[];        // all unfilled structures, sorted by atr_distance
+  magnet_bias: number | null;               // -100 (max downside pull) to +100 (max upside pull)
 }

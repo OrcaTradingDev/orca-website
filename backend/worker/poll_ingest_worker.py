@@ -16,7 +16,14 @@ from app.core.config import settings
 from app.core.db import AsyncSessionLocal
 from app.domain.config import load_orca_mc_config, load_screener_config
 from app.domain.indicators import _adx_wilder, _atr_wilder, _ema, _rsi_wilder, _sma
-from app.domain.magnet_map import MagnetStructure, detect_fvgs, detect_session_levels
+from app.domain.magnet_map import (
+    MagnetStructure,
+    detect_fvgs,
+    detect_session_levels,
+    detect_weekly_levels,
+    detect_swing_points,
+    detect_equal_highs_lows,
+)
 from app.domain.orca_mc import OrcaMCConfig, OrcaMCInputs, OrcaMCResult, compute_orca_mc, tf_bias
 from app.domain.signals import adx_dir_from_di, build_signals, ema_state
 from app.models.fx_universe import FXUniverse
@@ -1040,40 +1047,60 @@ async def upsert_magnet_structures(symbol: str, timeframe: str, structures: list
 
 async def compute_and_store_magnets(symbol: str) -> None:
     """
-    Detect unfilled FVGs on the 4h and 1day timeframes, plus the prior
-    session high/low from daily data. Stores the live unfilled set per
-    symbol/timeframe, replacing the previous cycle's snapshot.
+    Detect all price-action magnet structures and store them.
+
+    Per-timeframe (4h, 1day): FVGs, swing highs/lows, equal highs/lows.
+    From daily candles: session high/low, weekly high/low.
     """
     for timeframe in ("4h", "1day"):
         candles = await _fetch_raw_candles(symbol, timeframe, LIMIT_PER_REQUEST)
-        if len(candles) < 3:
+        if len(candles) < 10:
             continue
 
         atr = await _get_atr_for_symbol(symbol, timeframe)
         if not atr:
             continue
 
-        current_price = float(candles[-1][3])  # last close
+        current_price = float(candles[-1][3])
+        candle_list = list(candles)
 
-        fvgs = detect_fvgs(list(candles), current_price, atr)
-        for s in fvgs:
+        structures: list[MagnetStructure] = []
+
+        fvgs = detect_fvgs(candle_list, current_price, atr)
+        swings = detect_swing_points(candle_list, current_price, atr)
+        eqhl = detect_equal_highs_lows(candle_list, current_price, atr)
+
+        for s in fvgs + swings + eqhl:
             s.symbol = symbol
             s.timeframe = timeframe
+            structures.append(s)
 
-        await upsert_magnet_structures(symbol, timeframe, fvgs)
-        logger.info("[magnets] %s %s unfilled_fvgs=%d", symbol, timeframe, len(fvgs))
+        await upsert_magnet_structures(symbol, timeframe, structures)
+        logger.info(
+            "[magnets] %s %s fvgs=%d swings=%d eqhl=%d",
+            symbol, timeframe, len(fvgs), len(swings), len(eqhl),
+        )
 
-    # Session levels run on daily candles; stored under their own timeframe label
+    # Session and weekly levels — both derived from daily candles
     daily_candles = await _fetch_raw_candles(symbol, "1day", LIMIT_PER_REQUEST)
     if len(daily_candles) >= 2:
         atr_day = await _get_atr_for_symbol(symbol, "1day")
         if atr_day:
             current_price = float(daily_candles[-1][3])
-            session_levels = detect_session_levels(list(daily_candles), current_price, atr_day)
-            for s in session_levels:
+            daily_list = list(daily_candles)
+
+            session_levels = detect_session_levels(daily_list, current_price, atr_day)
+            weekly_levels  = detect_weekly_levels(daily_list, current_price, atr_day)
+
+            point_structures = session_levels + weekly_levels
+            for s in point_structures:
                 s.symbol = symbol
-            await upsert_magnet_structures(symbol, "session", session_levels)
-            logger.info("[magnets] %s session levels stored", symbol)
+
+            await upsert_magnet_structures(symbol, "session", point_structures)
+            logger.info(
+                "[magnets] %s session=%d weekly=%d",
+                symbol, len(session_levels), len(weekly_levels),
+            )
 
 
 async def load_orca_mc_config_safe() -> OrcaMCConfig:

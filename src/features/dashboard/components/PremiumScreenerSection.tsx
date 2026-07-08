@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useScreener } from "@/features/dashboard/hooks/useScreener";
 import { useSymbolDetail } from "@/features/dashboard/hooks/useSymbolDetail";
 import { ScreenerRow, OrcaSignals, OrcaMarketConditions } from "@/features/dashboard/types/screener";
-import CandlestickChart from "@/features/dashboard/components/CandlestickChart";
+import CandlestickChart, { magnetColor, structureLabel } from "@/features/dashboard/components/CandlestickChart";
 import { queryKeys } from "@/lib/query/keys";
 import { useScreenerStore } from "@/store/screener-store";
 import { useUserAlerts } from "@/features/dashboard/hooks/useUserAlerts";
@@ -1089,8 +1089,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   <CandlestickChart
                     key={detail.symbol}
                     symbol={detail.symbol}
-                    magnet_above={detail.magnet_above}
-                    magnet_below={detail.magnet_below}
+                    magnet_structures={detail.magnet_structures ?? []}
                   />
                 </div>
               </div>
@@ -1317,79 +1316,127 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   </>
                 )}
 
-                {/* ── Magnet Map — nearest price-action targets above and below ── */}
-                {(detail.magnet_above || detail.magnet_below) && (
-                  <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
-                    <div className="text-[#94A3B8] text-sm font-medium mb-3">Magnet Map</div>
+                {/* ── Magnet Map — bias gauge + full ranked structure list ── */}
+                {(detail.magnet_structures?.length > 0 || detail.magnet_above || detail.magnet_below) && (() => {
+                  const structs = detail.magnet_structures ?? [];
+                  const bias = detail.magnet_bias ?? 0;
+                  const biasAbs = Math.abs(bias);
+                  const biasColor = bias > 15 ? "#10B981" : bias < -15 ? "#EF4444" : "#64748B";
+                  const biasLabel = bias > 15 ? "Bullish Pull" : bias < -15 ? "Bearish Pull" : "Neutral";
+                  const above = structs.filter((m) => (m.price_top + m.price_bottom) / 2 > (detail.magnet_above?.price_top ?? 0) || detail.magnet_above == null
+                    ? true : false);
+                  // Re-split properly using magnet_above/below as reference or just by position
+                  const allAbove = structs.filter((m) => detail.magnet_above && m.formed_at === detail.magnet_above.formed_at && m.structure_type === detail.magnet_above.structure_type ? false : true);
 
-                    {/* Target above */}
-                    {detail.magnet_above ? (
-                      <div className="flex items-center justify-between mb-2 pb-2 border-b border-[#1E293B]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                          <span className="text-[#10B981] text-xs font-medium">
-                            {detail.magnet_above.structure_type === "fvg_bull" ? "Bullish FVG" :
-                             detail.magnet_above.structure_type === "fvg_bear" ? "Bearish FVG" :
-                             detail.magnet_above.structure_type === "session_high" ? "Prior Session High" :
-                             "Prior Session Low"}
+                  return (
+                    <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[#94A3B8] text-sm font-medium">Magnet Map</span>
+                        <span className="text-xs font-semibold" style={{ color: biasColor }}>{biasLabel}</span>
+                      </div>
+
+                      {/* Bias gauge */}
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between text-[10px] text-[#64748B] mb-1">
+                          <span>Bearish Pull</span>
+                          <span className="font-semibold tabular-nums" style={{ color: biasColor }}>
+                            {bias > 0 ? "+" : ""}{bias.toFixed(0)}
                           </span>
-                          <span className="text-[#334155] text-[10px] uppercase tracking-wide">
-                            {detail.magnet_above.timeframe === "session" ? "Daily" : detail.magnet_above.timeframe.toUpperCase()}
-                          </span>
+                          <span>Bullish Pull</span>
                         </div>
-                        <div className="text-right">
-                          <div className="text-white text-xs font-mono">
-                            {detail.magnet_above.price_top === detail.magnet_above.price_bottom
-                              ? detail.magnet_above.price_top.toFixed(5)
-                              : `${detail.magnet_above.price_bottom.toFixed(5)} – ${detail.magnet_above.price_top.toFixed(5)}`}
-                          </div>
-                          {detail.magnet_above.atr_distance !== null && (
-                            <div className="text-[#64748B] text-[10px]">{detail.magnet_above.atr_distance.toFixed(1)} ATR away</div>
-                          )}
+                        <div className="relative h-2 bg-[#1E293B] rounded-full overflow-hidden">
+                          <div className="absolute left-1/2 top-0 bottom-0 w-px bg-[#334155]" />
+                          <div
+                            className="absolute top-0 bottom-0 rounded-full transition-all"
+                            style={
+                              bias >= 0
+                                ? { left: "50%", width: `${biasAbs / 2}%`, background: biasColor }
+                                : { right: "50%", width: `${biasAbs / 2}%`, background: biasColor }
+                            }
+                          />
                         </div>
                       </div>
-                    ) : (
-                      <div className="text-[#475569] text-xs mb-2 pb-2 border-b border-[#1E293B]">No unfilled structure above</div>
-                    )}
 
-                    {/* Current price divider */}
-                    <div className="flex items-center gap-2 my-2">
-                      <div className="flex-1 h-px bg-[#00D4FF]/30" />
-                      <span className="text-[#00D4FF] text-[10px] font-medium">CURRENT PRICE</span>
-                      <div className="flex-1 h-px bg-[#00D4FF]/30" />
+                      {/* Structures above current price */}
+                      {detail.magnet_above && (
+                        <div className="space-y-1.5 mb-2">
+                          {structs
+                            .filter((m) => (m.price_top + m.price_bottom) / 2 > (detail.magnet_above!.price_top + detail.magnet_above!.price_bottom) / 2 ||
+                              (m.structure_type === detail.magnet_above!.structure_type && m.formed_at === detail.magnet_above!.formed_at))
+                            .slice(0, 4)
+                            .reverse()
+                            .map((m, i) => {
+                              const color = magnetColor(m);
+                              const isNearest = m.structure_type === detail.magnet_above!.structure_type && m.formed_at === detail.magnet_above!.formed_at;
+                              return (
+                                <div key={i} className={`flex items-center justify-between py-1 px-2 rounded ${isNearest ? "bg-[#1E293B]" : ""}`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                                    <span className="text-xs truncate" style={{ color }}>{structureLabel(m)}</span>
+                                    <span className="text-[10px] text-[#334155] uppercase shrink-0">
+                                      {m.timeframe === "session" ? "D" : m.timeframe.replace("1day","D").replace("4h","4H").replace("1h","1H").toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="text-right shrink-0 ml-2">
+                                    <div className="text-white text-[11px] font-mono">
+                                      {m.price_top === m.price_bottom ? m.price_top.toFixed(5) : `${m.price_bottom.toFixed(5)}–${m.price_top.toFixed(5)}`}
+                                    </div>
+                                    {m.atr_distance != null && (
+                                      <div className="text-[#64748B] text-[10px]">{m.atr_distance.toFixed(1)} ATR</div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                      {/* Current price divider */}
+                      <div className="flex items-center gap-2 my-2">
+                        <div className="flex-1 h-px bg-[#A78BFA]/30" />
+                        <span className="text-[#A78BFA] text-[10px] font-medium">CURRENT PRICE</span>
+                        <div className="flex-1 h-px bg-[#A78BFA]/30" />
+                      </div>
+
+                      {/* Structures below current price */}
+                      {detail.magnet_below && (
+                        <div className="space-y-1.5 mt-2">
+                          {structs
+                            .filter((m) => (m.price_top + m.price_bottom) / 2 <= (detail.magnet_below!.price_top + detail.magnet_below!.price_bottom) / 2 ||
+                              (m.structure_type === detail.magnet_below!.structure_type && m.formed_at === detail.magnet_below!.formed_at))
+                            .slice(0, 4)
+                            .map((m, i) => {
+                              const color = magnetColor(m);
+                              const isNearest = m.structure_type === detail.magnet_below!.structure_type && m.formed_at === detail.magnet_below!.formed_at;
+                              return (
+                                <div key={i} className={`flex items-center justify-between py-1 px-2 rounded ${isNearest ? "bg-[#1E293B]" : ""}`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                                    <span className="text-xs truncate" style={{ color }}>{structureLabel(m)}</span>
+                                    <span className="text-[10px] text-[#334155] uppercase shrink-0">
+                                      {m.timeframe === "session" ? "D" : m.timeframe.replace("1day","D").replace("4h","4H").replace("1h","1H").toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="text-right shrink-0 ml-2">
+                                    <div className="text-white text-[11px] font-mono">
+                                      {m.price_top === m.price_bottom ? m.price_top.toFixed(5) : `${m.price_bottom.toFixed(5)}–${m.price_top.toFixed(5)}`}
+                                    </div>
+                                    {m.atr_distance != null && (
+                                      <div className="text-[#64748B] text-[10px]">{m.atr_distance.toFixed(1)} ATR</div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      )}
+
+                      {structs.length === 0 && (
+                        <div className="text-[#475569] text-xs text-center py-2">No structures detected yet</div>
+                      )}
                     </div>
-
-                    {/* Target below */}
-                    {detail.magnet_below ? (
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#EF4444]" />
-                          <span className="text-[#EF4444] text-xs font-medium">
-                            {detail.magnet_below.structure_type === "fvg_bull" ? "Bullish FVG" :
-                             detail.magnet_below.structure_type === "fvg_bear" ? "Bearish FVG" :
-                             detail.magnet_below.structure_type === "session_high" ? "Prior Session High" :
-                             "Prior Session Low"}
-                          </span>
-                          <span className="text-[#334155] text-[10px] uppercase tracking-wide">
-                            {detail.magnet_below.timeframe === "session" ? "Daily" : detail.magnet_below.timeframe.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-white text-xs font-mono">
-                            {detail.magnet_below.price_top === detail.magnet_below.price_bottom
-                              ? detail.magnet_below.price_top.toFixed(5)
-                              : `${detail.magnet_below.price_bottom.toFixed(5)} – ${detail.magnet_below.price_top.toFixed(5)}`}
-                          </div>
-                          {detail.magnet_below.atr_distance !== null && (
-                            <div className="text-[#64748B] text-[10px]">{detail.magnet_below.atr_distance.toFixed(1)} ATR away</div>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-[#475569] text-xs mt-2">No unfilled structure below</div>
-                    )}
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Action buttons */}
                 <div className="flex gap-3 pb-2">
