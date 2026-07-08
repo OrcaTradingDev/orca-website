@@ -155,6 +155,17 @@ export interface OrcaMarketConditions {
   status_since: string | null;
 }
 
+// Matches Pydantic "MagnetTarget"
+export interface MagnetTarget {
+  structure_type: string; // 'fvg_bull' | 'fvg_bear' | 'session_high' | 'session_low'
+  price_top: number;
+  price_bottom: number;
+  timeframe: string;      // '4h' | '1day' | 'session'
+  atr_distance: number | null;
+  magnitude: number | null;
+  formed_at: string;      // ISO timestamp
+}
+
 // Matches Pydantic "SymbolDetail"
 export interface SymbolDetail {
   symbol: string;
@@ -163,4 +174,6 @@ export interface SymbolDetail {
   signals: OrcaSignals;
   advanced: AdvancedMetrics;
   orca_mc: OrcaMarketConditions | null;
+  magnet_above: MagnetTarget | null;
+  magnet_below: MagnetTarget | null;
 }

@@ -14,6 +14,7 @@ from app.models.market_trend_aggregates_latest import MarketTrendAggregatesLates
 from app.models.market_indicators_latest import MarketIndicatorsLatest
 from app.models.market_trend_scores_latest import MarketTrendScoresLatest
 from app.schemas.screener import (
+    MagnetTarget,
     ScreenerPage,
     ScreenerRow,
     TrendBreakdown,
@@ -348,6 +349,55 @@ def _build_orca_mc_schema(row, on_thresh: int) -> Optional[OrcaMarketConditions]
     )
 
 
+# ── Magnet Map helper ─────────────────────────────────────────────────────────
+
+async def _fetch_magnet_targets(
+    db: AsyncSession, symbol: str, current_price: float
+) -> tuple[Optional[MagnetTarget], Optional[MagnetTarget]]:
+    """
+    Return the single nearest unfilled structure above and the single nearest
+    one below current price, across all timeframes in market_magnet_structures.
+    """
+    result = await db.execute(
+        text(
+            """
+            SELECT structure_type, price_top, price_bottom, timeframe,
+                   atr_distance, magnitude, formed_at
+            FROM market_magnet_structures
+            WHERE symbol = :s
+            ORDER BY atr_distance ASC NULLS LAST
+            """
+        ),
+        {"s": symbol},
+    )
+    rows = result.all()
+
+    above: Optional[MagnetTarget] = None
+    below: Optional[MagnetTarget] = None
+
+    for stype, top, bottom, tf, atr_dist, mag, formed_at in rows:
+        top = float(top)
+        bottom = float(bottom)
+        midpoint = (top + bottom) / 2
+        target = MagnetTarget(
+            structure_type=stype,
+            price_top=top,
+            price_bottom=bottom,
+            timeframe=tf,
+            atr_distance=float(atr_dist) if atr_dist is not None else None,
+            magnitude=float(mag) if mag is not None else None,
+            formed_at=formed_at.isoformat() if formed_at else "",
+        )
+        if midpoint > current_price and above is None:
+            above = target
+        elif midpoint <= current_price and below is None:
+            below = target
+        if above and below:
+            break
+
+    return above, below
+
+
 # ── Symbol detail endpoint ────────────────────────────────────────────────────
 
 @router.get("/symbol/{symbol}/detail", response_model=SymbolDetail)
@@ -466,6 +516,23 @@ async def get_symbol_detail(
     )).mappings().first()
     orca_mc = _build_orca_mc_schema(orca_mc_row, orca_mc_cfg.on_thresh)
 
+    # Current price from the latest 4h close (more granular than daily)
+    price_row = (await db.execute(
+        text(
+            """
+            SELECT close FROM market_prices
+            WHERE symbol=:s AND timeframe='4h'
+            ORDER BY timestamp DESC LIMIT 1
+            """
+        ),
+        {"s": symbol},
+    )).first()
+    current_price = float(price_row[0]) if price_row else None
+
+    magnet_above = magnet_below = None
+    if current_price is not None:
+        magnet_above, magnet_below = await _fetch_magnet_targets(db, symbol, current_price)
+
     return SymbolDetail(
         symbol=symbol,
         name=name,
@@ -479,4 +546,6 @@ async def get_symbol_detail(
             vol=vol,
             alert=False,
         ),
+        magnet_above=magnet_above,
+        magnet_below=magnet_below,
     )

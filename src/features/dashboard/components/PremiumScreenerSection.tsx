@@ -1317,6 +1317,80 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   </>
                 )}
 
+                {/* ── Magnet Map — nearest price-action targets above and below ── */}
+                {(detail.magnet_above || detail.magnet_below) && (
+                  <div className="bg-[#0A1628] rounded-lg p-4 border border-[#1E293B]">
+                    <div className="text-[#94A3B8] text-sm font-medium mb-3">Magnet Map</div>
+
+                    {/* Target above */}
+                    {detail.magnet_above ? (
+                      <div className="flex items-center justify-between mb-2 pb-2 border-b border-[#1E293B]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                          <span className="text-[#10B981] text-xs font-medium">
+                            {detail.magnet_above.structure_type === "fvg_bull" ? "Bullish FVG" :
+                             detail.magnet_above.structure_type === "fvg_bear" ? "Bearish FVG" :
+                             detail.magnet_above.structure_type === "session_high" ? "Prior Session High" :
+                             "Prior Session Low"}
+                          </span>
+                          <span className="text-[#334155] text-[10px] uppercase tracking-wide">
+                            {detail.magnet_above.timeframe === "session" ? "Daily" : detail.magnet_above.timeframe.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-white text-xs font-mono">
+                            {detail.magnet_above.price_top === detail.magnet_above.price_bottom
+                              ? detail.magnet_above.price_top.toFixed(5)
+                              : `${detail.magnet_above.price_bottom.toFixed(5)} – ${detail.magnet_above.price_top.toFixed(5)}`}
+                          </div>
+                          {detail.magnet_above.atr_distance !== null && (
+                            <div className="text-[#64748B] text-[10px]">{detail.magnet_above.atr_distance.toFixed(1)} ATR away</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[#475569] text-xs mb-2 pb-2 border-b border-[#1E293B]">No unfilled structure above</div>
+                    )}
+
+                    {/* Current price divider */}
+                    <div className="flex items-center gap-2 my-2">
+                      <div className="flex-1 h-px bg-[#00D4FF]/30" />
+                      <span className="text-[#00D4FF] text-[10px] font-medium">CURRENT PRICE</span>
+                      <div className="flex-1 h-px bg-[#00D4FF]/30" />
+                    </div>
+
+                    {/* Target below */}
+                    {detail.magnet_below ? (
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#EF4444]" />
+                          <span className="text-[#EF4444] text-xs font-medium">
+                            {detail.magnet_below.structure_type === "fvg_bull" ? "Bullish FVG" :
+                             detail.magnet_below.structure_type === "fvg_bear" ? "Bearish FVG" :
+                             detail.magnet_below.structure_type === "session_high" ? "Prior Session High" :
+                             "Prior Session Low"}
+                          </span>
+                          <span className="text-[#334155] text-[10px] uppercase tracking-wide">
+                            {detail.magnet_below.timeframe === "session" ? "Daily" : detail.magnet_below.timeframe.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-white text-xs font-mono">
+                            {detail.magnet_below.price_top === detail.magnet_below.price_bottom
+                              ? detail.magnet_below.price_top.toFixed(5)
+                              : `${detail.magnet_below.price_bottom.toFixed(5)} – ${detail.magnet_below.price_top.toFixed(5)}`}
+                          </div>
+                          {detail.magnet_below.atr_distance !== null && (
+                            <div className="text-[#64748B] text-[10px]">{detail.magnet_below.atr_distance.toFixed(1)} ATR away</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[#475569] text-xs mt-2">No unfilled structure below</div>
+                    )}
+                  </div>
+                )}
+
                 {/* Action buttons */}
                 <div className="flex gap-3 pb-2">
                   <Button

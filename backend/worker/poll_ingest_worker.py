@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.db import AsyncSessionLocal
 from app.domain.config import load_orca_mc_config, load_screener_config
 from app.domain.indicators import _adx_wilder, _atr_wilder, _ema, _rsi_wilder, _sma
+from app.domain.magnet_map import MagnetStructure, detect_fvgs, detect_session_levels
 from app.domain.orca_mc import OrcaMCConfig, OrcaMCInputs, OrcaMCResult, compute_orca_mc, tf_bias
 from app.domain.signals import adx_dir_from_di, build_signals, ema_state
 from app.models.fx_universe import FXUniverse
@@ -959,6 +960,120 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
             await compute_and_store_orca_mc(symbol, orca_cfg)
         except Exception:
             logger.exception("[orca-mc] failed for %s", symbol)
+
+    # Magnet Map — runs after Orca MC so all indicators are fresh
+    for symbol in symbols:
+        try:
+            await compute_and_store_magnets(symbol)
+        except Exception:
+            logger.exception("[magnets] failed for %s", symbol)
+
+
+async def _fetch_raw_candles(symbol: str, timeframe: str, limit: int):
+    """Return (open, high, low, close, timestamp) tuples ascending by time."""
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            text(
+                """
+                SELECT open, high, low, close, timestamp FROM (
+                    SELECT open, high, low, close, timestamp
+                    FROM market_prices
+                    WHERE symbol = :s AND timeframe = :tf
+                    ORDER BY timestamp DESC
+                    LIMIT :lim
+                ) sub
+                ORDER BY timestamp ASC
+                """
+            ),
+            {"s": symbol, "tf": timeframe, "lim": limit},
+        )
+        return result.all()
+
+
+async def _get_atr_for_symbol(symbol: str, timeframe: str) -> Optional[float]:
+    async with AsyncSessionLocal() as db:
+        row = (await db.execute(
+            text("SELECT atr_14 FROM market_indicators_latest WHERE symbol=:s AND timeframe=:tf"),
+            {"s": symbol, "tf": timeframe},
+        )).first()
+        return float(row[0]) if row and row[0] is not None else None
+
+
+async def upsert_magnet_structures(symbol: str, timeframe: str, structures: list[MagnetStructure]) -> None:
+    """Replace all stored magnets for (symbol, timeframe) with the freshly detected set."""
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("DELETE FROM market_magnet_structures WHERE symbol=:s AND timeframe=:tf"),
+            {"s": symbol, "tf": timeframe},
+        )
+        for s in structures:
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO market_magnet_structures
+                        (symbol, timeframe, structure_type, price_top, price_bottom,
+                         formed_at, atr_distance, magnitude, updated_at)
+                    VALUES
+                        (:symbol, :tf, :stype, :top, :bottom,
+                         :formed_at, :atr_dist, :mag, NOW())
+                    ON CONFLICT (symbol, timeframe, structure_type, formed_at) DO UPDATE SET
+                        price_top    = EXCLUDED.price_top,
+                        price_bottom = EXCLUDED.price_bottom,
+                        atr_distance = EXCLUDED.atr_distance,
+                        magnitude    = EXCLUDED.magnitude,
+                        updated_at   = NOW()
+                    """
+                ),
+                {
+                    "symbol": symbol,
+                    "tf": timeframe,
+                    "stype": s.structure_type,
+                    "top": s.price_top,
+                    "bottom": s.price_bottom,
+                    "formed_at": s.formed_at,
+                    "atr_dist": s.atr_distance,
+                    "mag": s.magnitude,
+                },
+            )
+        await db.commit()
+
+
+async def compute_and_store_magnets(symbol: str) -> None:
+    """
+    Detect unfilled FVGs on the 4h and 1day timeframes, plus the prior
+    session high/low from daily data. Stores the live unfilled set per
+    symbol/timeframe, replacing the previous cycle's snapshot.
+    """
+    for timeframe in ("4h", "1day"):
+        candles = await _fetch_raw_candles(symbol, timeframe, LIMIT_PER_REQUEST)
+        if len(candles) < 3:
+            continue
+
+        atr = await _get_atr_for_symbol(symbol, timeframe)
+        if not atr:
+            continue
+
+        current_price = float(candles[-1][3])  # last close
+
+        fvgs = detect_fvgs(list(candles), current_price, atr)
+        for s in fvgs:
+            s.symbol = symbol
+            s.timeframe = timeframe
+
+        await upsert_magnet_structures(symbol, timeframe, fvgs)
+        logger.info("[magnets] %s %s unfilled_fvgs=%d", symbol, timeframe, len(fvgs))
+
+    # Session levels run on daily candles; stored under their own timeframe label
+    daily_candles = await _fetch_raw_candles(symbol, "1day", LIMIT_PER_REQUEST)
+    if len(daily_candles) >= 2:
+        atr_day = await _get_atr_for_symbol(symbol, "1day")
+        if atr_day:
+            current_price = float(daily_candles[-1][3])
+            session_levels = detect_session_levels(list(daily_candles), current_price, atr_day)
+            for s in session_levels:
+                s.symbol = symbol
+            await upsert_magnet_structures(symbol, "session", session_levels)
+            logger.info("[magnets] %s session levels stored", symbol)
 
 
 async def load_orca_mc_config_safe() -> OrcaMCConfig:

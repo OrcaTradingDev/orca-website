@@ -64,6 +64,15 @@ class TimeframeBar(BaseModel):
     bear: int
     score: float
 
+class MagnetTarget(BaseModel):
+    structure_type: str       # 'fvg_bull', 'fvg_bear', 'session_high', 'session_low'
+    price_top: float
+    price_bottom: float
+    timeframe: str            # '4h', '1day', 'session'
+    atr_distance: Optional[float] = None
+    magnitude: Optional[float] = None
+    formed_at: str            # ISO timestamp
+
 class SymbolDetail(BaseModel):
     symbol: str
     name: str
@@ -71,3 +80,5 @@ class SymbolDetail(BaseModel):
     signals: OrcaSignals
     advanced: AdvancedMetrics
     orca_mc: Optional[OrcaMarketConditions] = None
+    magnet_above: Optional[MagnetTarget] = None
+    magnet_below: Optional[MagnetTarget] = None
