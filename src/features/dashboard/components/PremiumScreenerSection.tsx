@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useScreener } from "@/features/dashboard/hooks/useScreener";
 import { useSymbolDetail } from "@/features/dashboard/hooks/useSymbolDetail";
 import { ScreenerRow, OrcaSignals, OrcaMarketConditions } from "@/features/dashboard/types/screener";
+import CandlestickChart from "@/features/dashboard/components/CandlestickChart";
 import { queryKeys } from "@/lib/query/keys";
 import { useScreenerStore } from "@/store/screener-store";
 import { useUserAlerts } from "@/features/dashboard/hooks/useUserAlerts";
@@ -1085,12 +1086,11 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               {/* Main area — chart fills all available space */}
               <div className="flex-1 min-w-0 p-4 lg:p-6 flex flex-col min-h-[320px]">
                 <div className="flex-1 rounded-lg overflow-hidden border border-[#1E293B]">
-                  <iframe
+                  <CandlestickChart
                     key={detail.symbol}
-                    src={`https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(getTVSymbol(detail.symbol))}&interval=D&theme=dark&style=1&locale=en&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0`}
-                    style={{ width: "100%", height: "100%", border: "none" }}
-                    allowFullScreen
-                    title={`${detail.symbol} chart`}
+                    symbol={detail.symbol}
+                    magnet_above={detail.magnet_above}
+                    magnet_below={detail.magnet_below}
                   />
                 </div>
               </div>

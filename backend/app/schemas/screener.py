@@ -82,3 +82,13 @@ class SymbolDetail(BaseModel):
     orca_mc: Optional[OrcaMarketConditions] = None
     magnet_above: Optional[MagnetTarget] = None
     magnet_below: Optional[MagnetTarget] = None
+
+class CandleOut(BaseModel):
+    time: int   # Unix seconds
+    open: float
+    high: float
+    low: float
+    close: float
+
+class CandlesResponse(BaseModel):
+    candles: List[CandleOut]

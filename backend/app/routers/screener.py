@@ -14,6 +14,8 @@ from app.models.market_trend_aggregates_latest import MarketTrendAggregatesLates
 from app.models.market_indicators_latest import MarketIndicatorsLatest
 from app.models.market_trend_scores_latest import MarketTrendScoresLatest
 from app.schemas.screener import (
+    CandleOut,
+    CandlesResponse,
     MagnetTarget,
     ScreenerPage,
     ScreenerRow,
@@ -549,3 +551,49 @@ async def get_symbol_detail(
         magnet_above=magnet_above,
         magnet_below=magnet_below,
     )
+
+
+# ── Candles endpoint ──────────────────────────────────────────────────────────
+
+ALLOWED_TIMEFRAMES = {"5min", "30min", "1h", "4h", "1day"}
+
+@router.get("/candles/{symbol}", response_model=CandlesResponse)
+async def get_candles(
+    symbol: str,
+    timeframe: str = Query("4h"),
+    limit: int = Query(200, ge=10, le=1000),
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+) -> CandlesResponse:
+    symbol = symbol.upper()
+    if timeframe not in ALLOWED_TIMEFRAMES:
+        raise HTTPException(status_code=400, detail=f"timeframe must be one of {sorted(ALLOWED_TIMEFRAMES)}")
+
+    result = await db.execute(
+        text(
+            """
+            SELECT timestamp, open, high, low, close
+            FROM (
+                SELECT timestamp, open, high, low, close
+                FROM market_prices
+                WHERE symbol = :s AND timeframe = :tf
+                ORDER BY timestamp DESC
+                LIMIT :lim
+            ) sub
+            ORDER BY timestamp ASC
+            """
+        ),
+        {"s": symbol, "tf": timeframe, "lim": limit},
+    )
+    rows = result.all()
+    candles = [
+        CandleOut(
+            time=int(ts.timestamp()),
+            open=float(o),
+            high=float(h),
+            low=float(l),
+            close=float(c),
+        )
+        for ts, o, h, l, c in rows
+    ]
+    return CandlesResponse(candles=candles)
