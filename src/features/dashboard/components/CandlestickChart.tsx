@@ -8,7 +8,6 @@ import {
   LineStyle,
   type IChartApi,
   type ISeriesApi,
-  type IPriceLine,
   type UTCTimestamp,
   type SeriesMarker,
 } from "lightweight-charts";
@@ -47,11 +46,9 @@ function getCategory(t: string): StructureCategory {
   return "fvg";
 }
 
-const MAX_PER_SIDE = 4;
-
 const BULLISH_TYPES = new Set(["fvg_bull", "session_low", "week_low", "swing_low", "eql"]);
 
-// Rendered as native series markers (candle-anchored), not price lines
+// Rendered as native series markers (candle-anchored arrows), not lines
 const MARKER_TYPES = new Set(["swing_high", "swing_low", "eqh", "eql"]);
 
 export function magnetColor(m: MagnetTarget): string {
@@ -78,23 +75,26 @@ function isZone(m: MagnetTarget): boolean {
   return Math.abs(m.price_top - m.price_bottom) > 0.000001;
 }
 
-interface ZoneRect { topY: number; height: number; color: string; }
+// Zone shading for FVGs
+interface ZoneRect { topY: number; height: number; color: string; label: string; }
+// Right-edge pill labels for session/weekly single-price levels
+interface PriceLabel { y: number; color: string; text: string; }
 
 export default function CandlestickChart({ symbol, magnet_structures }: CandlestickChartProps) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const chartRef      = useRef<IChartApi | null>(null);
   const seriesRef     = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const priceLinesRef = useRef<IPriceLine[]>([]);
   const magnetRef     = useRef(magnet_structures);
   const activeCatRef  = useRef<Set<StructureCategory>>(new Set(ALL_CATEGORIES));
 
   useEffect(() => { magnetRef.current = magnet_structures; }, [magnet_structures]);
 
-  const [timeframe, setTimeframe]           = useState<Timeframe>("4h");
-  const [loading, setLoading]               = useState(true);
-  const [error, setError]                   = useState<string | null>(null);
-  const [zones, setZones]                   = useState<ZoneRect[]>([]);
-  const [lastClose, setLastClose]           = useState<number>(0);
+  const [timeframe, setTimeframe]   = useState<Timeframe>("4h");
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState<string | null>(null);
+  const [zones, setZones]           = useState<ZoneRect[]>([]);
+  const [labels, setLabels]         = useState<PriceLabel[]>([]);
+  const [lastClose, setLastClose]   = useState<number>(0);
   const [activeCategories, setActiveCategories] = useState<Set<StructureCategory>>(
     () => new Set(ALL_CATEGORIES)
   );
@@ -109,26 +109,43 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     });
   };
 
-  // Stable callback — reads from refs only, no closure over props/state
+  // Stable callback — computes zone shading + right-edge labels from price coordinates.
+  // No full-width lines: FVGs → shading + label, session/weekly → label only.
   const refreshZones = useCallback(() => {
     const s = seriesRef.current;
     if (!s) return;
     const activeCats = activeCatRef.current;
-    const result: ZoneRect[] = [];
+
+    const zoneResult:  ZoneRect[]   = [];
+    const labelResult: PriceLabel[] = [];
 
     for (const m of magnetRef.current) {
       if (!activeCats.has(getCategory(m.structure_type))) continue;
-      if (MARKER_TYPES.has(m.structure_type)) continue; // these are native series markers
-      if (!isZone(m)) continue;
-      const topY = s.priceToCoordinate(m.price_top);
-      const botY = s.priceToCoordinate(m.price_bottom);
-      if (topY == null || botY == null) continue;
-      const minY = Math.min(topY, botY);
-      const maxY = Math.max(topY, botY);
-      if (maxY > minY) result.push({ topY: minY, height: maxY - minY, color: magnetColor(m) });
+      if (MARKER_TYPES.has(m.structure_type)) continue; // these use native series markers
+
+      if (isZone(m)) {
+        // FVG zone shading
+        const topY = s.priceToCoordinate(m.price_top);
+        const botY = s.priceToCoordinate(m.price_bottom);
+        if (topY == null || botY == null) continue;
+        const minY = Math.min(topY, botY);
+        const maxY = Math.max(topY, botY);
+        if (maxY > minY) {
+          zoneResult.push({
+            topY: minY, height: maxY - minY,
+            color: magnetColor(m), label: structureLabel(m),
+          });
+        }
+      } else {
+        // Session / weekly single-price level → right-edge label only
+        const y = s.priceToCoordinate(m.price_top);
+        if (y == null) continue;
+        labelResult.push({ y, color: magnetColor(m), text: structureLabel(m) });
+      }
     }
 
-    setZones(result);
+    setZones(zoneResult);
+    setLabels(labelResult);
   }, []);
 
   // Create chart once on mount
@@ -171,10 +188,11 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
       chartRef.current  = null;
       seriesRef.current = null;
       setZones([]);
+      setLabels([]);
     };
   }, [refreshZones]);
 
-  // Fetch candles only when symbol or timeframe changes
+  // Fetch candles on symbol or timeframe change
   useEffect(() => {
     const series = seriesRef.current;
     const chart  = chartRef.current;
@@ -184,10 +202,6 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     let rafId: number | undefined;
     setLoading(true);
     setError(null);
-
-    // Clear stale overlays immediately
-    for (const l of priceLinesRef.current) series.removePriceLine(l);
-    priceLinesRef.current = [];
     series.setMarkers([]);
 
     http
@@ -214,40 +228,11 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     };
   }, [symbol, timeframe, refreshZones]);
 
-  // Redraw overlays when structures, categories, or lastClose change — no re-fetch
+  // Set markers when structures, categories, or lastClose change — no re-fetch, no price lines
   useEffect(() => {
     const series = seriesRef.current;
     if (!series || !lastClose) return;
 
-    // Clear old price lines
-    for (const l of priceLinesRef.current) series.removePriceLine(l);
-    priceLinesRef.current = [];
-
-    const addLine = (opts: Parameters<typeof series.createPriceLine>[0]) =>
-      priceLinesRef.current.push(series.createPriceLine(opts));
-
-    // Line-type structures (FVG / session / weekly), capped per side
-    const lineStructures = magnet_structures.filter(
-      m => !MARKER_TYPES.has(m.structure_type) && activeCategories.has(getCategory(m.structure_type))
-    );
-    const sorted = [...lineStructures].sort((a, b) => (a.atr_distance ?? 999) - (b.atr_distance ?? 999));
-    const above  = sorted.filter(m => (m.price_top + m.price_bottom) / 2 > lastClose).slice(0, MAX_PER_SIDE);
-    const below  = sorted.filter(m => (m.price_top + m.price_bottom) / 2 <= lastClose).slice(0, MAX_PER_SIDE);
-
-    for (const m of [...above, ...below]) {
-      const c     = magnetColor(m);
-      const style = { color: c, lineWidth: 1 as const, lineStyle: LineStyle.Dashed };
-      if (isZone(m)) {
-        addLine({ ...style, price: m.price_top,    axisLabelVisible: true,  title: structureLabel(m) });
-        addLine({ ...style, price: m.price_bottom, axisLabelVisible: false, title: "" });
-      } else {
-        addLine({ ...style, price: m.price_top, axisLabelVisible: true, title: structureLabel(m) });
-      }
-    }
-
-    // Native series markers for swing / EQH / EQL — placed at the actual source candle.
-    // candle_time (Unix seconds) is preferred; formed_at is a reliable fallback because
-    // detect_swing_points / detect_equal_highs_lows both set formed_at = candles[i].timestamp.
     const markerStructures = magnet_structures.filter(
       m => MARKER_TYPES.has(m.structure_type) &&
            activeCategories.has(getCategory(m.structure_type)) &&
@@ -267,11 +252,9 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
           size:     1,
         };
       })
-      // setMarkers requires ascending time order
       .sort((a, b) => (a.time as number) - (b.time as number));
 
     series.setMarkers(markers);
-
     requestAnimationFrame(refreshZones);
   }, [magnet_structures, activeCategories, lastClose, refreshZones]);
 
@@ -317,23 +300,61 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
         })}
       </div>
 
-      {/* Chart + zone shading overlay */}
+      {/* Chart + DOM overlay */}
       <div className="flex-1 relative min-h-0">
         <div ref={containerRef} className="absolute inset-0" />
 
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
+          {/* FVG zone shading */}
           {zones.map((z, i) => (
+            <div key={i} className="absolute left-0 right-0" style={{ top: z.topY, height: z.height }}>
+              <div
+                className="absolute inset-0"
+                style={{
+                  background:   z.color + "18",
+                  borderTop:    `1px solid ${z.color}40`,
+                  borderBottom: `1px solid ${z.color}40`,
+                }}
+              />
+              {/* Label pill at vertical center of zone */}
+              <div
+                className="absolute right-0 flex items-center"
+                style={{
+                  top: z.height / 2 - 9,
+                  background: z.color,
+                  color: "white",
+                  fontSize: 9,
+                  fontWeight: 600,
+                  padding: "1px 5px",
+                  borderRadius: "2px 0 0 2px",
+                  whiteSpace: "nowrap",
+                  lineHeight: "16px",
+                }}
+              >
+                {z.label}
+              </div>
+            </div>
+          ))}
+
+          {/* Session / weekly right-edge labels (no line) */}
+          {labels.map((l, i) => (
             <div
-              key={i}
-              className="absolute left-0 right-0"
+              key={`lbl${i}`}
+              className="absolute right-0 flex items-center"
               style={{
-                top:          z.topY,
-                height:       z.height,
-                background:   z.color + "1A",
-                borderTop:    `1px dashed ${z.color}55`,
-                borderBottom: `1px dashed ${z.color}55`,
+                top: l.y - 9,
+                background: l.color,
+                color: "white",
+                fontSize: 9,
+                fontWeight: 600,
+                padding: "1px 5px",
+                borderRadius: "2px 0 0 2px",
+                whiteSpace: "nowrap",
+                lineHeight: "16px",
               }}
-            />
+            >
+              {l.text}
+            </div>
           ))}
         </div>
 
