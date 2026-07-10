@@ -245,18 +245,21 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
       }
     }
 
-    // Native series markers for swing / EQH / EQL — placed at the actual source candle
+    // Native series markers for swing / EQH / EQL — placed at the actual source candle.
+    // candle_time (Unix seconds) is preferred; formed_at is a reliable fallback because
+    // detect_swing_points / detect_equal_highs_lows both set formed_at = candles[i].timestamp.
     const markerStructures = magnet_structures.filter(
       m => MARKER_TYPES.has(m.structure_type) &&
            activeCategories.has(getCategory(m.structure_type)) &&
-           m.candle_time != null
+           (m.candle_time != null || m.formed_at !== "")
     );
 
     const markers: SeriesMarker<UTCTimestamp>[] = markerStructures
       .map(m => {
+        const t = m.candle_time ?? Math.floor(new Date(m.formed_at).getTime() / 1000);
         const isHigh = m.structure_type === "swing_high" || m.structure_type === "eqh";
         return {
-          time:     m.candle_time as UTCTimestamp,
+          time:     t as UTCTimestamp,
           position: isHigh ? "aboveBar" as const : "belowBar" as const,
           color:    magnetColor(m),
           shape:    isHigh ? "arrowDown" as const : "arrowUp" as const,
