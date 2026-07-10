@@ -51,6 +51,9 @@ const BULLISH_TYPES = new Set(["fvg_bull", "session_low", "week_low", "swing_low
 // Rendered as native series markers (candle-anchored arrows), not lines
 const MARKER_TYPES = new Set(["swing_high", "swing_low", "eqh", "eql"]);
 
+// These are universal reference levels — always shown regardless of chart timeframe
+const SESSION_TYPES = new Set(["session_high", "session_low", "week_high", "week_low"]);
+
 export function magnetColor(m: MagnetTarget): string {
   return BULLISH_TYPES.has(m.structure_type) ? "#10B981" : "#EF4444";
 }
@@ -86,6 +89,7 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
   const seriesRef     = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const magnetRef     = useRef(magnet_structures);
   const activeCatRef  = useRef<Set<StructureCategory>>(new Set(ALL_CATEGORIES));
+  const timeframeRef  = useRef<Timeframe>("4h");
 
   useEffect(() => { magnetRef.current = magnet_structures; }, [magnet_structures]);
 
@@ -100,6 +104,7 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
   );
 
   useEffect(() => { activeCatRef.current = activeCategories; }, [activeCategories]);
+  useEffect(() => { timeframeRef.current = timeframe; }, [timeframe]);
 
   const toggleCategory = (cat: StructureCategory) => {
     setActiveCategories(prev => {
@@ -120,9 +125,13 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     const zoneResult:  ZoneRect[]   = [];
     const labelResult: PriceLabel[] = [];
 
+    const currentTF = timeframeRef.current;
+
     for (const m of magnetRef.current) {
       if (!activeCats.has(getCategory(m.structure_type))) continue;
       if (MARKER_TYPES.has(m.structure_type)) continue;
+      // Skip structures from a different timeframe; session/weekly levels are always shown
+      if (!SESSION_TYPES.has(m.structure_type) && m.timeframe !== currentTF) continue;
 
       if (isZone(m)) {
         // FVG zone shading — starts at the candle where the FVG formed, not the left edge
@@ -239,6 +248,7 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     const markerStructures = magnet_structures.filter(
       m => MARKER_TYPES.has(m.structure_type) &&
            activeCategories.has(getCategory(m.structure_type)) &&
+           m.timeframe === timeframe &&
            (m.candle_time != null || m.formed_at !== "")
     );
 
