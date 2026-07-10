@@ -1054,7 +1054,7 @@ async def compute_and_store_magnets(symbol: str) -> None:
     Per-timeframe (4h, 1day): FVGs, swing highs/lows, equal highs/lows.
     From daily candles: session high/low, weekly high/low.
     """
-    for timeframe in ("4h", "1day"):
+    for timeframe in ("5min", "30min", "1h", "4h", "1day", "1week"):
         candles = await _fetch_raw_candles(symbol, timeframe, LIMIT_PER_REQUEST)
         if len(candles) < 10:
             continue
