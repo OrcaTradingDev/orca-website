@@ -10,6 +10,7 @@ import {
   type ISeriesApi,
   type IPriceLine,
   type UTCTimestamp,
+  type SeriesMarker,
 } from "lightweight-charts";
 import { http } from "@/lib/http";
 import type { MagnetTarget } from "@/features/dashboard/types/screener";
@@ -46,12 +47,11 @@ function getCategory(t: string): StructureCategory {
   return "fvg";
 }
 
-// Capped per side to avoid crowding the chart with lines
 const MAX_PER_SIDE = 4;
 
 const BULLISH_TYPES = new Set(["fvg_bull", "session_low", "week_low", "swing_low", "eql"]);
 
-// These types are rendered as DOM triangle markers, not full-width price lines
+// Rendered as native series markers (candle-anchored), not price lines
 const MARKER_TYPES = new Set(["swing_high", "swing_low", "eqh", "eql"]);
 
 export function magnetColor(m: MagnetTarget): string {
@@ -78,8 +78,7 @@ function isZone(m: MagnetTarget): boolean {
   return Math.abs(m.price_top - m.price_bottom) > 0.000001;
 }
 
-interface ZoneRect   { topY: number; height: number; color: string; }
-interface PriceMarker { y: number; color: string; isHigh: boolean; label: string; }
+interface ZoneRect { topY: number; height: number; color: string; }
 
 export default function CandlestickChart({ symbol, magnet_structures }: CandlestickChartProps) {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -95,13 +94,11 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
   const [loading, setLoading]               = useState(true);
   const [error, setError]                   = useState<string | null>(null);
   const [zones, setZones]                   = useState<ZoneRect[]>([]);
-  const [priceMarkers, setPriceMarkers]     = useState<PriceMarker[]>([]);
   const [lastClose, setLastClose]           = useState<number>(0);
   const [activeCategories, setActiveCategories] = useState<Set<StructureCategory>>(
     () => new Set(ALL_CATEGORIES)
   );
 
-  // Keep ref in sync so stable callbacks can read current state
   useEffect(() => { activeCatRef.current = activeCategories; }, [activeCategories]);
 
   const toggleCategory = (cat: StructureCategory) => {
@@ -112,35 +109,26 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     });
   };
 
-  // Stable callback — reads magnets + active categories from refs
+  // Stable callback — reads from refs only, no closure over props/state
   const refreshZones = useCallback(() => {
     const s = seriesRef.current;
     if (!s) return;
     const activeCats = activeCatRef.current;
-
-    const zoneResult: ZoneRect[]    = [];
-    const markerResult: PriceMarker[] = [];
+    const result: ZoneRect[] = [];
 
     for (const m of magnetRef.current) {
       if (!activeCats.has(getCategory(m.structure_type))) continue;
-
-      if (MARKER_TYPES.has(m.structure_type)) {
-        const y = s.priceToCoordinate(m.price_top);
-        if (y == null) continue;
-        const isHigh = m.structure_type === "swing_high" || m.structure_type === "eqh";
-        markerResult.push({ y, color: magnetColor(m), isHigh, label: structureLabel(m) });
-      } else if (isZone(m)) {
-        const topY = s.priceToCoordinate(m.price_top);
-        const botY = s.priceToCoordinate(m.price_bottom);
-        if (topY == null || botY == null) continue;
-        const minY = Math.min(topY, botY);
-        const maxY = Math.max(topY, botY);
-        if (maxY > minY) zoneResult.push({ topY: minY, height: maxY - minY, color: magnetColor(m) });
-      }
+      if (MARKER_TYPES.has(m.structure_type)) continue; // these are native series markers
+      if (!isZone(m)) continue;
+      const topY = s.priceToCoordinate(m.price_top);
+      const botY = s.priceToCoordinate(m.price_bottom);
+      if (topY == null || botY == null) continue;
+      const minY = Math.min(topY, botY);
+      const maxY = Math.max(topY, botY);
+      if (maxY > minY) result.push({ topY: minY, height: maxY - minY, color: magnetColor(m) });
     }
 
-    setZones(zoneResult);
-    setPriceMarkers(markerResult);
+    setZones(result);
   }, []);
 
   // Create chart once on mount
@@ -183,7 +171,6 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
       chartRef.current  = null;
       seriesRef.current = null;
       setZones([]);
-      setPriceMarkers([]);
     };
   }, [refreshZones]);
 
@@ -197,6 +184,11 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     let rafId: number | undefined;
     setLoading(true);
     setError(null);
+
+    // Clear stale overlays immediately
+    for (const l of priceLinesRef.current) series.removePriceLine(l);
+    priceLinesRef.current = [];
+    series.setMarkers([]);
 
     http
       .get<{ candles: { time: number; open: number; high: number; low: number; close: number }[] }>(
@@ -222,7 +214,7 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     };
   }, [symbol, timeframe, refreshZones]);
 
-  // Redraw overlays when structures, active categories, or lastClose change — no re-fetch
+  // Redraw overlays when structures, categories, or lastClose change — no re-fetch
   useEffect(() => {
     const series = seriesRef.current;
     if (!series || !lastClose) return;
@@ -234,7 +226,7 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
     const addLine = (opts: Parameters<typeof series.createPriceLine>[0]) =>
       priceLinesRef.current.push(series.createPriceLine(opts));
 
-    // Line-type structures only (not MARKER_TYPES), filtered by active categories
+    // Line-type structures (FVG / session / weekly), capped per side
     const lineStructures = magnet_structures.filter(
       m => !MARKER_TYPES.has(m.structure_type) && activeCategories.has(getCategory(m.structure_type))
     );
@@ -252,6 +244,30 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
         addLine({ ...style, price: m.price_top, axisLabelVisible: true, title: structureLabel(m) });
       }
     }
+
+    // Native series markers for swing / EQH / EQL — placed at the actual source candle
+    const markerStructures = magnet_structures.filter(
+      m => MARKER_TYPES.has(m.structure_type) &&
+           activeCategories.has(getCategory(m.structure_type)) &&
+           m.candle_time != null
+    );
+
+    const markers: SeriesMarker<UTCTimestamp>[] = markerStructures
+      .map(m => {
+        const isHigh = m.structure_type === "swing_high" || m.structure_type === "eqh";
+        return {
+          time:     m.candle_time as UTCTimestamp,
+          position: isHigh ? "aboveBar" as const : "belowBar" as const,
+          color:    magnetColor(m),
+          shape:    isHigh ? "arrowDown" as const : "arrowUp" as const,
+          text:     structureLabel(m),
+          size:     1,
+        };
+      })
+      // setMarkers requires ascending time order
+      .sort((a, b) => (a.time as number) - (b.time as number));
+
+    series.setMarkers(markers);
 
     requestAnimationFrame(refreshZones);
   }, [magnet_structures, activeCategories, lastClose, refreshZones]);
@@ -298,11 +314,10 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
         })}
       </div>
 
-      {/* Chart + overlays */}
+      {/* Chart + zone shading overlay */}
       <div className="flex-1 relative min-h-0">
         <div ref={containerRef} className="absolute inset-0" />
 
-        {/* Zone shading + swing/EQH/EQL triangle markers */}
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
           {zones.map((z, i) => (
             <div
@@ -316,24 +331,6 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
                 borderBottom: `1px dashed ${z.color}55`,
               }}
             />
-          ))}
-
-          {priceMarkers.map((pm, i) => (
-            <div
-              key={`m${i}`}
-              className="absolute flex items-center gap-1"
-              style={{ left: 6, top: pm.y - 5 }}
-            >
-              <svg width="10" height="10" viewBox="0 0 10 10" style={{ flexShrink: 0 }}>
-                {pm.isHigh
-                  ? <polygon points="5,10 0,0 10,0" fill={pm.color} opacity="0.85" />
-                  : <polygon points="5,0 0,10 10,10" fill={pm.color} opacity="0.85" />
-                }
-              </svg>
-              <span style={{ color: pm.color, fontSize: 9, fontFamily: "monospace", opacity: 0.75, lineHeight: 1 }}>
-                {pm.label}
-              </span>
-            </div>
           ))}
         </div>
 

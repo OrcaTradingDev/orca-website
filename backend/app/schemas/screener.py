@@ -72,6 +72,7 @@ class MagnetTarget(BaseModel):
     atr_distance: Optional[float] = None
     magnitude: Optional[float] = None
     formed_at: str            # ISO timestamp
+    candle_time: Optional[int] = None  # Unix seconds of source candle (swing/EQH/EQL only)
 
 class SymbolDetail(BaseModel):
     symbol: str

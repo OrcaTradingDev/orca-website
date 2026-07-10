@@ -35,6 +35,7 @@ class MagnetStructure:
     formed_at: object          # datetime
     atr_distance: Optional[float]
     magnitude: Optional[float]
+    candle_time: Optional[int] = None  # Unix seconds of the source candle (swing/EQH/EQL only)
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -248,10 +249,12 @@ def detect_swing_points(
         window_highs = [float(candles[j][1]) for j in range(i - lookback, i + lookback + 1) if j != i]
         window_lows  = [float(candles[j][2]) for j in range(i - lookback, i + lookback + 1) if j != i]
 
+        ts = candles[i][4]
+        candle_unix = int(ts.timestamp()) if hasattr(ts, "timestamp") else None
         if h >= max(window_highs):
-            raw_highs.append({"price": h, "idx": i, "formed_at": candles[i][4]})
+            raw_highs.append({"price": h, "idx": i, "formed_at": ts, "candle_time": candle_unix})
         if l <= min(window_lows):
-            raw_lows.append( {"price": l, "idx": i, "formed_at": candles[i][4]})
+            raw_lows.append( {"price": l, "idx": i, "formed_at": ts, "candle_time": candle_unix})
 
     def filter_unswept_highs(swings: list[dict]) -> list[dict]:
         result = []
@@ -299,6 +302,7 @@ def detect_swing_points(
             formed_at=sw["formed_at"],
             atr_distance=round(abs(current_price - sw["price"]) / current_atr, 3),
             magnitude=0.0,
+            candle_time=sw.get("candle_time"),
         ))
     for sw in final_lows:
         structures.append(MagnetStructure(
@@ -308,6 +312,7 @@ def detect_swing_points(
             formed_at=sw["formed_at"],
             atr_distance=round(abs(current_price - sw["price"]) / current_atr, 3),
             magnitude=0.0,
+            candle_time=sw.get("candle_time"),
         ))
     return structures
 
@@ -349,10 +354,12 @@ def detect_equal_highs_lows(
         l = float(candles[i][2])
         window_h = [float(candles[j][1]) for j in range(i - swing_lookback, i + swing_lookback + 1) if j != i]
         window_l = [float(candles[j][2]) for j in range(i - swing_lookback, i + swing_lookback + 1) if j != i]
+        ts_eq = candles[i][4]
+        candle_unix_eq = int(ts_eq.timestamp()) if hasattr(ts_eq, "timestamp") else None
         if h >= max(window_h):
-            raw_highs.append({"price": h, "idx": i, "ts": candles[i][4]})
+            raw_highs.append({"price": h, "idx": i, "ts": ts_eq, "candle_time": candle_unix_eq})
         if l <= min(window_l):
-            raw_lows.append( {"price": l, "idx": i, "ts": candles[i][4]})
+            raw_lows.append( {"price": l, "idx": i, "ts": ts_eq, "candle_time": candle_unix_eq})
 
     def cluster(swings: list[dict]) -> list[list[dict]]:
         """Group swings within tolerance of each other."""
@@ -384,30 +391,32 @@ def detect_equal_highs_lows(
         if is_swept_high(cl):
             continue
         price = sum(s["price"] for s in cl) / len(cl)
-        formed_at = max(cl, key=lambda s: s["idx"])["ts"]
+        most_recent = max(cl, key=lambda s: s["idx"])
         structures.append(MagnetStructure(
             symbol="", timeframe="",
             structure_type="eqh",
             price_top=max(s["price"] for s in cl),
             price_bottom=min(s["price"] for s in cl),
-            formed_at=formed_at,
+            formed_at=most_recent["ts"],
             atr_distance=round(abs(current_price - price) / current_atr, 3),
             magnitude=round((max(s["price"] for s in cl) - min(s["price"] for s in cl)) / current_atr, 3),
+            candle_time=most_recent.get("candle_time"),
         ))
 
     for cl in cluster(raw_lows):
         if is_swept_low(cl):
             continue
         price = sum(s["price"] for s in cl) / len(cl)
-        formed_at = max(cl, key=lambda s: s["idx"])["ts"]
+        most_recent = max(cl, key=lambda s: s["idx"])
         structures.append(MagnetStructure(
             symbol="", timeframe="",
             structure_type="eql",
             price_top=max(s["price"] for s in cl),
             price_bottom=min(s["price"] for s in cl),
-            formed_at=formed_at,
+            formed_at=most_recent["ts"],
             atr_distance=round(abs(current_price - price) / current_atr, 3),
             magnitude=round((max(s["price"] for s in cl) - min(s["price"] for s in cl)) / current_atr, 3),
+            candle_time=most_recent.get("candle_time"),
         ))
 
     return structures

@@ -1019,15 +1019,16 @@ async def upsert_magnet_structures(symbol: str, timeframe: str, structures: list
                     """
                     INSERT INTO market_magnet_structures
                         (symbol, timeframe, structure_type, price_top, price_bottom,
-                         formed_at, atr_distance, magnitude, updated_at)
+                         formed_at, atr_distance, magnitude, candle_time, updated_at)
                     VALUES
                         (:symbol, :tf, :stype, :top, :bottom,
-                         :formed_at, :atr_dist, :mag, NOW())
+                         :formed_at, :atr_dist, :mag, :candle_time, NOW())
                     ON CONFLICT (symbol, timeframe, structure_type, formed_at) DO UPDATE SET
                         price_top    = EXCLUDED.price_top,
                         price_bottom = EXCLUDED.price_bottom,
                         atr_distance = EXCLUDED.atr_distance,
                         magnitude    = EXCLUDED.magnitude,
+                        candle_time  = EXCLUDED.candle_time,
                         updated_at   = NOW()
                     """
                 ),
@@ -1040,6 +1041,7 @@ async def upsert_magnet_structures(symbol: str, timeframe: str, structures: list
                     "formed_at": s.formed_at,
                     "atr_dist": s.atr_distance,
                     "mag": s.magnitude,
+                    "candle_time": s.candle_time,
                 },
             )
         await db.commit()

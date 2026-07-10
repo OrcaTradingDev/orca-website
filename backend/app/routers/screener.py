@@ -364,7 +364,7 @@ async def _fetch_magnet_data(
         text(
             """
             SELECT structure_type, price_top, price_bottom, timeframe,
-                   atr_distance, magnitude, formed_at
+                   atr_distance, magnitude, formed_at, candle_time
             FROM market_magnet_structures
             WHERE symbol = :s
             ORDER BY atr_distance ASC NULLS LAST
@@ -375,7 +375,7 @@ async def _fetch_magnet_data(
     rows = result.all()
 
     all_targets: list[MagnetTarget] = []
-    for stype, top, bottom, tf, atr_dist, mag, formed_at in rows:
+    for stype, top, bottom, tf, atr_dist, mag, formed_at, candle_time in rows:
         all_targets.append(MagnetTarget(
             structure_type=stype,
             price_top=float(top),
@@ -384,6 +384,7 @@ async def _fetch_magnet_data(
             atr_distance=float(atr_dist) if atr_dist is not None else None,
             magnitude=float(mag) if mag is not None else None,
             formed_at=formed_at.isoformat() if formed_at else "",
+            candle_time=int(candle_time) if candle_time is not None else None,
         ))
 
     above: Optional[MagnetTarget] = None

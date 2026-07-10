@@ -164,6 +164,7 @@ export interface MagnetTarget {
   atr_distance: number | null;
   magnitude: number | null;
   formed_at: string;      // ISO timestamp
+  candle_time: number | null; // Unix seconds of source candle (swing/EQH/EQL only)
 }
 
 // Matches Pydantic "SymbolDetail"
