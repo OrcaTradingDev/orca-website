@@ -75,8 +75,8 @@ function isZone(m: MagnetTarget): boolean {
   return Math.abs(m.price_top - m.price_bottom) > 0.000001;
 }
 
-// Zone shading for FVGs
-interface ZoneRect { topY: number; height: number; color: string; label: string; }
+// Zone shading for FVGs — leftX is where the zone starts (the forming candle's x coord)
+interface ZoneRect { leftX: number; topY: number; height: number; color: string; label: string; }
 // Right-edge pill labels for session/weekly single-price levels
 interface PriceLabel { y: number; color: string; text: string; }
 
@@ -112,8 +112,9 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
   // Stable callback — computes zone shading + right-edge labels from price coordinates.
   // No full-width lines: FVGs → shading + label, session/weekly → label only.
   const refreshZones = useCallback(() => {
-    const s = seriesRef.current;
-    if (!s) return;
+    const s     = seriesRef.current;
+    const chart = chartRef.current;
+    if (!s || !chart) return;
     const activeCats = activeCatRef.current;
 
     const zoneResult:  ZoneRect[]   = [];
@@ -121,23 +122,25 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
 
     for (const m of magnetRef.current) {
       if (!activeCats.has(getCategory(m.structure_type))) continue;
-      if (MARKER_TYPES.has(m.structure_type)) continue; // these use native series markers
+      if (MARKER_TYPES.has(m.structure_type)) continue;
 
       if (isZone(m)) {
-        // FVG zone shading
+        // FVG zone shading — starts at the candle where the FVG formed, not the left edge
         const topY = s.priceToCoordinate(m.price_top);
         const botY = s.priceToCoordinate(m.price_bottom);
         if (topY == null || botY == null) continue;
         const minY = Math.min(topY, botY);
         const maxY = Math.max(topY, botY);
-        if (maxY > minY) {
-          zoneResult.push({
-            topY: minY, height: maxY - minY,
-            color: magnetColor(m), label: structureLabel(m),
-          });
-        }
+        if (maxY <= minY) continue;
+
+        const formedUnix = Math.floor(new Date(m.formed_at).getTime() / 1000) as UTCTimestamp;
+        const rawX = chart.timeScale().timeToCoordinate(formedUnix);
+        // clamp to 0: if formed before visible range use left edge, never go negative
+        const leftX = rawX != null ? Math.max(0, rawX) : 0;
+
+        zoneResult.push({ leftX, topY: minY, height: maxY - minY, color: magnetColor(m), label: structureLabel(m) });
       } else {
-        // Session / weekly single-price level → right-edge label only
+        // Session / weekly single-price level → right-edge label only, no line
         const y = s.priceToCoordinate(m.price_top);
         if (y == null) continue;
         labelResult.push({ y, color: magnetColor(m), text: structureLabel(m) });
@@ -305,9 +308,9 @@ export default function CandlestickChart({ symbol, magnet_structures }: Candlest
         <div ref={containerRef} className="absolute inset-0" />
 
         <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1 }}>
-          {/* FVG zone shading */}
+          {/* FVG zone shading — starts at the forming candle, extends to right edge */}
           {zones.map((z, i) => (
-            <div key={i} className="absolute left-0 right-0" style={{ top: z.topY, height: z.height }}>
+            <div key={i} className="absolute right-0" style={{ left: z.leftX, top: z.topY, height: z.height }}>
               <div
                 className="absolute inset-0"
                 style={{
