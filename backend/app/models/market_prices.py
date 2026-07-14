@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Numeric, String, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -12,6 +12,7 @@ class MarketPrice(Base):
     __tablename__ = "market_prices"
 
     id: Mapped[int] = mapped_column(
+        BigInteger,
         primary_key=True,
         autoincrement=True,
     )
