@@ -1080,10 +1080,10 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               ))}
             </div>
           ) : (
-            <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+            <div className="flex-1 overflow-y-auto lg:overflow-hidden flex flex-col lg:flex-row">
 
               {/* Main area — chart fills all available space */}
-              <div className="flex-1 min-w-0 p-4 lg:p-6 flex flex-col min-h-[320px]">
+              <div className="shrink-0 lg:flex-1 min-w-0 p-4 lg:p-6 flex flex-col h-[280px] lg:h-auto">
                 <div className="flex-1 rounded-lg overflow-hidden border border-[#1E293B]">
                   <CandlestickChart
                     key={detail.symbol}
@@ -1094,7 +1094,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               </div>
 
               {/* Side panel — signals, breakdown, metrics, actions */}
-              <div className="w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E293B] overflow-y-auto p-4 lg:p-6 space-y-4">
+              <div className="w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E293B] lg:overflow-y-auto p-4 lg:p-6 space-y-4">
 
                 {/* OrcaBot Status — the one and only status banner (Orca MC v3.0 engine) */}
                 {detail.orca_mc ? (
