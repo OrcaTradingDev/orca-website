@@ -651,10 +651,22 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
       {/* End Best Market Today banner */}
 
       {/* Controls */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        {/* Search — full width on mobile */}
+        <div className="relative w-full sm:w-auto order-first sm:order-last">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
+          <Input
+            type="text"
+            placeholder="Search symbols..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 w-full sm:w-[240px] bg-[#14181F] border-[#1E293B] text-white placeholder:text-[#64748B] focus:border-[#00D4FF]"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
           <Select value={assetClassFilter} onValueChange={setAssetClassFilter}>
-            <SelectTrigger className="w-[180px] bg-[#14181F] border-[#1E293B] text-white">
+            <SelectTrigger className="w-[140px] sm:w-[180px] bg-[#14181F] border-[#1E293B] text-white text-sm">
               <SelectValue placeholder="Asset Class" />
             </SelectTrigger>
             <SelectContent className="bg-[#14181F] border-[#1E293B]">
@@ -668,7 +680,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
           </Select>
 
           <Select value={trendFilter} onValueChange={setTrendFilter}>
-            <SelectTrigger className="w-[200px] bg-[#14181F] border-[#1E293B] text-white">
+            <SelectTrigger className="w-[140px] sm:w-[200px] bg-[#14181F] border-[#1E293B] text-white text-sm">
               <SelectValue placeholder="Trend Strength" />
             </SelectTrigger>
             <SelectContent className="bg-[#14181F] border-[#1E293B]">
@@ -680,19 +692,6 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               <SelectItem value="Strong Bearish">Strong Bearish</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94A3B8]" />
-            <Input
-              type="text"
-              placeholder="Search symbols..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 w-[240px] bg-[#14181F] border-[#1E293B] text-white placeholder:text-[#64748B] focus:border-[#00D4FF]"
-            />
-          </div>
 
           <Button
             variant="outline"
@@ -700,8 +699,8 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
             disabled={isFetching}
             className="bg-[#14181F] border-[#1E293B] text-[#94A3B8] hover:text-white hover:bg-[#1A1F2E]"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-            <span className="text-sm">{lastUpdatedLabel}</span>
+            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""} sm:mr-2`} />
+            <span className="hidden sm:inline text-sm">{lastUpdatedLabel}</span>
           </Button>
 
           {!freeOnly && (
@@ -711,8 +710,8 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               disabled={filteredAssets.length === 0}
               className="bg-[#14181F] border-[#00D4FF] text-[#00D4FF] hover:bg-[#00D4FF] hover:text-white disabled:opacity-50"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Export
+              <Download className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Export</span>
             </Button>
           )}
         </div>

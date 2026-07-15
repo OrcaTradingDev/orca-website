@@ -21,6 +21,7 @@ import BotSection from "@/features/dashboard/components/BotSection";
 import AccountSection from "@/features/dashboard/components/AccountSection";
 import SubscriptionSection from "@/features/dashboard/components/SubscriptionSection";
 import AdminSection from "@/features/dashboard/components/AdminSection";
+import MobileBottomNav from "@/features/dashboard/components/MobileBottomNav";
 import { useAuthStore } from "@/store/auth-store";
 
 const SECTIONS: Record<string, React.ReactNode> = {
@@ -74,6 +75,18 @@ function UpgradingBanner() {
   );
 }
 
+// ── Shared hook: detects mobile viewport ─────────────────────────────────────
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
+
 // ── Free screener layout (no sidebar) ─────────────────────────────────────────
 
 function FreeScreenerLayout() {
@@ -105,7 +118,7 @@ function FreeScreenerLayout() {
 
   return (
     <div className="min-h-screen bg-[#0B0F19] text-white pt-[64px]">
-      <main className="p-8 md:p-12">
+      <main className="p-3 sm:p-8 md:p-12">
         <div className="max-w-[1400px] mx-auto">
           {upgrading && <UpgradingBanner />}
           <PremiumScreenerSection freeOnly={true} />
@@ -121,6 +134,7 @@ function FullScreenerLayout() {
   const [activeSection, setActiveSection] = useState("screener");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const isAdmin = useAuthStore((s) => s.user?.isAdmin ?? false);
+  const isMobile = useIsMobile();
 
   const renderSection = () => {
     if (activeSection === "admin") {
@@ -133,21 +147,27 @@ function FullScreenerLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-white pt-[64px]">
-      <Sidebar
-        activeSection={activeSection}
-        onSectionChange={setActiveSection}
-        onCollapsedChange={setIsSidebarCollapsed}
-      />
+    <div className="min-h-screen bg-[#0B0F19] text-white pt-[64px] pb-[60px] sm:pb-0">
+      {/* Sidebar — desktop only */}
+      <div className="hidden sm:block">
+        <Sidebar
+          activeSection={activeSection}
+          onSectionChange={setActiveSection}
+          onCollapsedChange={setIsSidebarCollapsed}
+        />
+      </div>
 
       <main
-        className="p-12 transition-all duration-300 ease-in-out"
-        style={{ marginLeft: isSidebarCollapsed ? "64px" : "260px" }}
+        className="p-3 sm:p-8 md:p-12 transition-all duration-300 ease-in-out"
+        style={{ marginLeft: isMobile ? 0 : (isSidebarCollapsed ? "64px" : "260px") }}
       >
         <div className="max-w-[1400px]">
           {renderSection()}
         </div>
       </main>
+
+      {/* Bottom nav — mobile only */}
+      <MobileBottomNav activeSection={activeSection} onSectionChange={setActiveSection} />
     </div>
   );
 }
