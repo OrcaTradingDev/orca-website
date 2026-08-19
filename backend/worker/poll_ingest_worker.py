@@ -6,8 +6,11 @@ import json
 import logging
 import os
 import signal
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
@@ -60,6 +63,60 @@ MAX_FUTURE_SKEW_SECONDS = int(os.getenv("INGEST_MAX_FUTURE_SKEW_SECONDS", "120")
 
 # If we hit rate limit, wait a bit then continue
 RATE_LIMIT_BACKOFF_SECONDS = int(os.getenv("INGEST_RATE_LIMIT_BACKOFF_SECONDS", "20"))
+
+# ── NY-Close candle resampling ───────────────────────────────────────────────
+# TradingView and FX brokers (OANDA, etc.) align 4H and 1D bars to the NY Close
+# (17:00 ET). Twelve Data returns UTC-midnight-aligned bars for these timeframes,
+# producing different OHLC values. Fix: fetch 1H candles (always universally
+# aligned) and resample into 4H/1D using the real session boundaries.
+
+_NY_TZ = ZoneInfo("America/New_York")
+
+# 1H bars needed to produce ~300 4H bars (4×) and ~300 1D bars (24×); cap at
+# Twelve Data's max outputsize of 5000.
+_RESAMPLE_SOURCE_LIMIT = int(os.getenv("RESAMPLE_SOURCE_LIMIT", "5000"))
+
+
+def _ny_bar_key(ts: datetime, hours_per_bar: int) -> datetime:
+    """UTC open timestamp of the NY-Close-aligned bar (hours_per_bar=4 or 24) that contains ts."""
+    ny = ts.astimezone(_NY_TZ)
+    total_minutes = ny.hour * 60 + ny.minute
+    # Shift timeline so 17:00 ET (NY Close) = 0:00 of the session day
+    session_minutes = (total_minutes - 17 * 60) % (24 * 60)
+    slot = session_minutes // (hours_per_bar * 60)
+    bar_total_minutes = (17 * 60 + slot * hours_per_bar * 60) % (24 * 60)
+    bar_hour = bar_total_minutes // 60
+    bar_minute = bar_total_minutes % 60
+    ny_date = ny.date()
+    # If the bar_hour is ahead of where we are in the NY clock, it started yesterday
+    if bar_hour > ny.hour or (bar_hour == ny.hour and bar_minute > ny.minute):
+        ny_date = (ny - timedelta(days=1)).date()
+    bar_ny = datetime(ny_date.year, ny_date.month, ny_date.day,
+                      bar_hour, bar_minute, 0, tzinfo=_NY_TZ)
+    return bar_ny.astimezone(timezone.utc).replace(tzinfo=timezone.utc)
+
+
+def _resample_ny(rows: List[Dict], hours_per_bar: int) -> List[Dict]:
+    """Aggregate 1H OHLCV rows into NY-Close-aligned bars of the given width."""
+    if not rows:
+        return []
+    buckets: Dict[datetime, List[Dict]] = defaultdict(list)
+    for r in rows:
+        key = _ny_bar_key(r["timestamp"], hours_per_bar)
+        buckets[key].append(r)
+    result = []
+    for bar_ts in sorted(buckets):
+        candles = sorted(buckets[bar_ts], key=lambda x: x["timestamp"])
+        vols = [c["volume"] for c in candles if c.get("volume") is not None]
+        result.append({
+            "timestamp": bar_ts,
+            "open":   candles[0]["open"],
+            "high":   max(c["high"] for c in candles),
+            "low":    min(c["low"]  for c in candles),
+            "close":  candles[-1]["close"],
+            "volume": sum(vols, Decimal(0)) if vols else None,
+        })
+    return result
 
 
 def normalize_symbol(sym: str) -> str:
@@ -835,9 +892,17 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
     has_tf = await market_prices_has_timeframe_column()
 
     for timeframe in timeframes:
+        # 4H and 1D are fetched as 1H source and resampled to NY-Close alignment
+        # so that bars match TradingView / OANDA. 5M, 30M, 1H, 1W are always
+        # universally aligned and fetched directly.
+        resample_hours = {"4h": 4, "1h4": 4, "1day": 24}.get(timeframe)
+        source_tf = "1h" if resample_hours else timeframe
+        source_limit = _RESAMPLE_SOURCE_LIMIT if resample_hours else LIMIT_PER_REQUEST
+
         for symbol in symbols:
             try:
-                ohlc_rows = await td.fetch_ohlc(symbol=symbol, timeframe=timeframe, limit=LIMIT_PER_REQUEST)
+                raw_rows = await td.fetch_ohlc(symbol=symbol, timeframe=source_tf, limit=source_limit)
+                ohlc_rows = _resample_ny(raw_rows, resample_hours) if resample_hours else raw_rows
             except Exception as e:
                 if _looks_like_rate_limit(e):
                     logger.warning(
