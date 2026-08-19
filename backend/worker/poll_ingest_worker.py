@@ -664,10 +664,17 @@ async def upsert_latest_indicators(symbol: str, timeframe: str, ind: Dict) -> No
         await db.commit()
 
 
-async def fetch_symbols() -> List[str]:
+async def fetch_symbols() -> List[Tuple[str, str]]:
+    """Returns list of (symbol, type) tuples from fx_universe."""
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(FXUniverse.symbol))
-        return [normalize_symbol(r[0]) for r in result.all()]
+        result = await db.execute(select(FXUniverse.symbol, FXUniverse.type))
+        return [(normalize_symbol(r[0]), r[1]) for r in result.all()]
+
+
+# Asset types that use the FX session convention (NY Close 17:00 ET as day boundary).
+# Twelve Data returns UTC-midnight-aligned daily/4H bars for these, so we must
+# resample from 1H source to match TradingView.
+_NY_CLOSE_TYPES = frozenset({"fx_major", "fx_cross", "commodity"})
 
 
 def _looks_like_rate_limit(exc: Exception) -> bool:
@@ -891,15 +898,20 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
 
     has_tf = await market_prices_has_timeframe_column()
 
-    for timeframe in timeframes:
-        # 4H and 1D are fetched as 1H source and resampled to NY-Close alignment
-        # so that bars match TradingView / OANDA. 5M, 30M, 1H, 1W are always
-        # universally aligned and fetched directly.
-        resample_hours = {"4h": 4, "1h4": 4, "1day": 24}.get(timeframe)
-        source_tf = "1h" if resample_hours else timeframe
-        source_limit = _RESAMPLE_SOURCE_LIMIT if resample_hours else LIMIT_PER_REQUEST
+    # Potential resample hours per timeframe key (only for NY-Close asset types)
+    _resample_map = {"4h": 4, "1day": 24}
 
-        for symbol in symbols:
+    for timeframe in timeframes:
+        for symbol, sym_type in symbols:
+            # FX pairs and OTC commodities (metals, oil) use NY Close (17:00 ET) as
+            # their session boundary on TradingView, but Twelve Data returns
+            # UTC-midnight-aligned 4H/1D bars. Resample from 1H source to fix.
+            # Stocks and exchange-based indices already have exchange-aligned bars
+            # from Twelve Data that match TradingView — fetch them directly.
+            resample_hours = _resample_map.get(timeframe) if sym_type in _NY_CLOSE_TYPES else None
+            source_tf = "1h" if resample_hours else timeframe
+            source_limit = _RESAMPLE_SOURCE_LIMIT if resample_hours else LIMIT_PER_REQUEST
+
             try:
                 raw_rows = await td.fetch_ohlc(symbol=symbol, timeframe=source_tf, limit=source_limit)
                 ohlc_rows = _resample_ny(raw_rows, resample_hours) if resample_hours else raw_rows
@@ -1027,14 +1039,14 @@ async def ingest_once(td: TwelveDataService, timeframes: List[str]) -> None:
     # so it runs as a second pass after the main ingest loop, once all
     # timeframes' market_prices/indicators are fresh for this cycle.
     orca_cfg = await load_orca_mc_config_safe()
-    for symbol in symbols:
+    for symbol, _sym_type in symbols:
         try:
             await compute_and_store_orca_mc(symbol, orca_cfg)
         except Exception:
             logger.exception("[orca-mc] failed for %s", symbol)
 
     # Magnet Map — runs after Orca MC so all indicators are fresh
-    for symbol in symbols:
+    for symbol, _sym_type in symbols:
         try:
             await compute_and_store_magnets(symbol)
         except Exception:

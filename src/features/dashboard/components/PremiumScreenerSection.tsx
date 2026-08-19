@@ -5,7 +5,24 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useScreener } from "@/features/dashboard/hooks/useScreener";
 import { useSymbolDetail } from "@/features/dashboard/hooks/useSymbolDetail";
 import { ScreenerRow, OrcaSignals, OrcaMarketConditions } from "@/features/dashboard/types/screener";
-import CandlestickChart, { magnetColor, structureLabel } from "@/features/dashboard/components/CandlestickChart";
+import CandlestickChart from "@/features/dashboard/components/CandlestickChart";
+import type { MagnetTarget } from "@/features/dashboard/types/screener";
+
+function magnetColor(m: MagnetTarget): string {
+  const bullish = new Set(["fvg_bull", "session_low", "week_low", "swing_low", "eql"]);
+  return bullish.has(m.structure_type) ? "#10B981" : "#EF4444";
+}
+
+function structureLabel(m: MagnetTarget): string {
+  const labels: Record<string, string> = {
+    fvg_bull: "Bull FVG", fvg_bear: "Bear FVG",
+    session_high: "Sess High", session_low: "Sess Low",
+    week_high: "Week High", week_low: "Week Low",
+    swing_high: "Swing H", swing_low: "Swing L",
+    eqh: "EQH", eql: "EQL",
+  };
+  return labels[m.structure_type] ?? m.structure_type;
+}
 import { queryKeys } from "@/lib/query/keys";
 import { useScreenerStore } from "@/store/screener-store";
 import { useUserAlerts } from "@/features/dashboard/hooks/useUserAlerts";
@@ -1088,7 +1105,6 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   <CandlestickChart
                     key={detail.symbol}
                     symbol={detail.symbol}
-                    magnet_structures={detail.magnet_structures ?? []}
                   />
                 </div>
               </div>
