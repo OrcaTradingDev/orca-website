@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
+from pydantic import BaseModel
+from sqlalchemy import func, select, text as sa_text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user
 from app.core.db import get_db
 from app.models.journal_trade import JournalTrade
+from app.models.member_journal_share import MemberJournalShare
 from app.models.user import User
 from app.domain.config import load_screener_config
 from app.domain.signals import adx_dir_from_di, build_signals, ema_state, vol_score_from_atr
@@ -425,3 +428,66 @@ async def update_settings(
     user.journal_coaching_access = body.journal_coaching_access
     await db.commit()
     return CoachingSettings(journal_coaching_access=user.journal_coaching_access)
+
+
+# ── Journal sharing (opt-in: member → founder can view) ──────────────────────
+
+class JournalShareBody(BaseModel):
+    data: Any  # full localStorage journal blob
+
+
+class JournalShareStatus(BaseModel):
+    sharing: bool
+    updated_at: Optional[str] = None
+
+
+@router.get("/share/status", response_model=JournalShareStatus)
+async def get_share_status(
+    db: AsyncSession = Depends(get_db),
+    user_payload: dict = Depends(get_current_user),
+) -> JournalShareStatus:
+    email = user_payload["email"]
+    row = (await db.execute(
+        select(MemberJournalShare).where(MemberJournalShare.email == email)
+    )).scalar_one_or_none()
+    if row is None:
+        return JournalShareStatus(sharing=False)
+    return JournalShareStatus(
+        sharing=True,
+        updated_at=row.updated_at.isoformat() if row.updated_at else None,
+    )
+
+
+@router.post("/share", status_code=200)
+async def save_share(
+    body: JournalShareBody,
+    db: AsyncSession = Depends(get_db),
+    user_payload: dict = Depends(get_current_user),
+) -> dict:
+    """Save or update the member's shared journal snapshot."""
+    email = user_payload["email"]
+    name = user_payload.get("name") or user_payload.get("email")
+    stmt = (
+        pg_insert(MemberJournalShare)
+        .values(email=email, name=name, journal_json=body.data)
+        .on_conflict_do_update(
+            index_elements=["email"],
+            set_={"name": name, "journal_json": body.data, "updated_at": sa_text("NOW()")},
+        )
+    )
+    await db.execute(stmt)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/share", status_code=204)
+async def delete_share(
+    db: AsyncSession = Depends(get_db),
+    user_payload: dict = Depends(get_current_user),
+) -> None:
+    """Remove the member's shared journal snapshot (stops sharing)."""
+    email = user_payload["email"]
+    await db.execute(
+        MemberJournalShare.__table__.delete().where(MemberJournalShare.email == email)
+    )
+    await db.commit()

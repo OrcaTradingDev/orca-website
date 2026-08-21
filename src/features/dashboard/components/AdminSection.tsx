@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuthStore } from "@/store/auth-store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -520,9 +520,134 @@ function ScreenerLabTab() {
   );
 }
 
+// ─── Member Journals tab ──────────────────────────────────────────────────────
+
+interface SharedMember {
+  email: string;
+  name: string | null;
+  updated_at: string | null;
+}
+
+function MemberJournalsTab() {
+  const token = useAuthStore((s) => s.token);
+  const [members, setMembers] = useState<SharedMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewing, setViewing] = useState<{ email: string; name: string | null; data: unknown } | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/admin/member-journals`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then(setMembers)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const openJournal = useCallback(async (email: string, name: string | null) => {
+    if (!token) return;
+    setViewLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/admin/member-journals/${encodeURIComponent(email)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await r.json();
+      setViewing({ email, name, data: j.data });
+    } catch {
+      /* ignore */
+    } finally {
+      setViewLoading(false);
+    }
+  }, [token]);
+
+  if (viewing) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setViewing(null)}
+            className="px-3 py-1.5 text-xs rounded border border-[#1E293B] text-[#94A3B8] hover:text-white hover:border-[#334155] transition-colors"
+          >
+            ← Back
+          </button>
+          <span className="text-white font-medium">{viewing.name ?? viewing.email}</span>
+          <span className="text-[#64748B] text-sm">{viewing.email}</span>
+        </div>
+        <MemberJournalViewer data={viewing.data} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-[#94A3B8] text-sm">
+        Members who have opted in to share their journal with you.
+      </p>
+      {loading ? (
+        <p className="text-[#64748B] text-sm">Loading…</p>
+      ) : members.length === 0 ? (
+        <p className="text-[#64748B] text-sm">No members are currently sharing their journal.</p>
+      ) : (
+        <div className="space-y-2">
+          {members.map((m) => (
+            <div
+              key={m.email}
+              className="flex items-center justify-between bg-[#0F1520] border border-[#1E293B] rounded-xl px-5 py-4"
+            >
+              <div>
+                <p className="text-white text-sm font-medium">{m.name ?? m.email}</p>
+                <p className="text-[#64748B] text-xs mt-0.5">{m.email}</p>
+                {m.updated_at && (
+                  <p className="text-[#64748B] text-xs mt-0.5">
+                    Last synced {new Date(m.updated_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => openJournal(m.email, m.name)}
+                disabled={viewLoading}
+                className="px-4 py-2 text-xs font-medium rounded-lg bg-[#00D4FF] text-black hover:bg-[#00B8D9] transition-colors disabled:opacity-50"
+              >
+                View Journal
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MemberJournalViewer({ data }: { data: unknown }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const journalSrc = `/otos-journal.html?readOnly=1&apiBase=${encodeURIComponent(API_BASE)}`;
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    function onLoad() {
+      iframe?.contentWindow?.postMessage({ type: "orca_inject_journal", data }, "*");
+    }
+    iframe.addEventListener("load", onLoad);
+    return () => iframe.removeEventListener("load", onLoad);
+  }, [data]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      src={journalSrc}
+      style={{ display: "block", width: "100%", height: "calc(100vh - 220px)", border: "none", borderRadius: "12px" }}
+      title="Member Journal"
+    />
+  );
+}
+
 // ─── Main AdminSection ────────────────────────────────────────────────────────
 
-type Tab = "users" | "screener";
+type Tab = "users" | "screener" | "journals";
 
 export default function AdminSection() {
   const [activeTab, setActiveTab] = useState<Tab>("users");
@@ -530,6 +655,7 @@ export default function AdminSection() {
   const tabs: { id: Tab; label: string; icon: string }[] = [
     { id: "users",    label: "User Management", icon: "👥" },
     { id: "screener", label: "Screener Lab",     icon: "⚙️" },
+    { id: "journals", label: "Member Journals",  icon: "📓" },
   ];
 
   return (
@@ -541,7 +667,7 @@ export default function AdminSection() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-[#14181F] border border-[#1E293B] rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-[#14181F] border border-[#1E293B] rounded-xl p-1 w-fit flex-wrap">
         {tabs.map((t) => (
           <button
             key={t.id}
@@ -561,6 +687,7 @@ export default function AdminSection() {
       {/* Tab content */}
       {activeTab === "users"    && <UserManagementTab />}
       {activeTab === "screener" && <ScreenerLabTab />}
+      {activeTab === "journals" && <MemberJournalsTab />}
     </div>
   );
 }

@@ -1052,6 +1052,17 @@
         <div class="hint" style="margin-top:6px">A single sheet with the eight box checklist and the three rules, to keep beside your screen.</div>
       </div>
     </div>
+    <!-- ── Share with OrcaTrading ── -->
+    <div class="form-row" style="border-top:1px solid var(--line);padding-top:18px;margin-top:4px">
+      <div>
+        <label>Share journal with OrcaTrading</label>
+        <div class="hint" style="margin-top:4px">Allow the OrcaTrading team to view your journal for coaching and review. You can turn this off at any time.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+        <button type="button" id="shareToggleBtn" class="btn btn-ghost btn-sm" onclick="toggleShare()">Loading…</button>
+        <span id="shareStatus" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+    </div>
     <div class="modal-foot"><div style="margin-left:auto"><button class="btn btn-primary" onclick="closeSettings()">Done</button></div></div>
   </div>
 </div>
@@ -1101,7 +1112,80 @@ function save(){
     if(ok){txt.textContent='Saved';dot.style.background='#7fe0a8';}
     else{txt.textContent='Storage full, use Export';dot.style.background='var(--warn)';}
   }
+  if(ok && _shareEnabled) _syncShare();
   return ok;
+}
+
+// ── OrcaTrading journal sharing ───────────────────────────────────────────────
+const _API_BASE=(()=>{try{return new URL(location.href).searchParams.get('apiBase')||'';}catch(e){return '';}})();
+let _shareEnabled=false;
+
+function _authToken(){
+  try{const s=localStorage.getItem('auth-storage');if(!s)return null;const p=JSON.parse(s);return (p&&p.state&&p.state.token)||null;}catch(e){return null;}
+}
+
+async function _shareRequest(method,body){
+  const token=_authToken();
+  if(!token||!_API_BASE)return null;
+  try{
+    const res=await fetch(`${_API_BASE}/journal/share`,{
+      method,
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`},
+      body:body?JSON.stringify(body):undefined,
+    });
+    return res;
+  }catch(e){return null;}
+}
+
+async function _syncShare(){
+  const data=JSON.parse(localStorage.getItem(KEY)||'{}');
+  await _shareRequest('POST',{data});
+}
+
+async function _loadShareStatus(){
+  const btn=document.getElementById('shareToggleBtn');
+  const status=document.getElementById('shareStatus');
+  if(!btn)return;
+  const token=_authToken();
+  if(!token||!_API_BASE){btn.textContent='Sign in to share';btn.disabled=true;return;}
+  try{
+    const res=await fetch(`${_API_BASE}/journal/share/status`,{headers:{'Authorization':`Bearer ${token}`}});
+    if(!res.ok)throw new Error();
+    const j=await res.json();
+    _shareEnabled=j.sharing||false;
+    btn.disabled=false;
+    _renderShareBtn(j);
+  }catch(e){btn.textContent='Unable to load';btn.disabled=false;}
+}
+
+function _renderShareBtn(j){
+  const btn=document.getElementById('shareToggleBtn');
+  const status=document.getElementById('shareStatus');
+  if(!btn)return;
+  if(_shareEnabled){
+    btn.textContent='Stop sharing';btn.style.color='var(--bad)';btn.style.borderColor='var(--bad)';
+    if(j&&j.updated_at&&status)status.textContent='Last synced '+new Date(j.updated_at).toLocaleString();
+  }else{
+    btn.textContent='Share with OrcaTrading';btn.style.color='';btn.style.borderColor='';
+    if(status)status.textContent='';
+  }
+}
+
+async function toggleShare(){
+  const btn=document.getElementById('shareToggleBtn');
+  if(!btn)return;
+  btn.disabled=true;
+  if(_shareEnabled){
+    const res=await _shareRequest('DELETE');
+    if(res&&(res.ok||res.status===204)){_shareEnabled=false;_renderShareBtn(null);showToast('Journal sharing disabled.','');}
+    else showToast('Could not disable sharing. Try again.','bad');
+  }else{
+    await _syncShare();
+    const res2=await fetch(`${_API_BASE}/journal/share/status`,{headers:{'Authorization':`Bearer ${_authToken()}`}});
+    const j=res2.ok?await res2.json():{sharing:true};
+    _shareEnabled=true;_renderShareBtn(j);showToast('Journal shared with OrcaTrading.','good');
+  }
+  btn.disabled=false;
 }
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -1924,7 +2008,7 @@ function renderAccentSwatches(){
   document.getElementById('accentSwatches').innerHTML=ACCENTS.map(a=>`<div class="swatch${(state.settings.accent||'')===a[0]?' on':''}" title="${a[1]}" style="background:${a[2]}" data-a="${a[0]}"></div>`).join('');
   document.querySelectorAll('#accentSwatches .swatch').forEach(s=>s.onclick=()=>{state.settings.accent=s.dataset.a;applyAccent();save();renderAccentSwatches();});
 }
-function openSettings(){renderAccentSwatches();document.getElementById('accentCustom').value=(state.settings.accent||'#2f6bab');document.getElementById('logoPreview').src=currentLogo();document.getElementById('screenerUrl').value=(state.settings.screenerUrl||'https://www.tradewithorca.com/screener');document.getElementById('currencySym').value=cur();document.getElementById('settingsOverlay').classList.add('open');}
+function openSettings(){renderAccentSwatches();document.getElementById('accentCustom').value=(state.settings.accent||'#2f6bab');document.getElementById('logoPreview').src=currentLogo();document.getElementById('screenerUrl').value=(state.settings.screenerUrl||'https://www.tradewithorca.com/screener');document.getElementById('currencySym').value=cur();document.getElementById('settingsOverlay').classList.add('open');_loadShareStatus();}
 document.getElementById('screenerUrl').addEventListener('input',e=>{state.settings.screenerUrl=e.target.value;save();});
 document.getElementById('currencySym').addEventListener('input',e=>{state.settings.currency=(e.target.value||'$').slice(0,4);save();updateCurrencyLabels();renderDashboard();});
 document.getElementById('dashRange').addEventListener('change',e=>{dashRange=e.target.value;renderDashboard();});
@@ -2129,6 +2213,26 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{if(
 
 /* ---------- init ---------- */
 load();renderAll();
+
+// Admin read-only injection — parent frame sends member's journal data via postMessage
+window.addEventListener('message',function(e){
+  if(!e.data||e.data.type!=='orca_inject_journal')return;
+  try{
+    const d=e.data.data;
+    if(d&&typeof d==='object'){
+      state=Object.assign({student:'',theme:'dark',practiceMode:false,settings:{accent:'',logo:''},dailyChecks:[],decisions:[],plays:[],weeklies:[]},d);
+      normalize();renderAll();
+      // Mark read-only so saves don't overwrite member data
+      document.querySelectorAll('button,input,textarea,select').forEach(function(el){
+        if(el.id!=='btnTheme')el.setAttribute('disabled','disabled');
+      });
+      const bar=document.createElement('div');
+      bar.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#1e293b;color:#94a3b8;text-align:center;font-size:12px;padding:8px;z-index:9999';
+      bar.textContent='Read-only view — you are viewing a member\'s journal';
+      document.body.appendChild(bar);
+    }
+  }catch(err){}
+});
 </script>
 </body>
 </html>

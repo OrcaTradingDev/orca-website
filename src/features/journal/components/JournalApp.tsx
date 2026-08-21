@@ -9,10 +9,13 @@ export type JournalSection = string;
 // return visits automatically. The OrcaTrading navbar sits above (64px), so
 // the iframe fills the remaining viewport height.
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
 export default function JournalApp() {
+  const src = `/otos-journal.html?apiBase=${encodeURIComponent(API_BASE)}`;
   return (
     <iframe
-      src="/otos-journal.html"
+      src={src}
       style={{
         display: "block",
         width: "100%",
