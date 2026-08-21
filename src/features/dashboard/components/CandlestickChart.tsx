@@ -252,12 +252,11 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
             style={{
               top: 10,
               right: 10,
-              zIndex: 4,
-              background: "rgba(10,22,40,0.82)",
-              border: "1px solid rgba(0,212,255,0.2)",
+              zIndex: 100,
+              background: "rgba(10,22,40,0.88)",
+              border: "1px solid rgba(0,212,255,0.25)",
               borderRadius: 6,
               padding: "6px 10px",
-              backdropFilter: "blur(4px)",
             }}
           >
             {labels.map(({ key, delta, positive, color }) => (
