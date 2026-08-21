@@ -176,40 +176,10 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
 
   return (
     <div className="relative w-full h-full flex flex-col bg-[#0A1628]">
-      {/* Header */}
+      {/* Header row 1: symbol + controls */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#1E293B] shrink-0 gap-2">
-        {/* Left: symbol + forecast band deltas */}
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-[#64748B] text-xs font-medium shrink-0">{symbol}</span>
-          {showForecast && forecastData && (() => {
-            const base = forecastData.last_close;
-            const dec  = base > 100 ? 2 : base > 1 ? 4 : 6;
-            const last = forecastData.timestamps.length - 1;
-            const vals: Record<string, number[]> = {
-              p10: forecastData.p10, p25: forecastData.p25, p50: forecastData.p50,
-              p75: forecastData.p75, p90: forecastData.p90,
-            };
-            return (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {BAND_KEYS.map(key => {
-                  const delta = vals[key][last] - base;
-                  const sign  = delta >= 0 ? "+" : "";
-                  return (
-                    <span key={key} style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, whiteSpace: "nowrap" }}>
-                      <span style={{ color: BAND_LABEL_COLORS[key] }}>{key} </span>
-                      <span style={{ color: delta >= 0 ? "#10B981" : "#EF4444" }}>
-                        {sign}{delta.toFixed(dec)}
-                      </span>
-                    </span>
-                  );
-                })}
-              </div>
-            );
-          })()}
-        </div>
-
-        {/* Right: AI Forecast toggle + timeframe selector */}
-        <div className="flex items-center gap-2 shrink-0">
+        <span className="text-[#64748B] text-xs font-medium">{symbol}</span>
+        <div className="flex items-center gap-2">
           {hasForecastTf && (
             <button
               onClick={() => { setShowForecast(p => !p); if (showForecast) setForecastData(null); }}
@@ -240,6 +210,33 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
           </div>
         </div>
       </div>
+
+      {/* Header row 2: forecast band labels (own row, always full width) */}
+      {showForecast && forecastData && forecastData.timestamps.length > 0 && (() => {
+        const base = forecastData.last_close;
+        const dec  = base > 100 ? 2 : base > 1 ? 4 : 6;
+        const last = forecastData.timestamps.length - 1;
+        const vals: Record<string, number[]> = {
+          p10: forecastData.p10, p25: forecastData.p25, p50: forecastData.p50,
+          p75: forecastData.p75, p90: forecastData.p90,
+        };
+        return (
+          <div className="flex items-center gap-3 px-3 py-1 border-b border-[#1E293B] shrink-0">
+            {BAND_KEYS.map(key => {
+              const delta = vals[key][last] - base;
+              const sign  = delta >= 0 ? "+" : "";
+              return (
+                <span key={key} style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, whiteSpace: "nowrap" }}>
+                  <span style={{ color: BAND_LABEL_COLORS[key] }}>{key} </span>
+                  <span style={{ color: delta >= 0 ? "#10B981" : "#EF4444" }}>
+                    {sign}{delta.toFixed(dec)}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Chart */}
       <div className="flex-1 relative min-h-0">
