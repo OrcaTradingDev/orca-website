@@ -109,7 +109,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     const bandWidths  = [1, 1, 2, 1, 1] as const;
     const bandStyles  = [LineStyle.Dashed, LineStyle.Dashed, LineStyle.Solid, LineStyle.Dashed, LineStyle.Dashed];
 
-    // 20 individual scenario path series (rendered behind bands)
+    // 20 individual scenario path series — hidden until they have data
     pathRefs.current = Array.from({ length: 20 }, () =>
       chart.addLineSeries({
         color: "rgba(0,212,255,0.12)",
@@ -118,6 +118,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false,
+        visible: false,
       })
     );
 
@@ -156,7 +157,10 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     setForecastData(null);
 
     bandRefs.current.forEach(s => s?.setData([]));
-    pathRefs.current.forEach(s => s?.setData([]));
+    pathRefs.current.forEach(s => {
+      s?.setData([]);
+      s?.applyOptions({ visible: false });
+    });
 
     const candlePromise = http.get<{
       candles: { time: number; open: number; high: number; low: number; close: number }[];
@@ -175,9 +179,18 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     Promise.all([candlePromise, forecastPromise]).then(([{ data }, forecast]) => {
       if (cancelled) return;
 
-      // Deduplicate by timestamp (safety net for any duplicate DB rows)
-      const seen = new Set<number>();
-      const uniqueCandles = data.candles.filter(c => !seen.has(c.time) && seen.add(c.time));
+      // Deduplicate by interval bucket — handles rows with off-by-seconds timestamps
+      // within the same candle period (e.g. 14:00:00 and 14:00:01 on a 4H chart).
+      const tfInterval: Record<Timeframe, number> = {
+        "5min": 300, "30min": 1800, "1h": 3600, "4h": 14400, "1day": 86400, "1week": 604800,
+      };
+      const interval = tfInterval[timeframe];
+      const buckets = new Map<number, typeof data.candles[0]>();
+      for (const c of data.candles) {
+        const bucket = Math.floor(c.time / interval);
+        if (!buckets.has(bucket)) buckets.set(bucket, c);
+      }
+      const uniqueCandles = Array.from(buckets.values()).sort((a, b) => a.time - b.time);
       series.setData(uniqueCandles.map(c => ({ ...c, time: c.time as UTCTimestamp })));
 
       if (forecast && showForecast) {
@@ -192,7 +205,10 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
         // Render individual scenario paths (fan behind the percentile bands)
         if (forecast.paths?.length) {
           forecast.paths.forEach((path, i) => {
-            pathRefs.current[i]?.setData([
+            const ref = pathRefs.current[i];
+            if (!ref) return;
+            ref.applyOptions({ visible: true });
+            ref.setData([
               anchor,
               ...forecast.timestamps.map((ts, j) => ({ time: ts as UTCTimestamp, value: path[j] })),
             ]);
