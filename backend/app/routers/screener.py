@@ -30,6 +30,7 @@ from app.schemas.screener import (
     MarketPhase,
     PullbackType,
 )
+from app.models.kronos_forecast import KronosForecast
 from app.domain.magnet_map import compute_bias as _compute_bias
 from app.domain.signals import (
     adx_dir_from_di,
@@ -618,3 +619,43 @@ async def get_candles(
         for ts, o, h, l, c in rows
     ]
     return CandlesResponse(candles=candles)
+
+
+# ── Kronos forecast endpoint ───────────────────────────────────────────────────
+
+_FORECAST_TIMEFRAMES = {"4h", "1day"}
+
+@router.get("/candles/{symbol}/forecast")
+async def get_candle_forecast(
+    symbol: str,
+    timeframe: str = Query("4h"),
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
+):
+    """
+    Return the latest stored Kronos probability bands for a symbol/timeframe.
+    Only 4h and 1day are supported. Returns 404 if no forecast has been computed yet.
+    """
+    symbol = symbol.upper()
+    if timeframe not in _FORECAST_TIMEFRAMES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Forecast only available for timeframes: {sorted(_FORECAST_TIMEFRAMES)}",
+        )
+
+    row = (await db.execute(
+        select(KronosForecast).where(
+            KronosForecast.symbol == symbol,
+            KronosForecast.timeframe == timeframe,
+        )
+    )).scalar_one_or_none()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="No forecast available yet")
+
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "generated_at": row.generated_at.isoformat(),
+        "bands": row.bands,
+    }

@@ -1217,6 +1217,11 @@ async def main():
         except Exception:
             logger.exception("Ingest loop error")
         try:
+            from worker.kronos_worker import run_if_due
+            await run_if_due()
+        except Exception:
+            logger.exception("Kronos run_if_due error")
+        try:
             await asyncio.wait_for(shutdown_event.wait(), timeout=POLL_SECONDS)
         except asyncio.TimeoutError:
             pass
