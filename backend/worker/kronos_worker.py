@@ -159,6 +159,7 @@ def _build_forecast_bands(
     log_returns = np.diff(np.log(closes))
     log_returns = log_returns[np.isfinite(log_returns)]
 
+    sample_paths: list = []
     if len(log_returns) < 20:
         # Too little history — fall back to σ·√t
         sigma = float(np.std(closes[-30:])) if len(closes) >= 30 else float(np.std(closes))
@@ -188,6 +189,10 @@ def _build_forecast_bands(
         p25 = [round(float(v), 8) for v in np.quantile(paths, 0.25, axis=0)]
         p75 = [round(float(v), 8) for v in np.quantile(paths, 0.75, axis=0)]
         p90 = [round(float(v), 8) for v in np.quantile(paths, 0.90, axis=0)]
+        # 20 evenly-spaced individual paths for "scenario fan" rendering on chart
+        idx = np.linspace(0, N_PATHS - 1, 20, dtype=int)
+        sample_paths = [[round(float(v), 4) for v in paths[i]] for i in idx]
+
 
     timestamps = [int(ts.timestamp()) for ts in future_ts]
 
@@ -200,6 +205,7 @@ def _build_forecast_bands(
         "p50": p50,
         "p75": p75,
         "p90": p90,
+        "paths": sample_paths,  # 20 individual scenario paths for fan chart
     }
 
 

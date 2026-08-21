@@ -25,6 +25,7 @@ interface ForecastBands {
   p50: number[];
   p75: number[];
   p90: number[];
+  paths?: number[][];  // 20 individual scenario paths for fan rendering
 }
 
 
@@ -70,6 +71,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
   const chartRef     = useRef<IChartApi | null>(null);
   const seriesRef    = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const bandRefs     = useRef<(ISeriesApi<"Line"> | null)[]>([null, null, null, null, null]);
+  const pathRefs     = useRef<(ISeriesApi<"Line"> | null)[]>([]);
 
   const [timeframe, setTimeframe]       = useState<Timeframe>("4h");
   const [loading, setLoading]           = useState(true);
@@ -107,6 +109,18 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     const bandWidths  = [1, 1, 2, 1, 1] as const;
     const bandStyles  = [LineStyle.Dashed, LineStyle.Dashed, LineStyle.Solid, LineStyle.Dashed, LineStyle.Dashed];
 
+    // 20 individual scenario path series (rendered behind bands)
+    pathRefs.current = Array.from({ length: 20 }, () =>
+      chart.addLineSeries({
+        color: "rgba(0,212,255,0.12)",
+        lineWidth: 1,
+        lineStyle: LineStyle.Solid,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      })
+    );
+
     bandRefs.current = SERIES_ORDER.map((_, i) =>
       chart.addLineSeries({
         color: BAND_COLORS[i],
@@ -126,6 +140,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       chartRef.current  = null;
       seriesRef.current = null;
       bandRefs.current  = [null, null, null, null, null];
+      pathRefs.current  = [];
     };
   }, []);
 
@@ -141,6 +156,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     setForecastData(null);
 
     bandRefs.current.forEach(s => s?.setData([]));
+    pathRefs.current.forEach(s => s?.setData([]));
 
     const candlePromise = http.get<{
       candles: { time: number; open: number; high: number; low: number; close: number }[];
@@ -170,17 +186,20 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
             ...forecast.timestamps.map((ts, j) => ({ time: ts as UTCTimestamp, value: band[j] })),
           ]);
         });
+        // Render individual scenario paths (fan behind the percentile bands)
+        if (forecast.paths?.length) {
+          forecast.paths.forEach((path, i) => {
+            pathRefs.current[i]?.setData([
+              anchor,
+              ...forecast.timestamps.map((ts, j) => ({ time: ts as UTCTimestamp, value: path[j] })),
+            ]);
+          });
+        }
+
         setForecastData(forecast);
       }
 
-      // Show the last N candles + all forecast bars so history isn't compressed
-      const candleCount   = data.candles.length;
-      const forecastCount = forecast ? forecast.timestamps.length + 1 : 0;
-      const viewBars      = TF_VIEWPORT[timeframe];
-      chart.timeScale().setVisibleLogicalRange({
-        from: Math.max(0, candleCount - viewBars),
-        to:   candleCount + forecastCount,
-      });
+      chart.timeScale().fitContent();
       setLoading(false);
     }).catch(() => {
       if (!cancelled) { setError("Failed to load chart data"); setLoading(false); }
