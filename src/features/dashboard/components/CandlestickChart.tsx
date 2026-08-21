@@ -207,9 +207,27 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
   return (
     <div className="relative w-full h-full flex flex-col bg-[#0A1628]">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1E293B] shrink-0">
-        <span className="text-[#64748B] text-xs font-medium">{symbol}</span>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#1E293B] shrink-0 gap-2">
+        {/* Left: symbol + forecast band deltas */}
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-[#64748B] text-xs font-medium shrink-0">{symbol}</span>
+          {showForecast && labels && (
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {labels.map(({ key, delta, positive }) => (
+                <span
+                  key={key}
+                  style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, whiteSpace: "nowrap" }}
+                >
+                  <span style={{ color: "#64748B" }}>{key} </span>
+                  <span style={{ color: positive ? "#10B981" : "#EF4444" }}>{delta}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Right: AI Forecast toggle + timeframe selector */}
+        <div className="flex items-center gap-2 shrink-0">
           {hasForecastTf && (
             <button
               onClick={() => { setShowForecast(p => !p); if (showForecast) setLabels(null); }}
@@ -244,42 +262,6 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       {/* Chart */}
       <div className="flex-1 relative min-h-0">
         <div ref={containerRef} className="absolute inset-0" />
-
-        {/* Forecast legend — top-right corner, always in-frame */}
-        {showForecast && labels && !loading && (
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: 10,
-              right: 10,
-              zIndex: 100,
-              background: "rgba(10,22,40,0.88)",
-              border: "1px solid rgba(0,212,255,0.25)",
-              borderRadius: 6,
-              padding: "6px 10px",
-            }}
-          >
-            {labels.map(({ key, delta, positive, color }) => (
-              <div
-                key={key}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  fontFamily: "ui-monospace, monospace",
-                  fontSize: 11,
-                  lineHeight: "18px",
-                  color,
-                }}
-              >
-                <span style={{ opacity: 0.6, minWidth: 26 }}>{key}</span>
-                <span style={{ color: positive ? "#10B981" : "#EF4444", minWidth: 60, textAlign: "right" }}>
-                  {delta}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
 
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0A1628]/80" style={{ zIndex: 2 }}>
