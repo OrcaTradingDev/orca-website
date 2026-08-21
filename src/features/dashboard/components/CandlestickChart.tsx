@@ -94,7 +94,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       priceLineStyle: LineStyle.Dashed,
     });
 
-    const bandWidths  = [1, 1, 1.5, 1, 1] as const;
+    const bandWidths  = [1, 1, 2, 1, 1] as const;
     const bandStyles  = [LineStyle.Dashed, LineStyle.Dashed, LineStyle.Solid, LineStyle.Dashed, LineStyle.Dashed];
 
     bandRefs.current = SERIES_ORDER.map((_, i) =>
