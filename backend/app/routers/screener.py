@@ -583,7 +583,7 @@ ALLOWED_TIMEFRAMES = {"5min", "30min", "1h", "4h", "1day", "1week"}
 async def get_candles(
     symbol: str,
     timeframe: str = Query("4h"),
-    limit: int = Query(200, ge=10, le=1000),
+    limit: int = Query(200, ge=10, le=3000),
     db: AsyncSession = Depends(get_db),
     _user: dict = Depends(get_current_user),
 ) -> CandlesResponse:
