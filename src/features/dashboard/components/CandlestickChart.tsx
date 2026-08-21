@@ -39,7 +39,7 @@ const FORECAST_TIMEFRAMES: Set<Timeframe> = new Set(["4h", "1day"]);
 
 // How many candles to fetch per timeframe
 const TF_LIMIT: Record<Timeframe, number> = {
-  "5min": 200, "30min": 200, "1h": 200, "4h": 400, "1day": 500, "1week": 200,
+  "5min": 200, "30min": 200, "1h": 200, "4h": 2000, "1day": 1500, "1week": 200,
 };
 
 // How many recent candles to show in the initial viewport (rest scrollable)
