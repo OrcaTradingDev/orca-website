@@ -36,6 +36,16 @@ const TF_LABELS: Record<Timeframe, string> = {
 
 const FORECAST_TIMEFRAMES: Set<Timeframe> = new Set(["4h", "1day"]);
 
+// How many candles to fetch per timeframe
+const TF_LIMIT: Record<Timeframe, number> = {
+  "5min": 200, "30min": 200, "1h": 200, "4h": 400, "1day": 500, "1week": 200,
+};
+
+// How many recent candles to show in the initial viewport (rest scrollable)
+const TF_VIEWPORT: Record<Timeframe, number> = {
+  "5min": 100, "30min": 100, "1h": 100, "4h": 100, "1day": 120, "1week": 100,
+};
+
 const BAND_KEYS = ["p90", "p75", "p50", "p25", "p10"] as const;
 const BAND_COLORS = [
   "rgba(0,212,255,0.35)",  // p10
@@ -134,7 +144,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
 
     const candlePromise = http.get<{
       candles: { time: number; open: number; high: number; low: number; close: number }[];
-    }>(`/screener/candles/${symbol}`, { params: { timeframe, limit: 200 } });
+    }>(`/screener/candles/${symbol}`, { params: { timeframe, limit: TF_LIMIT[timeframe] } });
 
     const forecastPromise: Promise<ForecastBands | null> =
       FORECAST_TIMEFRAMES.has(timeframe) && showForecast
@@ -163,7 +173,14 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
         setForecastData(forecast);
       }
 
-      chart.timeScale().fitContent();
+      // Show the last N candles + all forecast bars so history isn't compressed
+      const candleCount   = data.candles.length;
+      const forecastCount = forecast ? forecast.timestamps.length + 1 : 0;
+      const viewBars      = TF_VIEWPORT[timeframe];
+      chart.timeScale().setVisibleLogicalRange({
+        from: Math.max(0, candleCount - viewBars),
+        to:   candleCount + forecastCount,
+      });
       setLoading(false);
     }).catch(() => {
       if (!cancelled) { setError("Failed to load chart data"); setLoading(false); }

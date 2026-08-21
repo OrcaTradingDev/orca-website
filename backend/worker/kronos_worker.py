@@ -149,23 +149,45 @@ def _build_forecast_bands(
 
     # p50 = Kronos mean forecast for close
     predicted_closes = predicted["close"].values.astype(float)
+    p50 = [round(float(v), 8) for v in predicted_closes]
 
-    # σ from last 30 historical closes (capped at 1 for safety)
-    last_30 = df["close"].values[-30:].astype(float)
-    sigma = float(np.std(last_30))
-    if sigma == 0:
-        sigma = float(abs(last_30[-1]) * 0.001)  # fallback: 0.1% of price
+    # ── Bootstrap uncertainty bands ───────────────────────────────────────────
+    # Resample 500 paths from this asset's actual historical log-return
+    # distribution, then center each path on the Kronos directional prediction.
+    # This gives asset-specific, non-symmetric bands instead of a formulaic cone.
+    closes = df["close"].values.astype(float)
+    log_returns = np.diff(np.log(closes))
+    log_returns = log_returns[np.isfinite(log_returns)]
 
-    # Build bands with √t horizon scaling
-    p50 = predicted_closes.tolist()
-    p25, p75, p10, p90 = [], [], [], []
-    for i, mid in enumerate(p50):
-        scale = math.sqrt(i + 1)
-        p25.append(round(mid - 0.675 * sigma * scale, 8))
-        p75.append(round(mid + 0.675 * sigma * scale, 8))
-        p10.append(round(mid - 1.281 * sigma * scale, 8))
-        p90.append(round(mid + 1.281 * sigma * scale, 8))
-        p50[i] = round(mid, 8)
+    if len(log_returns) < 20:
+        # Too little history — fall back to σ·√t
+        sigma = float(np.std(closes[-30:])) if len(closes) >= 30 else float(np.std(closes))
+        if sigma == 0:
+            sigma = abs(float(closes[-1])) * 0.001
+        p10, p25, p75, p90 = [], [], [], []
+        for i, mid in enumerate(p50):
+            s = math.sqrt(i + 1)
+            p10.append(round(mid - 1.281 * sigma * s, 8))
+            p25.append(round(mid - 0.675 * sigma * s, 8))
+            p75.append(round(mid + 0.675 * sigma * s, 8))
+            p90.append(round(mid + 1.281 * sigma * s, 8))
+    else:
+        N_PATHS = 500
+        rng = np.random.default_rng(seed=42)
+        # 500 × pred_len matrix of resampled single-period log returns
+        sampled = rng.choice(log_returns, size=(N_PATHS, pred_len), replace=True)
+        # Compound from last close → 500 simulated price paths
+        paths = float(closes[-1]) * np.exp(np.cumsum(sampled, axis=1))  # (500, pred_len)
+        # Shift each path so the bootstrap median aligns with the Kronos p50
+        # at every step (preserves Kronos directional bias, uses bootstrap shape)
+        bootstrap_median = np.median(paths, axis=0)
+        kronos_arr = np.array(predicted_closes)
+        bias = np.where(bootstrap_median != 0, kronos_arr / bootstrap_median, 1.0)
+        paths = paths * bias
+        p10 = [round(float(v), 8) for v in np.quantile(paths, 0.10, axis=0)]
+        p25 = [round(float(v), 8) for v in np.quantile(paths, 0.25, axis=0)]
+        p75 = [round(float(v), 8) for v in np.quantile(paths, 0.75, axis=0)]
+        p90 = [round(float(v), 8) for v in np.quantile(paths, 0.90, axis=0)]
 
     timestamps = [int(ts.timestamp()) for ts in future_ts]
 
