@@ -27,12 +27,6 @@ interface ForecastBands {
   p90: number[];
 }
 
-interface BandLabel {
-  key: string;
-  delta: string;
-  positive: boolean;
-  color: string;
-}
 
 const TIMEFRAMES = ["5min", "30min", "1h", "4h", "1day", "1week"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
@@ -42,7 +36,7 @@ const TF_LABELS: Record<Timeframe, string> = {
 
 const FORECAST_TIMEFRAMES: Set<Timeframe> = new Set(["4h", "1day"]);
 
-const BAND_KEYS   = ["p90", "p75", "p50", "p25", "p10"] as const;
+const BAND_KEYS = ["p90", "p75", "p50", "p25", "p10"] as const;
 const BAND_COLORS = [
   "rgba(0,212,255,0.35)",  // p10
   "rgba(0,212,255,0.55)",  // p25
@@ -53,37 +47,13 @@ const BAND_COLORS = [
 // series order matches band arrays: p10, p25, p50, p75, p90
 const SERIES_ORDER = ["p10", "p25", "p50", "p75", "p90"] as const;
 
-function formatDelta(delta: number, base: number): string {
-  const sign = delta >= 0 ? "+" : "";
-  const dec = base > 100 ? 2 : base > 1 ? 4 : 6;
-  return `${sign}${delta.toFixed(dec)}`;
-}
-
-function buildLabels(forecast: ForecastBands): BandLabel[] {
-  const last = forecast.timestamps.length - 1;
-  const base  = forecast.last_close;
-  const bands: Record<string, number[]> = {
-    p10: forecast.p10, p25: forecast.p25, p50: forecast.p50,
-    p75: forecast.p75, p90: forecast.p90,
-  };
-  const labelColors: Record<string, string> = {
-    p90: "rgba(0,212,255,0.60)",
-    p75: "rgba(0,212,255,0.80)",
-    p50: "#00D4FF",
-    p25: "rgba(0,212,255,0.80)",
-    p10: "rgba(0,212,255,0.60)",
-  };
-  return BAND_KEYS.map((key) => {
-    const price = bands[key][last];
-    const delta = price - base;
-    return {
-      key,
-      delta: formatDelta(delta, base),
-      positive: delta >= 0,
-      color: labelColors[key],
-    };
-  });
-}
+const BAND_LABEL_COLORS: Record<string, string> = {
+  p90: "rgba(0,212,255,0.60)",
+  p75: "rgba(0,212,255,0.80)",
+  p50: "#00D4FF",
+  p25: "rgba(0,212,255,0.80)",
+  p10: "rgba(0,212,255,0.60)",
+};
 
 export default function CandlestickChart({ symbol }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,8 +64,8 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
   const [timeframe, setTimeframe]       = useState<Timeframe>("4h");
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState<string | null>(null);
-  const [showForecast, setShowForecast] = useState(true);
-  const [labels, setLabels]             = useState<BandLabel[] | null>(null);
+  const [showForecast, setShowForecast]     = useState(true);
+  const [forecastData, setForecastData]   = useState<ForecastBands | null>(null);
 
   // ── Chart creation (once) ─────────────────────────────────────────────────
   useEffect(() => {
@@ -158,7 +128,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    setLabels(null);
+    setForecastData(null);
 
     bandRefs.current.forEach(s => s?.setData([]));
 
@@ -190,7 +160,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
             ...forecast.timestamps.map((ts, j) => ({ time: ts as UTCTimestamp, value: band[j] })),
           ]);
         });
-        setLabels(buildLabels(forecast));
+        setForecastData(forecast);
       }
 
       chart.timeScale().fitContent();
@@ -211,26 +181,38 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
         {/* Left: symbol + forecast band deltas */}
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-[#64748B] text-xs font-medium shrink-0">{symbol}</span>
-          {showForecast && labels && (
-            <div className="flex items-center gap-2 overflow-x-auto">
-              {labels.map(({ key, delta, positive }) => (
-                <span
-                  key={key}
-                  style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, whiteSpace: "nowrap" }}
-                >
-                  <span style={{ color: "#64748B" }}>{key} </span>
-                  <span style={{ color: positive ? "#10B981" : "#EF4444" }}>{delta}</span>
-                </span>
-              ))}
-            </div>
-          )}
+          {showForecast && forecastData && (() => {
+            const base = forecastData.last_close;
+            const dec  = base > 100 ? 2 : base > 1 ? 4 : 6;
+            const last = forecastData.timestamps.length - 1;
+            const vals: Record<string, number[]> = {
+              p10: forecastData.p10, p25: forecastData.p25, p50: forecastData.p50,
+              p75: forecastData.p75, p90: forecastData.p90,
+            };
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {BAND_KEYS.map(key => {
+                  const delta = vals[key][last] - base;
+                  const sign  = delta >= 0 ? "+" : "";
+                  return (
+                    <span key={key} style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, whiteSpace: "nowrap" }}>
+                      <span style={{ color: BAND_LABEL_COLORS[key] }}>{key} </span>
+                      <span style={{ color: delta >= 0 ? "#10B981" : "#EF4444" }}>
+                        {sign}{delta.toFixed(dec)}
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Right: AI Forecast toggle + timeframe selector */}
         <div className="flex items-center gap-2 shrink-0">
           {hasForecastTf && (
             <button
-              onClick={() => { setShowForecast(p => !p); if (showForecast) setLabels(null); }}
+              onClick={() => { setShowForecast(p => !p); if (showForecast) setForecastData(null); }}
               title="Toggle Kronos AI forecast"
               className={`px-2 py-1 text-[10px] rounded font-medium transition-colors border ${
                 showForecast
