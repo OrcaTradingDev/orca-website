@@ -596,7 +596,7 @@ async def get_candles(
             """
             SELECT timestamp, open, high, low, close
             FROM (
-                SELECT timestamp, open, high, low, close
+                SELECT DISTINCT ON (timestamp) timestamp, open, high, low, close
                 FROM market_prices
                 WHERE symbol = :s AND timeframe = :tf
                 ORDER BY timestamp DESC

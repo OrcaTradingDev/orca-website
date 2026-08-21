@@ -175,7 +175,10 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     Promise.all([candlePromise, forecastPromise]).then(([{ data }, forecast]) => {
       if (cancelled) return;
 
-      series.setData(data.candles.map(c => ({ ...c, time: c.time as UTCTimestamp })));
+      // Deduplicate by timestamp (safety net for any duplicate DB rows)
+      const seen = new Set<number>();
+      const uniqueCandles = data.candles.filter(c => !seen.has(c.time) && seen.add(c.time));
+      series.setData(uniqueCandles.map(c => ({ ...c, time: c.time as UTCTimestamp })));
 
       if (forecast && showForecast) {
         const anchor     = { time: forecast.last_candle_time as UTCTimestamp, value: forecast.last_close };
