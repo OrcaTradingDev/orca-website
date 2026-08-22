@@ -25,9 +25,8 @@ interface ForecastBands {
   p50: number[];
   p75: number[];
   p90: number[];
-  paths?: number[][];  // 20 individual scenario paths for fan rendering
+  paths?: number[][];
 }
-
 
 const TIMEFRAMES = ["5min", "30min", "1h", "4h", "1day", "1week"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
@@ -37,26 +36,11 @@ const TF_LABELS: Record<Timeframe, string> = {
 
 const FORECAST_TIMEFRAMES: Set<Timeframe> = new Set(["4h", "1day"]);
 
-// How many candles to fetch per timeframe
 const TF_LIMIT: Record<Timeframe, number> = {
   "5min": 200, "30min": 200, "1h": 200, "4h": 2000, "1day": 1500, "1week": 200,
 };
 
-// How many recent candles to show in the initial viewport (rest scrollable)
-const TF_VIEWPORT: Record<Timeframe, number> = {
-  "5min": 100, "30min": 100, "1h": 100, "4h": 100, "1day": 120, "1week": 100,
-};
-
 const BAND_KEYS = ["p90", "p75", "p50", "p25", "p10"] as const;
-const BAND_COLORS = [
-  "rgba(0,212,255,0.35)",  // p10
-  "rgba(0,212,255,0.55)",  // p25
-  "#00D4FF",                // p50
-  "rgba(0,212,255,0.55)",  // p75
-  "rgba(0,212,255,0.35)",  // p90
-];
-// series order matches band arrays: p10, p25, p50, p75, p90
-const SERIES_ORDER = ["p10", "p25", "p50", "p75", "p90"] as const;
 
 const BAND_LABEL_COLORS: Record<string, string> = {
   p90: "rgba(0,212,255,0.60)",
@@ -70,14 +54,13 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef     = useRef<IChartApi | null>(null);
   const seriesRef    = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const bandRefs     = useRef<(ISeriesApi<"Line"> | null)[]>([null, null, null, null, null]);
   const pathRefs     = useRef<(ISeriesApi<"Line"> | null)[]>([]);
 
-  const [timeframe, setTimeframe]       = useState<Timeframe>("4h");
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState<string | null>(null);
-  const [showForecast, setShowForecast]     = useState(true);
-  const [forecastData, setForecastData]   = useState<ForecastBands | null>(null);
+  const [timeframe, setTimeframe]     = useState<Timeframe>("4h");
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [showForecast, setShowForecast] = useState(true);
+  const [forecastData, setForecastData] = useState<ForecastBands | null>(null);
 
   // ── Chart creation (once) ─────────────────────────────────────────────────
   useEffect(() => {
@@ -106,10 +89,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       priceLineStyle: LineStyle.Dashed,
     });
 
-    const bandWidths  = [1, 1, 2, 1, 1] as const;
-    const bandStyles  = [LineStyle.Dashed, LineStyle.Dashed, LineStyle.Solid, LineStyle.Dashed, LineStyle.Dashed];
-
-    // 20 individual scenario path series — hidden until they have data
+    // 20 individual scenario path series — hidden until populated
     pathRefs.current = Array.from({ length: 20 }, () =>
       chart.addLineSeries({
         color: "rgba(0,212,255,0.12)",
@@ -122,17 +102,6 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       })
     );
 
-    bandRefs.current = SERIES_ORDER.map((_, i) =>
-      chart.addLineSeries({
-        color: BAND_COLORS[i],
-        lineWidth: bandWidths[i],
-        lineStyle: bandStyles[i],
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false,
-      })
-    );
-
     chartRef.current  = chart;
     seriesRef.current = series;
 
@@ -140,7 +109,6 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       chart.remove();
       chartRef.current  = null;
       seriesRef.current = null;
-      bandRefs.current  = [null, null, null, null, null];
       pathRefs.current  = [];
     };
   }, []);
@@ -156,7 +124,6 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     setError(null);
     setForecastData(null);
 
-    bandRefs.current.forEach(s => s?.setData([]));
     pathRefs.current.forEach(s => {
       s?.setData([]);
       s?.applyOptions({ visible: false });
@@ -179,8 +146,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     Promise.all([candlePromise, forecastPromise]).then(([{ data }, forecast]) => {
       if (cancelled) return;
 
-      // Deduplicate by interval bucket — handles rows with off-by-seconds timestamps
-      // within the same candle period (e.g. 14:00:00 and 14:00:01 on a 4H chart).
+      // Deduplicate by interval bucket — handles off-by-seconds timestamps in same period
       const tfInterval: Record<Timeframe, number> = {
         "5min": 300, "30min": 1800, "1h": 3600, "4h": 14400, "1day": 86400, "1week": 604800,
       };
@@ -194,15 +160,8 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       series.setData(uniqueCandles.map(c => ({ ...c, time: c.time as UTCTimestamp })));
 
       if (forecast && showForecast) {
-        const anchor     = { time: forecast.last_candle_time as UTCTimestamp, value: forecast.last_close };
-        const bandArrays = [forecast.p10, forecast.p25, forecast.p50, forecast.p75, forecast.p90];
-        bandArrays.forEach((band, i) => {
-          bandRefs.current[i]?.setData([
-            anchor,
-            ...forecast.timestamps.map((ts, j) => ({ time: ts as UTCTimestamp, value: band[j] })),
-          ]);
-        });
-        // Render individual scenario paths (fan behind the percentile bands)
+        const anchor = { time: forecast.last_candle_time as UTCTimestamp, value: forecast.last_close };
+
         if (forecast.paths?.length) {
           forecast.paths.forEach((path, i) => {
             const ref = pathRefs.current[i];
@@ -266,7 +225,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
         </div>
       </div>
 
-      {/* Header row 2: forecast band labels (own row, always full width) */}
+      {/* Header row 2: forecast probability labels */}
       {showForecast && forecastData && forecastData.timestamps.length > 0 && (() => {
         const base = forecastData.last_close;
         const dec  = base > 100 ? 2 : base > 1 ? 4 : 6;
