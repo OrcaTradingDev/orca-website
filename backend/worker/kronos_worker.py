@@ -189,9 +189,8 @@ def _build_forecast_bands(
         p25 = [round(float(v), 8) for v in np.quantile(paths, 0.25, axis=0)]
         p75 = [round(float(v), 8) for v in np.quantile(paths, 0.75, axis=0)]
         p90 = [round(float(v), 8) for v in np.quantile(paths, 0.90, axis=0)]
-        # 20 evenly-spaced individual paths for "scenario fan" rendering on chart
-        idx = np.linspace(0, N_PATHS - 1, 20, dtype=int)
-        sample_paths = [[round(float(v), 4) for v in paths[i]] for i in idx]
+        # All 500 paths for scenario fan rendering on chart
+        sample_paths = [[round(float(v), 4) for v in paths[i]] for i in range(N_PATHS)]
 
 
     timestamps = [int(ts.timestamp()) for ts in future_ts]

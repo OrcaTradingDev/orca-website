@@ -89,8 +89,8 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       priceLineStyle: LineStyle.Dashed,
     });
 
-    // 20 individual scenario path series — hidden until populated
-    pathRefs.current = Array.from({ length: 20 }, () =>
+    // 500 individual scenario path series — hidden until populated
+    pathRefs.current = Array.from({ length: 500 }, () =>
       chart.addLineSeries({
         color: "rgba(0,212,255,0.12)",
         lineWidth: 1,
