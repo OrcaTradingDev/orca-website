@@ -16,10 +16,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import math
 import os
 import subprocess
 import sys
+import time as _time
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -137,9 +137,8 @@ def _build_forecast_bands(
     # anchored on those draws. Staleness-check in run_all_forecasts ensures
     # this only runs when a new candle has arrived, so the 4H window budget
     # is not spent on already-fresh forecasts.
-    N_KRONOS_SAMPLES = 50   # true Kronos draws per symbol/timeframe
+    N_KRONOS_SAMPLES = 500  # true Kronos draws per symbol/timeframe
 
-    import time as _time
     kronos_paths: list[list[float]] = []
     _t0 = _time.monotonic()
     for _ in range(N_KRONOS_SAMPLES):
@@ -168,44 +167,14 @@ def _build_forecast_bands(
         logger.warning("No Kronos draws succeeded — skipping")
         return None
 
-    kronos_arr = np.array(kronos_paths)          # (N_KRONOS_SAMPLES, pred_len)
-    predicted_closes = kronos_arr.mean(axis=0)   # mean across draws = p50
+    kronos_arr = np.array(kronos_paths)        # (n_draws, pred_len)
+    predicted_closes = kronos_arr.mean(axis=0) # mean across all draws = p50
     p50 = [round(float(v), 8) for v in predicted_closes]
-
-    # ── Bootstrap the remaining paths from historical returns ─────────────────
-    closes = df["close"].values.astype(float)
-    log_returns = np.diff(np.log(closes))
-    log_returns = log_returns[np.isfinite(log_returns)]
-
-    sample_paths: list = []
-    if len(log_returns) < 20:
-        sigma = float(np.std(closes[-30:])) if len(closes) >= 30 else float(np.std(closes))
-        if sigma == 0:
-            sigma = abs(float(closes[-1])) * 0.001
-        p10, p25, p75, p90 = [], [], [], []
-        for i, mid in enumerate(p50):
-            s = math.sqrt(i + 1)
-            p10.append(round(mid - 1.281 * sigma * s, 8))
-            p25.append(round(mid - 0.675 * sigma * s, 8))
-            p75.append(round(mid + 0.675 * sigma * s, 8))
-            p90.append(round(mid + 1.281 * sigma * s, 8))
-        sample_paths = [list(map(float, p)) for p in kronos_paths]
-    else:
-        N_BOOTSTRAP = 500 - len(kronos_paths)
-        rng = np.random.default_rng(seed=42)
-        sampled = rng.choice(log_returns, size=(N_BOOTSTRAP, pred_len), replace=True)
-        boot_paths = float(closes[-1]) * np.exp(np.cumsum(sampled, axis=1))
-        # Center bootstrap paths on the Kronos mean direction
-        boot_median = np.median(boot_paths, axis=0)
-        bias = np.where(boot_median != 0, predicted_closes / boot_median, 1.0)
-        boot_paths = boot_paths * bias
-        # Combine: true Kronos draws + bias-adjusted bootstrap
-        all_paths = np.vstack([kronos_arr, boot_paths])   # (500, pred_len)
-        p10 = [round(float(v), 8) for v in np.quantile(all_paths, 0.10, axis=0)]
-        p25 = [round(float(v), 8) for v in np.quantile(all_paths, 0.25, axis=0)]
-        p75 = [round(float(v), 8) for v in np.quantile(all_paths, 0.75, axis=0)]
-        p90 = [round(float(v), 8) for v in np.quantile(all_paths, 0.90, axis=0)]
-        sample_paths = [[round(float(v), 4) for v in all_paths[i]] for i in range(len(all_paths))]
+    p10 = [round(float(v), 8) for v in np.quantile(kronos_arr, 0.10, axis=0)]
+    p25 = [round(float(v), 8) for v in np.quantile(kronos_arr, 0.25, axis=0)]
+    p75 = [round(float(v), 8) for v in np.quantile(kronos_arr, 0.75, axis=0)]
+    p90 = [round(float(v), 8) for v in np.quantile(kronos_arr, 0.90, axis=0)]
+    sample_paths = [[round(float(v), 4) for v in kronos_arr[i]] for i in range(len(kronos_arr))]
 
 
     timestamps = [int(ts.timestamp()) for ts in future_ts]
