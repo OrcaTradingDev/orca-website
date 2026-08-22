@@ -131,37 +131,54 @@ def _build_forecast_bands(
     x_timestamp = df["timestamp"]
     y_timestamp = pd.Series(future_ts)
 
-    # Run Kronos (sync, called in executor)
-    try:
-        predicted = predictor.predict(
-            df,
-            x_timestamp,
-            y_timestamp,
-            pred_len=pred_len,
-            T=0.9,
-            top_p=0.9,
-            sample_count=20,
-            verbose=False,
-        )
-    except Exception:
-        logger.exception("Kronos predict() failed")
+    # ── True Kronos stochastic paths ─────────────────────────────────────────
+    # Call predict(sample_count=1) N_KRONOS_SAMPLES times to get distinct
+    # Kronos draws, then bootstrap the remainder from historical returns
+    # anchored on those draws. Staleness-check in run_all_forecasts ensures
+    # this only runs when a new candle has arrived, so the 4H window budget
+    # is not spent on already-fresh forecasts.
+    N_KRONOS_SAMPLES = 50   # true Kronos draws per symbol/timeframe
+
+    import time as _time
+    kronos_paths: list[list[float]] = []
+    _t0 = _time.monotonic()
+    for _ in range(N_KRONOS_SAMPLES):
+        try:
+            draw = predictor.predict(
+                df,
+                x_timestamp,
+                y_timestamp,
+                pred_len=pred_len,
+                T=0.9,
+                top_p=0.9,
+                sample_count=1,
+                verbose=False,
+            )
+            kronos_paths.append(draw["close"].values.astype(float).tolist())
+        except Exception:
+            logger.exception("Kronos predict() draw failed")
+            break
+    _elapsed = _time.monotonic() - _t0
+    logger.info(
+        "Kronos %d draws for %s took %.1fs (%.2fs/draw)",
+        len(kronos_paths), timeframe, _elapsed, _elapsed / max(len(kronos_paths), 1),
+    )
+
+    if not kronos_paths:
+        logger.warning("No Kronos draws succeeded — skipping")
         return None
 
-    # p50 = Kronos mean forecast for close
-    predicted_closes = predicted["close"].values.astype(float)
+    kronos_arr = np.array(kronos_paths)          # (N_KRONOS_SAMPLES, pred_len)
+    predicted_closes = kronos_arr.mean(axis=0)   # mean across draws = p50
     p50 = [round(float(v), 8) for v in predicted_closes]
 
-    # ── Bootstrap uncertainty bands ───────────────────────────────────────────
-    # Resample 500 paths from this asset's actual historical log-return
-    # distribution, then center each path on the Kronos directional prediction.
-    # This gives asset-specific, non-symmetric bands instead of a formulaic cone.
+    # ── Bootstrap the remaining paths from historical returns ─────────────────
     closes = df["close"].values.astype(float)
     log_returns = np.diff(np.log(closes))
     log_returns = log_returns[np.isfinite(log_returns)]
 
     sample_paths: list = []
     if len(log_returns) < 20:
-        # Too little history — fall back to σ·√t
         sigma = float(np.std(closes[-30:])) if len(closes) >= 30 else float(np.std(closes))
         if sigma == 0:
             sigma = abs(float(closes[-1])) * 0.001
@@ -172,25 +189,23 @@ def _build_forecast_bands(
             p25.append(round(mid - 0.675 * sigma * s, 8))
             p75.append(round(mid + 0.675 * sigma * s, 8))
             p90.append(round(mid + 1.281 * sigma * s, 8))
+        sample_paths = [list(map(float, p)) for p in kronos_paths]
     else:
-        N_PATHS = 500
+        N_BOOTSTRAP = 500 - len(kronos_paths)
         rng = np.random.default_rng(seed=42)
-        # 500 × pred_len matrix of resampled single-period log returns
-        sampled = rng.choice(log_returns, size=(N_PATHS, pred_len), replace=True)
-        # Compound from last close → 500 simulated price paths
-        paths = float(closes[-1]) * np.exp(np.cumsum(sampled, axis=1))  # (500, pred_len)
-        # Shift each path so the bootstrap median aligns with the Kronos p50
-        # at every step (preserves Kronos directional bias, uses bootstrap shape)
-        bootstrap_median = np.median(paths, axis=0)
-        kronos_arr = np.array(predicted_closes)
-        bias = np.where(bootstrap_median != 0, kronos_arr / bootstrap_median, 1.0)
-        paths = paths * bias
-        p10 = [round(float(v), 8) for v in np.quantile(paths, 0.10, axis=0)]
-        p25 = [round(float(v), 8) for v in np.quantile(paths, 0.25, axis=0)]
-        p75 = [round(float(v), 8) for v in np.quantile(paths, 0.75, axis=0)]
-        p90 = [round(float(v), 8) for v in np.quantile(paths, 0.90, axis=0)]
-        # All 500 paths for scenario fan rendering on chart
-        sample_paths = [[round(float(v), 4) for v in paths[i]] for i in range(N_PATHS)]
+        sampled = rng.choice(log_returns, size=(N_BOOTSTRAP, pred_len), replace=True)
+        boot_paths = float(closes[-1]) * np.exp(np.cumsum(sampled, axis=1))
+        # Center bootstrap paths on the Kronos mean direction
+        boot_median = np.median(boot_paths, axis=0)
+        bias = np.where(boot_median != 0, predicted_closes / boot_median, 1.0)
+        boot_paths = boot_paths * bias
+        # Combine: true Kronos draws + bias-adjusted bootstrap
+        all_paths = np.vstack([kronos_arr, boot_paths])   # (500, pred_len)
+        p10 = [round(float(v), 8) for v in np.quantile(all_paths, 0.10, axis=0)]
+        p25 = [round(float(v), 8) for v in np.quantile(all_paths, 0.25, axis=0)]
+        p75 = [round(float(v), 8) for v in np.quantile(all_paths, 0.75, axis=0)]
+        p90 = [round(float(v), 8) for v in np.quantile(all_paths, 0.90, axis=0)]
+        sample_paths = [[round(float(v), 4) for v in all_paths[i]] for i in range(len(all_paths))]
 
 
     timestamps = [int(ts.timestamp()) for ts in future_ts]
@@ -238,7 +253,7 @@ async def run_all_forecasts() -> None:
         for timeframe in ("4h", "1day"):
             try:
                 async with AsyncSessionLocal() as db:
-                    # Fetch candles
+                    # Fetch candles + existing forecast's last_candle_time in one round-trip
                     result = await db.execute(
                         text(
                             """
@@ -257,9 +272,31 @@ async def run_all_forecasts() -> None:
                     )
                     candle_rows = result.all()
 
+                    # Check if the latest candle is newer than our stored forecast
+                    existing = (await db.execute(
+                        text(
+                            "SELECT last_candle_time FROM kronos_forecasts "
+                            "WHERE symbol = :s AND timeframe = :tf"
+                        ),
+                        {"s": symbol, "tf": timeframe},
+                    )).first()
+
                 if len(candle_rows) < 50:
                     logger.debug("Skipping %s/%s — only %d candles", symbol, timeframe, len(candle_rows))
                     continue
+
+                latest_candle_ts = candle_rows[-1][0]  # last row, timestamp column
+                if existing and existing[0] is not None:
+                    stored_ts = existing[0]
+                    if stored_ts.tzinfo is None:
+                        stored_ts = stored_ts.replace(tzinfo=timezone.utc)
+                    if hasattr(latest_candle_ts, "tzinfo"):
+                        lct = latest_candle_ts if latest_candle_ts.tzinfo else latest_candle_ts.replace(tzinfo=timezone.utc)
+                    else:
+                        lct = datetime.fromtimestamp(float(latest_candle_ts), tz=timezone.utc)
+                    if lct <= stored_ts:
+                        logger.debug("Skipping %s/%s — no new candle since last forecast", symbol, timeframe)
+                        continue
 
                 df_hist = pd.DataFrame(
                     candle_rows, columns=["timestamp", "open", "high", "low", "close"]
