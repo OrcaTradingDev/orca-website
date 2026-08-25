@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select, text as sa_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -195,3 +197,38 @@ async def set_pod_sharing(
     await db.commit()
     invalidate_config_cache()
     return {"enabled": payload.enabled}
+
+
+# ── Force Kronos re-run ────────────────────────────────────────────────────────
+
+_kronos_running = False
+
+
+@router.post("/force-kronos")
+async def force_kronos(
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(require_admin),
+):
+    """
+    Clear all stored Kronos forecasts and re-run the full forecast cycle in the
+    background. Returns immediately; the run may take several minutes.
+    """
+    global _kronos_running
+    if _kronos_running:
+        return {"status": "already_running", "message": "Kronos run is already in progress."}
+
+    await db.execute(sa_text("DELETE FROM market_kronos_forecasts"))
+    await db.commit()
+
+    async def _run() -> None:
+        global _kronos_running
+        _kronos_running = True
+        try:
+            from worker.kronos_worker import run_all_forecasts
+            await run_all_forecasts()
+        finally:
+            _kronos_running = False
+
+    background_tasks.add_task(asyncio.ensure_future, _run())
+    return {"status": "started", "message": "Kronos re-run started in the background."}

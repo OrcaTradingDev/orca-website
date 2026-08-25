@@ -706,9 +706,56 @@ function PodSharingTab() {
   );
 }
 
+// ─── Kronos Admin Tab ────────────────────────────────────────────────────────
+
+function KronosTab() {
+  const { token } = useAuthStore();
+  const [status, setStatus] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+
+  const forceRun = async () => {
+    setRunning(true);
+    setStatus(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/force-kronos`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const d = await r.json();
+      setStatus(d.message ?? (r.ok ? "Started." : "Failed."));
+    } catch {
+      setStatus("Request failed.");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-6 space-y-5 max-w-lg">
+      <div>
+        <h2 className="text-white font-semibold text-base">Kronos Forecasts</h2>
+        <p className="text-[#64748B] text-sm mt-1">
+          Force a full Kronos re-run for all symbols (4H + 1D). Clears stored forecasts
+          first so the staleness check is bypassed. Runs in the background — takes
+          several minutes depending on symbol count.
+        </p>
+      </div>
+      <button
+        onClick={forceRun}
+        disabled={running}
+        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/30 hover:bg-[#00D4FF]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {running ? "Triggering…" : "Force Re-run Now"}
+      </button>
+      {status && <p className="text-xs text-[#94A3B8]">{status}</p>}
+    </div>
+  );
+}
+
+
 // ─── Main AdminSection ────────────────────────────────────────────────────────
 
-type Tab = "users" | "screener" | "journals" | "pod";
+type Tab = "users" | "screener" | "journals" | "pod" | "kronos";
 
 export default function AdminSection() {
   const [activeTab, setActiveTab] = useState<Tab>("users");
@@ -718,6 +765,7 @@ export default function AdminSection() {
     { id: "screener", label: "Screener Lab",     icon: "⚙️" },
     { id: "journals", label: "Member Journals",  icon: "📓" },
     { id: "pod",      label: "Pod Sharing",      icon: "🔒" },
+    { id: "kronos",   label: "Kronos",           icon: "🔮" },
   ];
 
   return (
@@ -751,6 +799,7 @@ export default function AdminSection() {
       {activeTab === "screener" && <ScreenerLabTab />}
       {activeTab === "journals" && <MemberJournalsTab />}
       {activeTab === "pod"      && <PodSharingTab />}
+      {activeTab === "kronos"   && <KronosTab />}
     </div>
   );
 }
