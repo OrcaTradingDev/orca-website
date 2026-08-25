@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+
+logger = logging.getLogger("admin")
 from pydantic import BaseModel
 from sqlalchemy import select, text as sa_text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -202,6 +205,23 @@ async def set_pod_sharing(
 # ── Force Kronos re-run ────────────────────────────────────────────────────────
 
 _kronos_running = False
+_kronos_last_result: dict = {}
+
+
+async def _kronos_bg_run() -> None:
+    global _kronos_running, _kronos_last_result
+    _kronos_running = True
+    _kronos_last_result = {}
+    try:
+        from worker.kronos_worker import run_all_forecasts
+        await run_all_forecasts()
+        _kronos_last_result = {"status": "done"}
+        logger.info("Force Kronos run completed successfully.")
+    except Exception as exc:
+        _kronos_last_result = {"status": "error", "detail": str(exc)}
+        logger.exception("Force Kronos run failed: %s", exc)
+    finally:
+        _kronos_running = False
 
 
 @router.post("/force-kronos")
@@ -212,23 +232,23 @@ async def force_kronos(
 ):
     """
     Clear all stored Kronos forecasts and re-run the full forecast cycle in the
-    background. Returns immediately; the run may take several minutes.
+    background. Returns immediately; may take several minutes to complete.
     """
     global _kronos_running
     if _kronos_running:
-        return {"status": "already_running", "message": "Kronos run is already in progress."}
+        return {"status": "already_running", "message": "Kronos run is already in progress — check back in a few minutes."}
 
     await db.execute(sa_text("DELETE FROM market_kronos_forecasts"))
     await db.commit()
 
-    async def _run() -> None:
-        global _kronos_running
-        _kronos_running = True
-        try:
-            from worker.kronos_worker import run_all_forecasts
-            await run_all_forecasts()
-        finally:
-            _kronos_running = False
+    background_tasks.add_task(_kronos_bg_run)
+    return {"status": "started", "message": "Kronos re-run started. Check server logs or poll /admin/kronos-status."}
 
-    background_tasks.add_task(asyncio.ensure_future, _run())
-    return {"status": "started", "message": "Kronos re-run started in the background."}
+
+@router.get("/kronos-status")
+async def kronos_status(_user: dict = Depends(require_admin)):
+    """Check whether a Kronos force-run is in progress and what the last run's result was."""
+    return {
+        "running": _kronos_running,
+        "last_result": _kronos_last_result,
+    }

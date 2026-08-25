@@ -710,23 +710,47 @@ function PodSharingTab() {
 
 function KronosTab() {
   const { token } = useAuthStore();
-  const [status, setStatus] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [serverRunning, setServerRunning] = useState<boolean | null>(null);
+  const [lastResult, setLastResult] = useState<{ status?: string; detail?: string } | null>(null);
+  const [triggering, setTriggering] = useState(false);
+
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const fetchStatus = async () => {
+    try {
+      const r = await fetch(`${API_BASE}/admin/kronos-status`, { headers });
+      const d = await r.json();
+      setServerRunning(d.running);
+      setLastResult(d.last_result ?? null);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Poll status every 10s while the tab is open
+  useEffect(() => {
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 10_000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const forceRun = async () => {
-    setRunning(true);
-    setStatus(null);
+    setTriggering(true);
+    setMsg(null);
     try {
       const r = await fetch(`${API_BASE}/admin/force-kronos`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers,
       });
       const d = await r.json();
-      setStatus(d.message ?? (r.ok ? "Started." : "Failed."));
+      setMsg(d.message ?? (r.ok ? "Started." : "Failed."));
+      await fetchStatus();
     } catch {
-      setStatus("Request failed.");
+      setMsg("Request failed.");
     } finally {
-      setRunning(false);
+      setTriggering(false);
     }
   };
 
@@ -736,18 +760,34 @@ function KronosTab() {
         <h2 className="text-white font-semibold text-base">Kronos Forecasts</h2>
         <p className="text-[#64748B] text-sm mt-1">
           Force a full Kronos re-run for all symbols (4H + 1D). Clears stored forecasts
-          first so the staleness check is bypassed. Runs in the background — takes
-          several minutes depending on symbol count.
+          so the staleness check is bypassed. Takes several minutes to complete.
         </p>
       </div>
+
+      <div className="flex items-center gap-3">
+        <div className={`w-2 h-2 rounded-full ${
+          serverRunning === null ? "bg-[#475569]"
+          : serverRunning ? "bg-[#F59E0B] animate-pulse"
+          : "bg-[#10B981]"
+        }`} />
+        <span className="text-sm text-[#94A3B8]">
+          {serverRunning === null ? "Checking…"
+           : serverRunning ? "Run in progress — check back in a few minutes"
+           : lastResult?.status === "error" ? `Last run failed: ${lastResult.detail}`
+           : lastResult?.status === "done" ? "Last run completed successfully"
+           : "Idle"}
+        </span>
+      </div>
+
       <button
         onClick={forceRun}
-        disabled={running}
+        disabled={triggering || serverRunning === true}
         className="px-4 py-2 rounded-lg text-sm font-medium bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/30 hover:bg-[#00D4FF]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {running ? "Triggering…" : "Force Re-run Now"}
+        {triggering ? "Triggering…" : serverRunning ? "Running…" : "Force Re-run Now"}
       </button>
-      {status && <p className="text-xs text-[#94A3B8]">{status}</p>}
+
+      {msg && <p className="text-xs text-[#94A3B8]">{msg}</p>}
     </div>
   );
 }
