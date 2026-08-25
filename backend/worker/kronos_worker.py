@@ -34,8 +34,8 @@ _MIN_INTERVAL_SECONDS = int(os.getenv("KRONOS_INTERVAL_SECONDS", str(4 * 3600)))
 
 # Prediction horizon per timeframe
 _PRED_LEN: Dict[str, int] = {
-    "4h": 20,    # ~3.3 days ahead
-    "1day": 10,  # ~2 weeks ahead
+    "4h": 60,    # ~10 days ahead (6 candles/day)
+    "1day": 30,  # ~1 month ahead
 }
 
 # Candle frequency in seconds per timeframe (for building future timestamps)
