@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional, List, Dict
 
@@ -16,6 +17,7 @@ from app.models.market_trend_scores_latest import MarketTrendScoresLatest
 from app.schemas.screener import (
     CandleOut,
     CandlesResponse,
+    ForwardConditions,
     MagnetTarget,
     ScreenerPage,
     ScreenerRow,
@@ -151,6 +153,40 @@ async def _fetch_orca_mc_summaries(db: AsyncSession, symbols: List[str]) -> Dict
     return summaries
 
 
+# ── Kronos Forward Conditions helper ─────────────────────────────────────────
+
+async def _fetch_kronos_forward_conditions(
+    db: AsyncSession, symbols: List[str]
+) -> Dict[str, ForwardConditions]:
+    """Bulk-fetch Forward Conditions from 4H Kronos bands for the given page symbols."""
+    if not symbols:
+        return {}
+
+    result = await db.execute(
+        text(
+            """
+            SELECT symbol, bands
+            FROM market_kronos_forecasts
+            WHERE symbol = ANY(:symbols) AND timeframe = '4h'
+            """
+        ),
+        {"symbols": symbols},
+    )
+
+    fc_map: Dict[str, ForwardConditions] = {}
+    for symbol, bands in result.all():
+        if bands and "expansion_prob" in bands:
+            try:
+                fc_map[symbol] = ForwardConditions(
+                    expansion_prob=bands["expansion_prob"],
+                    expected_range=bands["expected_range"],
+                    forward_state=bands["forward_state"],
+                )
+            except Exception:
+                pass
+    return fc_map
+
+
 # ── Screener rows endpoint ────────────────────────────────────────────────────
 
 @router.get("/rows", response_model=ScreenerPage)
@@ -231,8 +267,11 @@ async def get_screener_rows(
     rows_db = result.all()
 
     page_symbols = [r[0] for r in rows_db]
-    sparklines = await _fetch_sparklines(db, page_symbols)
-    orca_mc_summaries = await _fetch_orca_mc_summaries(db, page_symbols)
+    sparklines, orca_mc_summaries, forward_conditions_map = await asyncio.gather(
+        _fetch_sparklines(db, page_symbols),
+        _fetch_orca_mc_summaries(db, page_symbols),
+        _fetch_kronos_forward_conditions(db, page_symbols),
+    )
 
     rows: List[ScreenerRow] = []
     last_updated: Optional[datetime] = None
@@ -281,6 +320,7 @@ async def get_screener_rows(
                 signals=signals,
                 sparkline=sparklines.get(symbol, []),
                 orca_mc=orca_mc_summaries.get(symbol),
+                forward_conditions=forward_conditions_map.get(symbol),
             )
         )
 

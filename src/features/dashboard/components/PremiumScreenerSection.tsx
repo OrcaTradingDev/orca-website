@@ -419,6 +419,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [scoreSort, setScoreSort] = useState<"desc" | "asc" | null>(null);
+  const [expansionSort, setExpansionSort] = useState<"desc" | "asc" | null>(null);
 
   // Shared persisted state — also consumed by Watchlist + Alerts tabs
   const watchedSymbols       = useScreenerStore((s) => s.watchedSymbols);
@@ -508,13 +509,25 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
   }, [assets, searchQuery, assetClassFilter, trendFilter, enabledAssetClasses]);
 
   const sortedAssets = useMemo(() => {
+    if (expansionSort) {
+      const sorted = [...filteredAssets].sort(
+        (a, b) => (a.forward_conditions?.expansion_prob ?? -1) - (b.forward_conditions?.expansion_prob ?? -1)
+      );
+      return expansionSort === "desc" ? sorted.reverse() : sorted;
+    }
     if (!scoreSort) return filteredAssets;
     const sorted = [...filteredAssets].sort((a, b) => effectiveScore(a) - effectiveScore(b));
     return scoreSort === "desc" ? sorted.reverse() : sorted;
-  }, [filteredAssets, scoreSort]);
+  }, [filteredAssets, scoreSort, expansionSort]);
 
   const toggleScoreSort = useCallback(() => {
+    setExpansionSort(null);
     setScoreSort((prev) => (prev === "desc" ? "asc" : prev === "asc" ? null : "desc"));
+  }, []);
+
+  const toggleExpansionSort = useCallback(() => {
+    setScoreSort(null);
+    setExpansionSort((prev) => (prev === "desc" ? "asc" : prev === "asc" ? null : "desc"));
   }, []);
 
   // Best market (visible on current page)
@@ -794,6 +807,32 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                   </div>
                   <div className="text-xs text-[#94A3B8]">ADX | EMA | VOL</div>
                 </th>
+                <th
+                  className="py-4 px-4 text-center text-white w-[90px] cursor-pointer select-none"
+                  onClick={toggleExpansionSort}
+                  title="Sort by expansion probability"
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="flex items-center gap-1">
+                      EXPANSION
+                      {expansionSort === "desc" && <span className="text-[#00D4FF]">▾</span>}
+                      {expansionSort === "asc" && <span className="text-[#00D4FF]">▴</span>}
+                    </div>
+                    <div className="text-xs text-[#94A3B8]">Kronos %</div>
+                  </div>
+                </th>
+                <th className="py-4 px-4 text-center text-white w-[80px]">
+                  <div className="flex flex-col items-center gap-1">
+                    <span>RANGE</span>
+                    <div className="text-xs text-[#94A3B8]">×ATR</div>
+                  </div>
+                </th>
+                <th className="py-4 px-4 text-center text-white w-[120px]">
+                  <div className="flex flex-col items-center gap-1">
+                    <span>FORWARD STATE</span>
+                    <div className="text-xs text-[#94A3B8]">Kronos signal</div>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -801,13 +840,13 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                 <LoadingSkeleton />
               ) : isError ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-red-400">
+                  <td colSpan={12} className="py-12 text-center text-red-400">
                     Failed to load market data. Please check your connection.
                   </td>
                 </tr>
               ) : filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-[#94A3B8]">
+                  <td colSpan={12} className="py-12 text-center text-[#94A3B8]">
                     {assets.length === 0
                       ? "No data available. Data may be warming up..."
                       : "No assets found. Try adjusting your filters."}
@@ -987,6 +1026,60 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                             </button>
                           )}
                         </div>
+                      </td>
+
+                      {/* EXPANSION — % of Kronos paths exceeding recent range */}
+                      <td className="py-3 px-4 text-center" style={lockedStyle}>
+                        {asset.forward_conditions ? (
+                          <span
+                            className="text-sm font-semibold tabular-nums"
+                            style={{
+                              color: asset.forward_conditions.expansion_prob >= 60 ? "#10B981"
+                                : asset.forward_conditions.expansion_prob <= 35 ? "#64748B"
+                                : "#F59E0B",
+                            }}
+                          >
+                            {asset.forward_conditions.expansion_prob.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-[#475569] text-xs">—</span>
+                        )}
+                      </td>
+
+                      {/* RANGE — avg Kronos path range as ATR multiple */}
+                      <td className="py-3 px-4 text-center" style={lockedStyle}>
+                        {asset.forward_conditions ? (
+                          <span className="text-[#94A3B8] text-sm tabular-nums">
+                            {asset.forward_conditions.expected_range.toFixed(2)}×
+                          </span>
+                        ) : (
+                          <span className="text-[#475569] text-xs">—</span>
+                        )}
+                      </td>
+
+                      {/* FORWARD STATE — Improving / Stable / Deteriorating */}
+                      <td className="py-3 px-4 text-center" style={lockedStyle}>
+                        {asset.forward_conditions ? (
+                          <span
+                            className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                            style={{
+                              background: asset.forward_conditions.forward_state === "Improving"
+                                ? "rgba(16,185,129,0.15)"
+                                : asset.forward_conditions.forward_state === "Deteriorating"
+                                ? "rgba(239,68,68,0.12)"
+                                : "rgba(100,116,139,0.15)",
+                              color: asset.forward_conditions.forward_state === "Improving"
+                                ? "#10B981"
+                                : asset.forward_conditions.forward_state === "Deteriorating"
+                                ? "#EF4444"
+                                : "#94A3B8",
+                            }}
+                          >
+                            {asset.forward_conditions.forward_state}
+                          </span>
+                        ) : (
+                          <span className="text-[#475569] text-xs">—</span>
+                        )}
                       </td>
                     </tr>
                   );

@@ -47,6 +47,13 @@ export interface OrcaMCRowSummary {
   status_since: string | null;
 }
 
+// Matches Pydantic "ForwardConditions"
+export interface ForwardConditions {
+  expansion_prob: number;   // % of Kronos paths breaking outside last-20-candle range
+  expected_range: number;   // avg path range as ATR-14 multiple
+  forward_state: "Improving" | "Stable" | "Deteriorating";
+}
+
 // Matches Pydantic "ScreenerRow"
 export interface ScreenerRow {
   symbol: string;
@@ -58,6 +65,7 @@ export interface ScreenerRow {
   signals: OrcaSignals;
   sparkline: number[]; // last 30 1H closes, chronological
   orca_mc: OrcaMCRowSummary | null;
+  forward_conditions: ForwardConditions | null;
 }
 
 // Matches Pydantic "ScreenerPage"

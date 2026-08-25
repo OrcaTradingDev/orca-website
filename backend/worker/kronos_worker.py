@@ -176,6 +176,31 @@ def _build_forecast_bands(
     p90 = [round(float(v), 8) for v in np.quantile(kronos_arr, 0.90, axis=0)]
     sample_paths = [[round(float(v), 4) for v in kronos_arr[i]] for i in range(len(kronos_arr))]
 
+    # ── Forward Conditions — derived from the 500 Kronos paths ────────────────
+    highs  = df["high"].values.astype(float)
+    lows   = df["low"].values.astype(float)
+    closes = df["close"].values.astype(float)
+
+    tr = np.maximum(
+        highs[1:] - lows[1:],
+        np.maximum(np.abs(highs[1:] - closes[:-1]), np.abs(lows[1:] - closes[:-1])),
+    )
+    atr14 = float(np.mean(tr[-14:])) if len(tr) >= 14 else (float(np.mean(tr)) if len(tr) > 0 else 0.0)
+
+    recent_high = float(np.max(highs[-20:]))
+    recent_low  = float(np.min(lows[-20:]))
+    expanded = int(np.sum((kronos_arr.max(axis=1) > recent_high) | (kronos_arr.min(axis=1) < recent_low)))
+    expansion_prob = round(float(expanded / len(kronos_arr) * 100), 1)
+
+    path_ranges = kronos_arr.max(axis=1) - kronos_arr.min(axis=1)
+    expected_range = round(float(np.mean(path_ranges) / atr14), 2) if atr14 > 0 else 1.0
+
+    if expansion_prob >= 60:
+        forward_state = "Improving"
+    elif expansion_prob <= 35:
+        forward_state = "Deteriorating"
+    else:
+        forward_state = "Stable"
 
     timestamps = [int(ts.timestamp()) for ts in future_ts]
 
@@ -188,7 +213,10 @@ def _build_forecast_bands(
         "p50": p50,
         "p75": p75,
         "p90": p90,
-        "paths": sample_paths,  # 20 individual scenario paths for fan chart
+        "paths": sample_paths,
+        "expansion_prob": expansion_prob,
+        "expected_range": expected_range,
+        "forward_state": forward_state,
     }
 
 

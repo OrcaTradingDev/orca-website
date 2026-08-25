@@ -32,6 +32,11 @@ class OrcaSignals(BaseModel):
     is_best: bool = False
     status_since: Optional[str] = None  # ISO timestamp — when status/direction last changed
 
+class ForwardConditions(BaseModel):
+    expansion_prob: float   # % of Kronos paths that break outside last-20-candle range
+    expected_range: float   # avg path (max-min) expressed as ATR-14 multiple
+    forward_state: str      # "Improving" | "Stable" | "Deteriorating"
+
 class ScreenerRow(BaseModel):
     symbol: str
     name: str
@@ -45,6 +50,7 @@ class ScreenerRow(BaseModel):
     # PremiumScreenerSection.tsx. `signals` stays for is_best fallback and
     # because intraday/daily/longterm/advanced are still its data.
     orca_mc: Optional[OrcaMCRowSummary] = None
+    forward_conditions: Optional[ForwardConditions] = None
 
 class ScreenerPage(BaseModel):
     rows: List[ScreenerRow]
