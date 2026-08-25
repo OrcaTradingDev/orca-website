@@ -161,3 +161,37 @@ async def get_member_journal(
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         "data": row.journal_json,
     }
+
+
+# ── Pod sharing toggle ─────────────────────────────────────────────────────────
+# Stored as a boolean flag in the screener_config JSONB under key "pod_sharing_enabled".
+
+class PodSharingPayload(BaseModel):
+    enabled: bool
+
+@router.get("/pod-sharing")
+async def get_pod_sharing(
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(require_admin),
+):
+    row = (await db.execute(select(ScreenerConfigModel).limit(1))).scalar_one_or_none()
+    cfg = row.config if row else {}
+    return {"enabled": bool(cfg.get("pod_sharing_enabled", False))}
+
+@router.post("/pod-sharing")
+async def set_pod_sharing(
+    payload: PodSharingPayload,
+    db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(require_admin),
+):
+    row = (await db.execute(select(ScreenerConfigModel).limit(1))).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Screener config not initialised")
+    updated = {**row.config, "pod_sharing_enabled": payload.enabled}
+    await db.execute(
+        sa_text("UPDATE screener_config SET config = :cfg WHERE id = :id"),
+        {"cfg": updated, "id": row.id},
+    )
+    await db.commit()
+    invalidate_config_cache()
+    return {"enabled": payload.enabled}

@@ -645,9 +645,70 @@ function MemberJournalViewer({ data }: { data: unknown }) {
   );
 }
 
+// ─── Tab: Pod Sharing ─────────────────────────────────────────────────────────
+
+function PodSharingTab() {
+  const { token } = useAuthStore();
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/admin/pod-sharing`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => setEnabled(d.enabled))
+      .catch(() => setMsg("Failed to load setting"));
+  }, [token]);
+
+  const toggle = async () => {
+    if (enabled === null) return;
+    setSaving(true);
+    setMsg(null);
+    try {
+      const r = await fetch(`${API_BASE}/admin/pod-sharing`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: !enabled }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setEnabled(!enabled);
+      setMsg(`Journal sharing ${!enabled ? "enabled" : "disabled"}.`);
+    } catch {
+      setMsg("Failed to save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-6 space-y-5 max-w-lg">
+      <div>
+        <h2 className="text-white font-semibold text-base">Pod Journal Sharing</h2>
+        <p className="text-[#64748B] text-sm mt-1">
+          When enabled, members see the "Share journal with OrcaTrading" toggle in their journal settings. When disabled, the option is locked and hidden.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-4">
+        <div className={`w-12 h-6 rounded-full transition-colors relative cursor-pointer ${enabled ? "bg-[#00D4FF]" : "bg-[#1E293B]"}`} onClick={toggle}>
+          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-7" : "translate-x-1"}`} />
+        </div>
+        <span className="text-sm text-white">
+          {enabled === null ? "Loading…" : enabled ? "Enabled — members can share" : "Disabled — sharing locked"}
+        </span>
+        {saving && <span className="text-xs text-[#64748B]">Saving…</span>}
+      </div>
+
+      {msg && <p className="text-xs text-[#00D4FF]">{msg}</p>}
+    </div>
+  );
+}
+
 // ─── Main AdminSection ────────────────────────────────────────────────────────
 
-type Tab = "users" | "screener" | "journals";
+type Tab = "users" | "screener" | "journals" | "pod";
 
 export default function AdminSection() {
   const [activeTab, setActiveTab] = useState<Tab>("users");
@@ -656,6 +717,7 @@ export default function AdminSection() {
     { id: "users",    label: "User Management", icon: "👥" },
     { id: "screener", label: "Screener Lab",     icon: "⚙️" },
     { id: "journals", label: "Member Journals",  icon: "📓" },
+    { id: "pod",      label: "Pod Sharing",      icon: "🔒" },
   ];
 
   return (
@@ -688,6 +750,7 @@ export default function AdminSection() {
       {activeTab === "users"    && <UserManagementTab />}
       {activeTab === "screener" && <ScreenerLabTab />}
       {activeTab === "journals" && <MemberJournalsTab />}
+      {activeTab === "pod"      && <PodSharingTab />}
     </div>
   );
 }

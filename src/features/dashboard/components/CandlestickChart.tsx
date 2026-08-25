@@ -55,11 +55,13 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
   const chartRef     = useRef<IChartApi | null>(null);
   const seriesRef    = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const pathRefs     = useRef<(ISeriesApi<"Line"> | null)[]>([]);
+  const meanRef      = useRef<ISeriesApi<"Line"> | null>(null);
 
   const [timeframe, setTimeframe]     = useState<Timeframe>("4h");
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
   const [showForecast, setShowForecast] = useState(true);
+  const [fanMode, setFanMode]           = useState<"fan" | "avg">("fan");
   const [forecastData, setForecastData] = useState<ForecastBands | null>(null);
 
   // ── Chart creation (once) ─────────────────────────────────────────────────
@@ -102,6 +104,17 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       })
     );
 
+    // Single mean (p50) line for "average" mode
+    meanRef.current = chart.addLineSeries({
+      color: "#00D4FF",
+      lineWidth: 2,
+      lineStyle: LineStyle.Solid,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+      visible: false,
+    });
+
     chartRef.current  = chart;
     seriesRef.current = series;
 
@@ -110,6 +123,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       chartRef.current  = null;
       seriesRef.current = null;
       pathRefs.current  = [];
+      meanRef.current   = null;
     };
   }, []);
 
@@ -128,6 +142,8 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       s?.setData([]);
       s?.applyOptions({ visible: false });
     });
+    meanRef.current?.setData([]);
+    meanRef.current?.applyOptions({ visible: false });
 
     const candlePromise = http.get<{
       candles: { time: number; open: number; high: number; low: number; close: number }[];
@@ -160,21 +176,52 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
       series.setData(uniqueCandles.map(c => ({ ...c, time: c.time as UTCTimestamp })));
 
       if (forecast && showForecast) {
-        const anchor = { time: forecast.last_candle_time as UTCTimestamp, value: forecast.last_close };
+        const lastCandle = uniqueCandles[uniqueCandles.length - 1];
 
-        if (forecast.paths?.length) {
-          forecast.paths.forEach((path, i) => {
-            const ref = pathRefs.current[i];
-            if (!ref) return;
-            ref.applyOptions({ visible: true });
-            ref.setData([
+        // Re-anchor to the latest chart candle so stale forecasts don't leave
+        // real candles inside the fan. Scale path values proportionally so the
+        // fan starts from the current close.
+        const scale = lastCandle.close / forecast.last_close;
+        const anchor = { time: lastCandle.time as UTCTimestamp, value: lastCandle.close };
+
+        // Only show forecast timestamps that are strictly after the last candle
+        const futureIdxs: number[] = [];
+        forecast.timestamps.forEach((ts, i) => { if (ts > lastCandle.time) futureIdxs.push(i); });
+
+        if (futureIdxs.length > 0) {
+          if (fanMode === "fan" && forecast.paths?.length) {
+            forecast.paths.forEach((path, i) => {
+              const ref = pathRefs.current[i];
+              if (!ref) return;
+              ref.applyOptions({ visible: true });
+              ref.setData([
+                anchor,
+                ...futureIdxs.map(j => ({ time: forecast.timestamps[j] as UTCTimestamp, value: path[j] * scale })),
+              ]);
+            });
+          } else {
+            // Average mode: single p50 line
+            meanRef.current?.applyOptions({ visible: true });
+            meanRef.current?.setData([
               anchor,
-              ...forecast.timestamps.map((ts, j) => ({ time: ts as UTCTimestamp, value: path[j] })),
+              ...futureIdxs.map(j => ({ time: forecast.timestamps[j] as UTCTimestamp, value: forecast.p50[j] * scale })),
             ]);
-          });
+          }
         }
 
-        setForecastData(forecast);
+        // Build trimmed forecast for the label row
+        const trimmed = {
+          ...forecast,
+          last_candle_time: lastCandle.time,
+          last_close: lastCandle.close,
+          timestamps: futureIdxs.map(i => forecast.timestamps[i]),
+          p10: futureIdxs.map(i => forecast.p10[i] * scale),
+          p25: futureIdxs.map(i => forecast.p25[i] * scale),
+          p50: futureIdxs.map(i => forecast.p50[i] * scale),
+          p75: futureIdxs.map(i => forecast.p75[i] * scale),
+          p90: futureIdxs.map(i => forecast.p90[i] * scale),
+        };
+        setForecastData(trimmed.timestamps.length > 0 ? trimmed : null);
       }
 
       chart.timeScale().fitContent();
@@ -184,7 +231,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
     });
 
     return () => { cancelled = true; };
-  }, [symbol, timeframe, showForecast]);
+  }, [symbol, timeframe, showForecast, fanMode]);
 
   const hasForecastTf = FORECAST_TIMEFRAMES.has(timeframe);
 
@@ -195,17 +242,36 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
         <span className="text-[#64748B] text-xs font-medium">{symbol}</span>
         <div className="flex items-center gap-2">
           {hasForecastTf && (
-            <button
-              onClick={() => { setShowForecast(p => !p); if (showForecast) setForecastData(null); }}
-              title="Toggle Kronos AI forecast"
-              className={`px-2 py-1 text-[10px] rounded font-medium transition-colors border ${
-                showForecast
-                  ? "border-[#00D4FF] text-[#00D4FF] bg-[#00D4FF]/10"
-                  : "border-[#1E293B] text-[#64748B] hover:text-white"
-              }`}
-            >
-              AI Forecast
-            </button>
+            <>
+              <button
+                onClick={() => { setShowForecast(p => !p); if (showForecast) setForecastData(null); }}
+                title="Toggle Kronos AI forecast"
+                className={`px-2 py-1 text-[10px] rounded font-medium transition-colors border ${
+                  showForecast
+                    ? "border-[#00D4FF] text-[#00D4FF] bg-[#00D4FF]/10"
+                    : "border-[#1E293B] text-[#64748B] hover:text-white"
+                }`}
+              >
+                AI Forecast
+              </button>
+              {showForecast && (
+                <div className="flex rounded overflow-hidden border border-[#1E293B]">
+                  {(["fan", "avg"] as const).map(mode => (
+                    <button
+                      key={mode}
+                      onClick={() => setFanMode(mode)}
+                      className={`px-2 py-1 text-[10px] font-medium transition-colors ${
+                        fanMode === mode
+                          ? "bg-[#00D4FF]/20 text-[#00D4FF]"
+                          : "text-[#64748B] hover:text-white"
+                      }`}
+                    >
+                      {mode === "fan" ? "Fan" : "Avg"}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <div className="flex gap-1">
             {TIMEFRAMES.map(tf => (
