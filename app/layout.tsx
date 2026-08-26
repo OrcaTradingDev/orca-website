@@ -20,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta name="impact-site-verification" value="96fbbace-8eba-45b4-9413-6efb24c466ae" />
+        <meta name="impact-site-verification" content="96fbbace-8eba-45b4-9413-6efb24c466ae" />
         <Script async src="https://www.googletagmanager.com/gtag/js?id=G-ZJR508TE6C" strategy="afterInteractive" />
         <Script id="gtag-init" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
