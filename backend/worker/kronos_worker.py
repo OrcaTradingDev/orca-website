@@ -137,7 +137,7 @@ def _build_forecast_bands(
     # anchored on those draws. Staleness-check in run_all_forecasts ensures
     # this only runs when a new candle has arrived, so the 4H window budget
     # is not spent on already-fresh forecasts.
-    N_KRONOS_SAMPLES = 500  # true Kronos draws per symbol/timeframe
+    N_KRONOS_SAMPLES = 50   # true Kronos draws per symbol/timeframe
 
     kronos_paths: list[list[float]] = []
     _t0 = _time.monotonic()
