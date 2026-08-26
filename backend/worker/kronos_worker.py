@@ -272,7 +272,7 @@ async def run_all_forecasts() -> None:
                     # Check if the latest candle is newer than our stored forecast
                     existing = (await db.execute(
                         text(
-                            "SELECT last_candle_time FROM kronos_forecasts "
+                            "SELECT last_candle_time FROM market_kronos_forecasts "
                             "WHERE symbol = :s AND timeframe = :tf"
                         ),
                         {"s": symbol, "tf": timeframe},
