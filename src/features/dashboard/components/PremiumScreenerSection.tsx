@@ -818,7 +818,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                       {expansionSort === "desc" && <span className="text-[#00D4FF]">▾</span>}
                       {expansionSort === "asc" && <span className="text-[#00D4FF]">▴</span>}
                     </div>
-                    <div className="text-xs text-[#94A3B8]">Kronos %</div>
+                    <div className="text-xs text-[#94A3B8]">ML %</div>
                   </div>
                 </th>
                 <th className="py-4 px-4 text-center text-white w-[80px]">
@@ -830,7 +830,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                 <th className="py-4 px-4 text-center text-white w-[120px]">
                   <div className="flex flex-col items-center gap-1">
                     <span>FORWARD STATE</span>
-                    <div className="text-xs text-[#94A3B8]">Kronos signal</div>
+                    <div className="text-xs text-[#94A3B8]">ML signal</div>
                   </div>
                 </th>
               </tr>

@@ -245,7 +245,7 @@ export default function CandlestickChart({ symbol }: CandlestickChartProps) {
             <>
               <button
                 onClick={() => { setShowForecast(p => !p); if (showForecast) setForecastData(null); }}
-                title="Toggle Kronos AI forecast"
+                title="Toggle ML AI forecast"
                 className={`px-2 py-1 text-[10px] rounded font-medium transition-colors border ${
                   showForecast
                     ? "border-[#00D4FF] text-[#00D4FF] bg-[#00D4FF]/10"

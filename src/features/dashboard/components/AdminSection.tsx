@@ -757,9 +757,9 @@ function KronosTab() {
   return (
     <div className="bg-[#0B0F19] border border-[#1E293B] rounded-xl p-6 space-y-5 max-w-lg">
       <div>
-        <h2 className="text-white font-semibold text-base">Kronos Forecasts</h2>
+        <h2 className="text-white font-semibold text-base">ML Forecasts</h2>
         <p className="text-[#64748B] text-sm mt-1">
-          Force a full Kronos re-run for all symbols (4H + 1D). Clears stored forecasts
+          Force a full ML forecast re-run for all symbols (4H + 1D). Clears stored forecasts
           so the staleness check is bypassed. Takes several minutes to complete.
         </p>
       </div>
@@ -805,7 +805,7 @@ export default function AdminSection() {
     { id: "screener", label: "Screener Lab",     icon: "⚙️" },
     { id: "journals", label: "Member Journals",  icon: "📓" },
     { id: "pod",      label: "Pod Sharing",      icon: "🔒" },
-    { id: "kronos",   label: "Kronos",           icon: "🔮" },
+    { id: "kronos",   label: "ML Forecasts",     icon: "🔮" },
   ];
 
   return (
