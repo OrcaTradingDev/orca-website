@@ -14,8 +14,9 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const DISCORD_URL    = process.env.NEXT_PUBLIC_DISCORD_URI   ?? '#'
-const CLIENT_HUB_URL = process.env.NEXT_PUBLIC_CLIENT_HUB_URI ?? DISCORD_URL
+const DISCORD_URL      = process.env.NEXT_PUBLIC_DISCORD_URI   ?? '#'
+const CLIENT_HUB_URL   = process.env.NEXT_PUBLIC_CLIENT_HUB_URI ?? DISCORD_URL
+const SCREENER_BUY_URL = 'https://buy.stripe.com/00w14neBj8BggG252g6wE03'
 
 export default function Page() {
   const faq = [
@@ -420,7 +421,7 @@ export default function Page() {
               </p>
 
               <div className="hero-ctas">
-                <a className="btn btn-trial" href="/screener">Try the screener free — 7 days</a>
+                <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Try the screener free — 7 days</a>
                 <a className="btn btn-discord" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
               </div>
 
@@ -608,7 +609,7 @@ export default function Page() {
                   <p><b>7 days free. No card.</b> Try every instrument, every timeframe, the ML forecast and the forward state model — completely free. If you decide it is not for you, you close the tab and nothing happens.</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-                  <a className="btn btn-trial" href="/screener">Start your 7-day free trial</a>
+                  <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Start your 7-day free trial</a>
                   <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card needed to start.</span>
                 </div>
               </div>
@@ -827,7 +828,7 @@ export default function Page() {
                   <li>Advanced columns, ML forecast and forward state</li>
                   <li>Alerts and watchlists</li>
                 </ul>
-                <a className="btn btn-trial" href="/screener">Start your free 7-day trial</a>
+                <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Start your free 7-day trial</a>
               </div>
             </div>
             <p className="plan-foot">OrcaBot 2.0 is a separate one-time purchase for people who want the execution layer. It is not required for anything above. <a href="/orcabot">See what it does</a>.</p>
@@ -857,7 +858,7 @@ export default function Page() {
           <h2>Start with the read. The rest can wait.</h2>
           <p className="lede">Try the full screener free for 7 days — no card. Or join the Discord and start with the Academy right now.</p>
           <div className="closing-ctas">
-            <a className="btn btn-trial" href="/screener">Try free for 7 days</a>
+            <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Try free for 7 days</a>
             <a className="btn btn-discord" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
           </div>
           <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card needed. Cancel any time. The Academy and Discord are always free.</span>
