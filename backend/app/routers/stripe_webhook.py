@@ -34,7 +34,7 @@ async def stripe_webhook(
       1. Go to Developers → Webhooks → Add endpoint
       2. Endpoint URL: https://<your-api-domain>/stripe/webhook
       3. Select events: checkout.session.completed, customer.subscription.updated,
-         customer.subscription.deleted
+         customer.subscription.deleted, invoice.payment_failed
       4. Copy the signing secret into env var STRIPE_WEBHOOK_SECRET
       5. Set the success_url on your payment link to:
          https://<your-frontend-domain>/screener?upgraded=1
@@ -100,6 +100,31 @@ async def stripe_webhook(
         sub = event["data"]["object"].to_dict()
         await _sync_subscription_state(db, sub)
 
+    elif event["type"] == "invoice.payment_failed":
+        # Revoke access immediately on the first failed charge. Stripe will also
+        # update the subscription status to past_due and fire
+        # customer.subscription.updated, but handling it here means the user
+        # loses access as soon as the charge fails rather than after that second
+        # event propagates.
+        invoice = event["data"]["object"].to_dict()
+        customer_id = invoice.get("customer")
+        if customer_id:
+            result = await db.execute(
+                update(User)
+                .where(User.stripe_customer_id == customer_id)
+                .values(screener_access=False)
+                .returning(User.id)
+            )
+            await db.commit()
+            matched = result.fetchone()
+            if matched:
+                log.info(
+                    "screener_access revoked for user id=%s (invoice.payment_failed)",
+                    matched[0],
+                )
+            else:
+                log.warning("invoice.payment_failed for unknown customer %s", customer_id)
+
     elif event["type"] == "customer.subscription.deleted":
         sub = event["data"]["object"].to_dict()
         customer_id = sub.get("customer")
@@ -128,12 +153,22 @@ async def stripe_webhook(
     return {"status": "ok"}
 
 
+ACTIVE_STATUSES = {"active", "trialing"}
+
+
 async def _sync_subscription_state(db: AsyncSession, sub: dict) -> None:
-    """Mirror a Stripe Subscription object's cancel/period-end state onto the matching user."""
+    """Mirror a Stripe Subscription object's state onto the matching user.
+
+    Revokes screener_access when the subscription status is anything other than
+    active or trialing (e.g. past_due, unpaid, incomplete_expired).
+    """
     customer_id = sub.get("customer")
     if not customer_id:
         log.warning("subscription event received with no customer id")
         return
+
+    status = sub.get("status", "")
+    screener_access = status in ACTIVE_STATUSES
 
     period_end_ts = sub.get("current_period_end")
     period_end = (
@@ -144,6 +179,7 @@ async def _sync_subscription_state(db: AsyncSession, sub: dict) -> None:
         update(User)
         .where(User.stripe_customer_id == customer_id)
         .values(
+            screener_access=screener_access,
             stripe_subscription_id=sub.get("id"),
             subscription_cancel_at_period_end=bool(sub.get("cancel_at_period_end")),
             subscription_current_period_end=period_end,
@@ -154,6 +190,11 @@ async def _sync_subscription_state(db: AsyncSession, sub: dict) -> None:
     matched = result.fetchone()
     if matched is None:
         log.warning("subscription.updated for unknown customer %s", customer_id)
+    else:
+        log.info(
+            "subscription sync: user id=%s status=%s screener_access=%s",
+            matched[0], status, screener_access,
+        )
 
 
 @router.get("/subscription-status", response_model=SubscriptionStatus)
