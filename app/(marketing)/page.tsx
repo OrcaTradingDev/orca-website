@@ -806,29 +806,28 @@ export default function Page() {
               </div>
               <div className="plan hi">
                 <h3>The Pod</h3>
-                <div className="fig"><b style={{ color: '#B0A0FF' }}>€29.99</b><span>per month</span></div>
-                <div className="trial-line">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-                  7-day free trial — no card needed
-                </div>
+                <div className="fig"><b style={{ color: '#B0A0FF' }}>€19.99</b><span>per month</span></div>
                 <ul>
                   <li>Weekly calls and chart reviews</li>
                   <li>Ask Bennie, Market Watch, Wins &amp; Losses</li>
                   <li>The Pod Library: See, Read, Wyckoff, OTOS, The Trader</li>
                   <li>Share your journal for direct coaching</li>
-                  <li>Full screener premium access included</li>
                 </ul>
-                <a className="btn btn-pod" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Start your free 7-day trial</a>
+                <a className="btn btn-pod" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join The Pod</a>
               </div>
               <div className="plan">
                 <h3>Screener Premium</h3>
-                <div className="fig"><b>€8.99</b><span>per month</span></div>
+                <div className="fig"><b>€29.99</b><span>per month</span></div>
+                <div className="trial-line">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                  7-day free trial — no card needed
+                </div>
                 <ul>
                   <li>Every instrument and every timeframe</li>
                   <li>Advanced columns, ML forecast and forward state</li>
                   <li>Alerts and watchlists</li>
                 </ul>
-                <a className="btn btn-ghost" href="/screener">Compare tiers</a>
+                <a className="btn btn-trial" href="/screener">Start your free 7-day trial</a>
               </div>
             </div>
             <p className="plan-foot">OrcaBot 2.0 is a separate one-time purchase for people who want the execution layer. It is not required for anything above. <a href="/orcabot">See what it does</a>.</p>
