@@ -58,8 +58,10 @@ export function Navbar() {
               {/* Section anchors — homepage only */}
               {isHome && (
                 <>
-                  <a href="#products" className="navbar__link">Products</a>
-                  <a href="#pricing"  className="navbar__link">Pricing</a>
+                  <a href="#screener" className="navbar__link">Screener</a>
+                  <a href="#journal"  className="navbar__link">Journal</a>
+                  <a href="#academy"  className="navbar__link">Academy</a>
+                  <a href="#pod"      className="navbar__link">The Pod</a>
                 </>
               )}
 
@@ -130,8 +132,10 @@ export function Navbar() {
             )}
             {isHome && (
               <>
-                <a href="#products" className="navbar__mobile-link" onClick={handleLinkClick}>Products</a>
-                <a href="#pricing"  className="navbar__mobile-link" onClick={handleLinkClick}>Pricing</a>
+                <a href="#screener" className="navbar__mobile-link" onClick={handleLinkClick}>Screener</a>
+                <a href="#journal"  className="navbar__mobile-link" onClick={handleLinkClick}>Journal</a>
+                <a href="#academy"  className="navbar__mobile-link" onClick={handleLinkClick}>Academy</a>
+                <a href="#pod"      className="navbar__mobile-link" onClick={handleLinkClick}>The Pod</a>
               </>
             )}
             <a href="/orcabot"  className="navbar__mobile-link" onClick={handleLinkClick}>OrcaBot</a>
