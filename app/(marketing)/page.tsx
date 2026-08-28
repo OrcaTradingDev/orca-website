@@ -790,7 +790,7 @@ export default function Page() {
               </div>
               <div className="plan hi">
                 <h3>The Pod</h3>
-                <div className="fig"><b>Membership</b></div>
+                <div className="fig"><b>€19.99</b><span>per month</span></div>
                 <ul>
                   <li>Weekly calls and chart reviews</li>
                   <li>Ask Bennie, Market Watch, Wins &amp; Losses</li>
