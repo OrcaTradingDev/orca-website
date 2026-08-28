@@ -14,7 +14,7 @@ interface UserRow {
 }
 
 interface ScreenerConfig {
-  // OrcaBot Score
+  // Orca Score
   score_multiplier: number;
   adx_factor_base: number;
   adx_factor_range: number;
@@ -439,7 +439,7 @@ function ScreenerLabTab() {
       </div>
 
       {/* Score Formula */}
-      <SectionCard title="OrcaBot Score Formula" icon="🎯">
+      <SectionCard title="Orca Score Formula" icon="🎯">
         <SliderRow label="Score Multiplier" min={0.5} max={12} step={0.5} value={cfg.score_multiplier}
           description="Scales how much each bull% deviation point contributes to the score (currently 4)"
           onChange={set("score_multiplier")} />

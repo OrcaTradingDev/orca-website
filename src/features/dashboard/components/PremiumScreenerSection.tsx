@@ -1178,7 +1178,7 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
                 {selectedAsset?.symbol} – {selectedAsset?.name}
               </DialogTitle>
               <DialogDescription className="text-[#94A3B8] text-sm mt-0.5">
-                Full multi-timeframe breakdown &amp; OrcaBot signals
+                Full multi-timeframe breakdown &amp; Orca signals
               </DialogDescription>
             </div>
           </div>
@@ -1205,12 +1205,12 @@ export default function PremiumScreenerSection({ freeOnly = false }: { freeOnly?
               {/* Side panel — signals, breakdown, metrics, actions */}
               <div className="w-full lg:w-[420px] shrink-0 border-t lg:border-t-0 lg:border-l border-[#1E293B] lg:overflow-y-auto p-4 lg:p-6 space-y-4">
 
-                {/* OrcaBot Status — the one and only status banner (Orca MC v3.0 engine) */}
+                {/* Orca Status — the one and only status banner (Orca MC v3.0 engine) */}
                 {detail.orca_mc ? (
                   <div className={`rounded-xl px-4 py-3 ${ORCA_MC_BANNER_BG[detail.orca_mc.status] ?? ORCA_MC_BANNER_BG.OFF}`}>
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">OrcaBot Status</div>
+                        <div className="text-xs text-[#94A3B8] uppercase tracking-wider mb-1">Orca Status</div>
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-2xl font-bold" style={{ color: orcaMcStatusTextColor(detail.orca_mc.status) }}>
                             {detail.orca_mc.status}

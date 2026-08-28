@@ -4,9 +4,9 @@ import { Badge } from "@/components/ui/badge";
 const tools = [
   {
     id: 1,
-    name: "OrcaBot Flowscreener",
+    name: "Orca Flowscreener",
     description:
-      "Real-time multi-timeframe scanner with OrcaBot signals, market phase detection, pullback analysis, and ADX/EMA metrics.",
+      "Real-time multi-timeframe scanner with Orca signals, market phase detection, pullback analysis, and ADX/EMA metrics.",
     icon: BarChart3,
     status: "live" as const,
   },
@@ -34,7 +34,7 @@ const tools = [
   {
     id: 5,
     name: "Strategy Backtester",
-    description: "Test OrcaBot signal strategies against historical multi-timeframe data.",
+    description: "Test Orca signal strategies against historical multi-timeframe data.",
     icon: LineChart,
     status: "dev" as const,
   },

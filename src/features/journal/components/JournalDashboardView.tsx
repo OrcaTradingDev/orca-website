@@ -360,7 +360,7 @@ function OrcaImprovementWidget() {
         />
         <ImprovementCard
           emoji="🎯"
-          label="OrcaBot Signal"
+          label="Orca Signal"
           title={bestStatus ? `${bestStatus.status} status` : "—"}
           sub={bestStatus ? `${bestStatus.win_rate?.toFixed(1)}% win rate (${bestStatus.trades} trades)` : "—"}
           color="#6366F1"

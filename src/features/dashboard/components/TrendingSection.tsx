@@ -95,7 +95,7 @@ export default function TrendingSection() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="space-y-1">
-          <h1 className="text-white text-[32px]">Top OrcaBot Signals</h1>
+          <h1 className="text-white text-[32px]">Top Orca Signals</h1>
           <p className="text-[#94A3B8]">Highest-scoring active markets — updated live</p>
         </div>
 

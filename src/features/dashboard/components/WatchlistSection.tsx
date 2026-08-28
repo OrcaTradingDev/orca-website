@@ -99,7 +99,7 @@ export default function WatchlistSection() {
                   <th className="py-3 px-4 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Intraday</th>
                   <th className="py-3 px-4 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Daily</th>
                   <th className="py-3 px-4 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider">Long-Term</th>
-                  <th className="py-3 px-4 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider w-[160px]">OrcaBot</th>
+                  <th className="py-3 px-4 text-center text-[#94A3B8] text-xs font-medium uppercase tracking-wider w-[160px]">Orca</th>
                   <th className="py-3 px-4 w-[48px]" />
                 </tr>
               </thead>

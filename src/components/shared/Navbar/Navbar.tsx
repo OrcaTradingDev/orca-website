@@ -63,9 +63,7 @@ export function Navbar() {
                 </>
               )}
 
-              <a href="/orcabot" className={`navbar__link${pathname === '/orcabot' ? ' navbar__link--active' : ''}`}>
-                OrcaBot
-              </a>
+
               <a href="/about" className={`navbar__link${pathname === '/about' ? ' navbar__link--active' : ''}`}>
                 About
               </a>
@@ -134,7 +132,7 @@ export function Navbar() {
                 <a href="#pod"      className="navbar__mobile-link" onClick={handleLinkClick}>The Pod</a>
               </>
             )}
-            <a href="/orcabot"  className="navbar__mobile-link" onClick={handleLinkClick}>OrcaBot</a>
+
             <a href="/about"    className="navbar__mobile-link" onClick={handleLinkClick}>About</a>
             {user && (
               <>

@@ -6,7 +6,7 @@ const ROADMAP = [
   {
     icon: Zap,
     label: "Webhook signals",
-    desc: "Push OrcaBot ON/WATCH signals to any platform via configurable webhooks.",
+    desc: "Push Orca ON/WATCH signals to any platform via configurable webhooks.",
     eta: "Q3 2026",
   },
   {
@@ -18,7 +18,7 @@ const ROADMAP = [
   {
     icon: Code2,
     label: "REST API access",
-    desc: "Programmatic access to all screener data, OrcaBot signals, and historical scores.",
+    desc: "Programmatic access to all screener data, Orca signals, and historical scores.",
     eta: "Q4 2026",
   },
   {
@@ -34,7 +34,7 @@ export default function BotSection() {
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-white text-[32px]">Bot Integration</h1>
-        <p className="text-[#94A3B8]">Automate your workflow with OrcaBot signals</p>
+        <p className="text-[#94A3B8]">Automate your workflow with Orca signals</p>
       </div>
 
       {/* Hero */}
@@ -49,7 +49,7 @@ export default function BotSection() {
           </div>
           <h2 className="text-white text-2xl font-bold mb-3">Coming Soon</h2>
           <p className="text-[#94A3B8] max-w-lg leading-relaxed mb-6">
-            We&apos;re building automation features that connect OrcaBot signals directly to your
+            We&apos;re building automation features that connect Orca signals directly to your
             trading setup — from simple webhooks to full broker integration. No more manual signal
             monitoring.
           </p>

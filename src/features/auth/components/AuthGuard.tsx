@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 // Paths used for authentication flow (login, callback)
 const AUTH_PATHS = ['/login', '/auth/callback'] as const;
 // All publicly accessible paths (no login required)
-const PUBLIC_PATHS = ['/', '/orcabot', '/about', ...AUTH_PATHS] as const;
+const PUBLIC_PATHS = ['/', '/about', ...AUTH_PATHS] as const;
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { token, isHydrated } = useAuthStore();

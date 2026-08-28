@@ -57,7 +57,7 @@ export default function SubscriptionSection() {
           </div>
           <div className="space-y-3 mb-6">
             {[
-              "Access to OrcaBot screener",
+              "Access to Orca screener",
               "Up to 5 watchlist assets",
               "Up to 3 saved alerts",
               "Standard refresh rate",
@@ -107,7 +107,7 @@ export default function SubscriptionSection() {
                 "Unlimited saved alerts",
                 "Priority data refresh",
                 "Advanced ADX & EMA metrics",
-                "OrcaBot signal history",
+                "Signal history",
               ].map((f) => (
                 <div key={f} className="flex items-center gap-2.5 text-sm">
                   <Check className="w-4 h-4 text-[#FFD700] shrink-0" />

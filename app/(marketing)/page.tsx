@@ -831,7 +831,6 @@ export default function Page() {
                 <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Start your free 7-day trial</a>
               </div>
             </div>
-            <p className="plan-foot">OrcaBot 2.0 is a separate one-time purchase for people who want the execution layer. It is not required for anything above. <a href="/orcabot">See what it does</a>.</p>
           </div>
         </section>
 
@@ -877,7 +876,7 @@ export default function Page() {
                 <ul>
                   <li><a href="/screener">Screener</a></li>
                   <li><a href="/journal">OrcaJournal</a></li>
-                  <li><a href="/orcabot">OrcaBot 2.0</a></li>
+
                   <li><a href="/academy">Academy</a></li>
                   <li><a href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">The Pod</a></li>
                 </ul>

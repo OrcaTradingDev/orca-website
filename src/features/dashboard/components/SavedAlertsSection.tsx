@@ -44,7 +44,7 @@ export default function SavedAlertsSection() {
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-white text-[32px]">Saved Alerts</h1>
-        <p className="text-[#94A3B8]">Get notified when OrcaBot signals change</p>
+        <p className="text-[#94A3B8]">Get notified when Orca signals change</p>
       </div>
 
       {/* Empty state */}

@@ -480,10 +480,10 @@ function OrcaAnalyticsCard() {
       <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", padding: "20px 22px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
           <span style={{ fontSize: "16px" }}>🐋</span>
-          <span style={{ color: "#94A3B8", fontSize: "14px", fontWeight: 600 }}>OrcaBot Performance</span>
+          <span style={{ color: "#94A3B8", fontSize: "14px", fontWeight: 600 }}>Orca Performance</span>
         </div>
         <div style={{ color: "#475569", fontSize: "13px" }}>
-          Log trades manually to start seeing how your performance correlates with OrcaBot signals.
+          Log trades manually to start seeing how your performance correlates with Orca signals.
         </div>
       </div>
     );
@@ -493,7 +493,7 @@ function OrcaAnalyticsCard() {
     <div style={{ background: "#14181F", border: "1px solid #1E293B", borderRadius: "12px", padding: "22px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "18px" }}>
         <span style={{ fontSize: "16px" }}>🐋</span>
-        <span style={{ color: "white", fontSize: "15px", fontWeight: 600 }}>OrcaBot Performance</span>
+        <span style={{ color: "white", fontSize: "15px", fontWeight: 600 }}>Orca Performance</span>
         <span style={{ color: "#475569", fontSize: "12px", marginLeft: "auto" }}>Based on {data.by_score.reduce((s, b) => s + b.trades, 0)} trades with Orca data</span>
       </div>
 

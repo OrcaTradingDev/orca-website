@@ -418,11 +418,6 @@ export default function AboutPage() {
                   every week — calling out setups, reviewing decisions, pulling apart wins and losses in
                   front of everyone who needs to see it. That is not scalable. That is the point.
                 </p>
-                <p>
-                  OrcaBot 2.0 came from the same conviction applied to execution: most traders do not
-                  fail because their read was wrong. They fail in the space between the read and the
-                  trade. OrcaBot removes that space.
-                </p>
               </div>
             </div>
           </div>
@@ -511,15 +506,6 @@ export default function AboutPage() {
                 </p>
               </div>
               <div className="ab-product">
-                <span className="ab-product__tag ab-product__tag--early">Early access</span>
-                <h3>OrcaBot 2.0</h3>
-                <p>
-                  Hybrid automated trading for cTrader. You set the directional bias — one decision per
-                  day. The system handles entries, exits, risk, and trade management. Five-layer
-                  validation means it only fires when conditions are actually there.
-                </p>
-              </div>
-              <div className="ab-product">
                 <span className="ab-product__tag ab-product__tag--free">Free · Always</span>
                 <h3>The Discord</h3>
                 <p>
@@ -554,11 +540,6 @@ export default function AboutPage() {
                 The Academy is free so the room stays mixed. The Pod membership goes further — into
                 the depth, the coaching, the library — but the foundation is always open.
                 Because a community that only talks to itself stops learning.
-              </p>
-              <p>
-                OrcaBot clients get their own private hub — direct support, live updates, strategy
-                documents, and a team that is present every day. When you buy OrcaBot you are not
-                buying a file. You are entering a relationship with the people who built it.
               </p>
             </div>
           </div>
@@ -617,7 +598,6 @@ export default function AboutPage() {
             </div>
             <p style={{ maxWidth: '620px', fontSize: '1.05rem' }}>
               The screener is live. The journal is live. The Academy is being built out.
-              OrcaBot 2.0 is in early access with its first clients running it live.
               The Pod Library is growing. The webhook API, broker integration, and risk calculator
               are on the roadmap.
             </p>
