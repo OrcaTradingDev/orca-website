@@ -14,7 +14,8 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URI ?? '#'
+const DISCORD_URL    = process.env.NEXT_PUBLIC_DISCORD_URI   ?? '#'
+const CLIENT_HUB_URL = process.env.NEXT_PUBLIC_CLIENT_HUB_URI ?? DISCORD_URL
 
 export default function Page() {
   const faq = [
@@ -335,21 +336,36 @@ export default function Page() {
         .lp .lib span { font-size: 13.5px; line-height: 1.5; color: #8A9BA6; }
         .lp .pod-cta { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 
+        /* Trial badge */
+        .lp .trial-badge { display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg,#1B4A5C,#1D4A3C); border: 1px solid #2A6A58; border-radius: 999px; padding: 7px 16px; align-self: flex-start; }
+        .lp .trial-badge span { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--teal-dim); }
+        .lp .trial-callout { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg,var(--teal-deep),#0A1A14); border: 1px solid var(--teal-line); border-radius: 12px; padding: 18px 22px; }
+        .lp .trial-callout svg { flex-shrink: 0; color: var(--teal); }
+        .lp .trial-callout p { font-size: 15px; line-height: 1.55; color: #B6D8CC; }
+        .lp .trial-callout b { color: var(--teal-dim); font-weight: 600; }
+        .lp .btn-trial { background: linear-gradient(135deg,var(--teal),#2CC494); color: #041A13; font-weight: 700; border: none; box-shadow: 0 0 28px rgba(53,214,164,0.35); }
+        .lp .btn-trial:hover { background: linear-gradient(135deg,#58E8C0,#35D6A4); transform: translateY(-2px); box-shadow: 0 0 38px rgba(53,214,164,0.5); color: #041A13; }
+
         /* Pricing */
         .lp .plans { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
         @media (max-width: 940px) { .lp .plans { grid-template-columns: 1fr; } }
         .lp .plan { background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 28px 28px 30px; display: flex; flex-direction: column; gap: 14px; }
-        .lp .plan.hi { background: var(--surface-2); border-color: var(--violet-line); }
+        .lp .plan.hi { background: linear-gradient(160deg,#13102A 0%,#0E0C1E 100%); border-color: var(--violet-line); box-shadow: 0 0 0 1px #3A3270, 0 20px 60px rgba(139,124,240,0.15); position: relative; overflow: hidden; }
+        .lp .plan.hi::before { content: ""; position: absolute; inset: 0; background: radial-gradient(500px 240px at 50% -40px,rgba(139,124,240,0.12) 0%,transparent 70%); pointer-events: none; }
+        .lp .plan.hi::after { content: "BEST VALUE"; position: absolute; top: 16px; right: -28px; background: var(--violet); color: #fff; font-size: 9px; font-weight: 800; letter-spacing: 0.14em; padding: 5px 36px; transform: rotate(45deg); }
         .lp .plan h3 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
         .lp .plan .fig { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
         .lp .plan .fig b { font-family: var(--f-display); font-size: 36px; font-weight: 700; letter-spacing: -0.03em; }
         .lp .plan .fig span { font-size: 14px; color: #8A9BA6; }
+        .lp .plan .trial-line { font-size: 13px; color: var(--teal-dim); font-weight: 600; background: var(--teal-bg); border: 1px solid var(--teal-line); border-radius: 6px; padding: 7px 12px; display: flex; align-items: center; gap: 8px; }
         .lp .plan p { font-size: 14.5px; line-height: 1.58; color: #8A9BA6; }
         .lp .plan ul { display: flex; flex-direction: column; gap: 8px; }
         .lp .plan li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; color: #A6B6C0; }
         .lp .plan li::before { content: ""; width: 5px; height: 5px; border-radius: 999px; background: var(--cyan); margin-top: 8px; flex-shrink: 0; }
         .lp .plan.hi li::before { background: var(--violet); }
         .lp .plan .btn { margin-top: auto; }
+        .lp .btn-pod { background: linear-gradient(135deg,#7B6AE0,#9B8CF8); color: #fff; box-shadow: 0 0 24px rgba(139,124,240,0.4); border: none; font-weight: 700; }
+        .lp .btn-pod:hover { background: linear-gradient(135deg,#8B7CF0,#B0A0FF); transform: translateY(-2px); box-shadow: 0 0 36px rgba(139,124,240,0.55); color: #fff; }
         .lp .plan-foot { font-size: 13.5px; line-height: 1.6; color: var(--text-3); }
 
         /* FAQ */
@@ -394,7 +410,7 @@ export default function Page() {
             <div className="hero-copy">
               <div className="badge">
                 <span className="dot" />
-                <span>Screener live now</span>
+                <span>Screener live · 7-day free trial</span>
               </div>
 
               <h1>One way of reading the market.<br /><em>Four ways to use it.</em></h1>
@@ -404,12 +420,12 @@ export default function Page() {
               </p>
 
               <div className="hero-ctas">
-                <a className="btn btn-primary" href="/screener">Open the screener free</a>
-                <a className="btn btn-discord" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
+                <a className="btn btn-trial" href="/screener">Try the screener free — 7 days</a>
+                <a className="btn btn-discord" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
               </div>
 
               <div className="hero-sub">
-                <span className="hero-sub-note">No card, no trial clock.</span>
+                <span className="hero-sub-note">No card needed to start.</span>
                 <a className="underlink" href="/academy">Or start with the free Academy →</a>
               </div>
             </div>
@@ -587,13 +603,13 @@ export default function Page() {
                 <figcaption>The instrument. The forecast fan, the timeframe breakdown, and every component of the score itemised.</figcaption>
               </figure>
               <div className="stack-24" style={{ justifyContent: 'center' }}>
-                <div className="shipping">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#35D6A4" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.9H20l-4.9 3.6 1.9 5.9L12 14.8 7 18.4l1.9-5.9L4 8.9h6.1z"/></svg>
-                  <p><b>It is live and it keeps moving.</b> The screener is not in a waitlist beta. There is a free version you can use right now, and it gets new features regularly. The ML forecast and the forward state model went in recently.</p>
+                <div className="trial-callout">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                  <p><b>7 days free. No card.</b> Try every instrument, every timeframe, the ML forecast and the forward state model — completely free. If you decide it is not for you, you close the tab and nothing happens.</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
-                  <a className="btn btn-primary" href="/screener">Open the screener, free</a>
-                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card, no trial clock.</span>
+                  <a className="btn btn-trial" href="/screener">Start your 7-day free trial</a>
+                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card needed to start.</span>
                 </div>
               </div>
             </div>
@@ -763,7 +779,7 @@ export default function Page() {
             </div>
 
             <div className="pod-cta">
-              <a className="btn btn-discord" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Join The Pod</a>
+              <a className="btn btn-pod" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Start your free 7-day trial</a>
               <a className="btn btn-ghost" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Or start in the free Discord</a>
             </div>
           </div>
@@ -790,14 +806,19 @@ export default function Page() {
               </div>
               <div className="plan hi">
                 <h3>The Pod</h3>
-                <div className="fig"><b>€19.99</b><span>per month</span></div>
+                <div className="fig"><b style={{ color: '#B0A0FF' }}>€29.99</b><span>per month</span></div>
+                <div className="trial-line">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                  7-day free trial — no card needed
+                </div>
                 <ul>
                   <li>Weekly calls and chart reviews</li>
                   <li>Ask Bennie, Market Watch, Wins &amp; Losses</li>
                   <li>The Pod Library: See, Read, Wyckoff, OTOS, The Trader</li>
                   <li>Share your journal for direct coaching</li>
+                  <li>Full screener premium access included</li>
                 </ul>
-                <a className="btn btn-discord" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Join The Pod</a>
+                <a className="btn btn-pod" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Start your free 7-day trial</a>
               </div>
               <div className="plan">
                 <h3>Screener Premium</h3>
@@ -835,12 +856,12 @@ export default function Page() {
         {/* CLOSING */}
         <section className="sec closing" id="close">
           <h2>Start with the read. The rest can wait.</h2>
-          <p className="lede">Open the screener free, join the Discord, or start with the Academy — all three are available right now without a card.</p>
+          <p className="lede">Try the full screener free for 7 days — no card. Or join the Discord and start with the Academy right now.</p>
           <div className="closing-ctas">
-            <a className="btn btn-primary" href="/screener">Open the screener</a>
-            <a className="btn btn-discord" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
+            <a className="btn btn-trial" href="/screener">Try free for 7 days</a>
+            <a className="btn btn-discord" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
           </div>
-          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card, no trial clock, no weekly nag email if you join the Discord.</span>
+          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card needed. Cancel any time. The Academy and Discord are always free.</span>
         </section>
 
         {/* FOOTER */}
@@ -858,7 +879,7 @@ export default function Page() {
                   <li><a href="/journal">OrcaJournal</a></li>
                   <li><a href="/orcabot">OrcaBot 2.0</a></li>
                   <li><a href="/academy">Academy</a></li>
-                  <li><a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">The Pod</a></li>
+                  <li><a href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">The Pod</a></li>
                 </ul>
               </div>
               <div className="foot-col">
