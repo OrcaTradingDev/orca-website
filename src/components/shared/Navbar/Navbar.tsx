@@ -58,8 +58,6 @@ export function Navbar() {
               {/* Section anchors — homepage only */}
               {isHome && (
                 <>
-                  <a href="#screener" className="navbar__link">Screener</a>
-                  <a href="#journal"  className="navbar__link">Journal</a>
                   <a href="#academy"  className="navbar__link">Academy</a>
                   <a href="#pod"      className="navbar__link">The Pod</a>
                 </>
@@ -132,8 +130,6 @@ export function Navbar() {
             )}
             {isHome && (
               <>
-                <a href="#screener" className="navbar__mobile-link" onClick={handleLinkClick}>Screener</a>
-                <a href="#journal"  className="navbar__mobile-link" onClick={handleLinkClick}>Journal</a>
                 <a href="#academy"  className="navbar__mobile-link" onClick={handleLinkClick}>Academy</a>
                 <a href="#pod"      className="navbar__mobile-link" onClick={handleLinkClick}>The Pod</a>
               </>
