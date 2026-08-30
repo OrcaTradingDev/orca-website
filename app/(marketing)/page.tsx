@@ -646,6 +646,12 @@ export default function Page() {
               </div>
             </div>
 
+            <figure className="shot">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/journal-dashboard.png" width={1400} height={900} alt="OrcaJournal dashboard showing 92% process followed, 52% no-trade share, a cumulative R equity curve, and the Orca Improvement Center with actionable coaching points." loading="lazy" />
+              <figcaption>Process followed: 92%. No-trade share: 52%. These are the numbers that compound. Not the P&amp;L.</figcaption>
+            </figure>
+
             <div className="stack-24">
               <h3 style={{ fontSize: 'clamp(22px,3vw,28px)', fontWeight: 700, fontFamily: 'var(--f-display)', letterSpacing: '-0.02em' }}>The OTOS funnel, run one stage at a time.</h3>
               <p className="lede" style={{ maxWidth: '74ch' }}>Every decision goes top to bottom through the same seven stages, and you can stop honestly at any of them. Stopping is a successful outcome, which is the whole idea.</p>
@@ -665,6 +671,12 @@ export default function Page() {
               <b>It also tells you which conditions you are actually good in.</b>
               <span>Because every decision carries its screener context, the analytics group your results by market character, conviction, Orca score band and Orca status. That is how you find out that your best play in a range is not your best play in a trend, using your own trades rather than someone&apos;s opinion.</span>
             </div>
+
+            <figure className="shot">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/assets/journal-conditions.png" width={1400} height={820} alt="Performance by condition table showing results grouped by market character (ranging, expansion, trending), conviction level, Orca score band, and Orca status." loading="lazy" />
+              <figcaption>Every closed trade, grouped by the conditions it was taken in. Market character, conviction, Orca score band, Orca status. The table tells you where your edge actually is — and where it isn&apos;t.</figcaption>
+            </figure>
 
             <div>
               <a className="btn btn-primary" href="/journal">Open the Journal</a>
