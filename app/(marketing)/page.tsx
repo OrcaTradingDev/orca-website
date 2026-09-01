@@ -236,6 +236,9 @@ export default function Page() {
         .lp .shots { display: grid; grid-template-columns: 1fr; gap: 18px; }
         .lp .shot { border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; background: var(--surface-2); margin: 0; }
         .lp .shot figcaption { padding: 13px 18px; border-top: 1px solid #16232C; font-size: 13px; color: #8A9BA6; }
+        .lp .jrn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .lp .jrn-grid .shot figcaption { font-size: 12px; padding: 10px 14px; }
+        @media (max-width: 640px) { .lp .jrn-grid { grid-template-columns: 1fr; } }
 
         .lp .shipping { display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--teal-line); background: var(--teal-bg); border-radius: 10px; padding: 18px 22px; }
         .lp .shipping svg { flex-shrink: 0; margin-top: 2px; }
@@ -646,11 +649,18 @@ export default function Page() {
               </div>
             </div>
 
-            <figure className="shot">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/journal-dashboard.png" width={1400} height={900} alt="OrcaJournal dashboard showing 92% process followed, 52% no-trade share, a cumulative R equity curve, and the Orca Improvement Center with actionable coaching points." loading="lazy" />
-              <figcaption>Process followed: 92%. No-trade share: 52%. These are the numbers that compound. Not the P&amp;L.</figcaption>
-            </figure>
+            <div className="jrn-grid">
+              <figure className="shot">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/journal-dashboard.png" width={1400} height={900} alt="Dashboard: 92% process followed, 52% no-trade share, equity curve, Orca Improvement Center." loading="lazy" />
+                <figcaption>Process followed: 92%. No-trade share: 52%. The numbers that actually compound.</figcaption>
+              </figure>
+              <figure className="shot">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/journal-log.png" width={1400} height={960} alt="Journal trade log listing each decision with market, grade, Orca score, status, and outcome." loading="lazy" />
+                <figcaption>Every decision in the same place. Grade, Orca score, status at the time. The log does not forget.</figcaption>
+              </figure>
+            </div>
 
             <div className="stack-24">
               <h3 style={{ fontSize: 'clamp(22px,3vw,28px)', fontWeight: 700, fontFamily: 'var(--f-display)', letterSpacing: '-0.02em' }}>The OTOS funnel, run one stage at a time.</h3>
@@ -672,11 +682,28 @@ export default function Page() {
               <span>Because every decision carries its screener context, the analytics group your results by market character, conviction, Orca score band and Orca status. That is how you find out that your best play in a range is not your best play in a trend, using your own trades rather than someone&apos;s opinion.</span>
             </div>
 
-            <figure className="shot">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/assets/journal-conditions.png" width={1400} height={820} alt="Performance by condition table showing results grouped by market character (ranging, expansion, trending), conviction level, Orca score band, and Orca status." loading="lazy" />
-              <figcaption>Every closed trade, grouped by the conditions it was taken in. Market character, conviction, Orca score band, Orca status. The table tells you where your edge actually is — and where it isn&apos;t.</figcaption>
-            </figure>
+            <div className="jrn-grid">
+              <figure className="shot">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/journal-conditions.png" width={1400} height={820} alt="Performance by condition table grouped by market character, conviction, Orca score band, and Orca status." loading="lazy" />
+                <figcaption>Your trades by market character, conviction, and Orca status. Where your edge actually is — and where it isn&apos;t.</figcaption>
+              </figure>
+              <figure className="shot">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/journal-calendar.png" width={1400} height={900} alt="Daily P&L calendar for August 2026 showing green profit days, red loss days, and teal discipline days." loading="lazy" />
+                <figcaption>The calendar view. Green days, red days, discipline days. The month in one look.</figcaption>
+              </figure>
+              <figure className="shot">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/journal-grades.webp" width={1400} height={820} alt="R distribution bar chart, trade grades donut, and by-day-of-week table showing edge and leaks." loading="lazy" />
+                <figcaption>Trade grades, R distribution, and where in the week your edge and your leaks show up.</figcaption>
+              </figure>
+              <figure className="shot">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/assets/journal-analytics.png" width={1400} height={820} alt="Analytics section with average win/loss, payoff ratio, streaks, and equity curve with drawdown fill." loading="lazy" />
+                <figcaption>The equity curve, with drawdown. The numbers your broker does not show you.</figcaption>
+              </figure>
+            </div>
 
             <div>
               <a className="btn btn-primary" href="/journal">Open the Journal</a>

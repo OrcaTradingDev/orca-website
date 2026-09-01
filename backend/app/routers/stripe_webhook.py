@@ -70,22 +70,35 @@ async def stripe_webhook(
             return {"status": "ok", "note": "no email"}
 
         customer_email = customer_email.strip().lower()
-        # Needed later to cancel the subscription (subscription id) and to
-        # match subscription.* webhook events back to this user (they carry
-        # a customer id, not an email).
         stripe_customer_id = session.get("customer")
         stripe_subscription_id = session.get("subscription")
-        log.info("Granting screener_access to %s", customer_email)
+
+        # Only grant screener_access for the Screener Premium product.
+        # In the Stripe Dashboard, set metadata {"product": "screener_premium"}
+        # on the Screener Premium payment link. Pod and other purchases will
+        # have no such metadata and must NOT receive screener access.
+        metadata = session.get("metadata") or {}
+        is_screener_purchase = metadata.get("product") == "screener_premium"
+
+        values: dict = {
+            "stripe_customer_id": stripe_customer_id,
+            "stripe_subscription_id": stripe_subscription_id,
+            "subscription_cancel_at_period_end": False,
+        }
+        if is_screener_purchase:
+            values["screener_access"] = True
+            log.info("Granting screener_access to %s", customer_email)
+        else:
+            log.info(
+                "checkout.session.completed for %s — product=%r, screener_access NOT granted",
+                customer_email,
+                metadata.get("product"),
+            )
 
         result = await db.execute(
             update(User)
             .where(User.email == customer_email)
-            .values(
-                screener_access=True,
-                stripe_customer_id=stripe_customer_id,
-                stripe_subscription_id=stripe_subscription_id,
-                subscription_cancel_at_period_end=False,
-            )
+            .values(**values)
             .returning(User.id)
         )
         await db.commit()
@@ -94,7 +107,10 @@ async def stripe_webhook(
         if matched is None:
             log.warning("Payment from %s but no matching user found", customer_email)
         else:
-            log.info("screener_access granted to user id=%s (%s)", matched[0], customer_email)
+            log.info(
+                "checkout completed: user id=%s (%s) screener_access=%s",
+                matched[0], customer_email, is_screener_purchase,
+            )
 
     elif event["type"] == "customer.subscription.updated":
         sub = event["data"]["object"].to_dict()
