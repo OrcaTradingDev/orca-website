@@ -1,7 +1,18 @@
-import JournalApp from "@/features/journal/components/JournalApp";
-
-export const metadata = { title: "OrcaJournal — Trader Development" };
+'use client'
 
 export default function JournalPage() {
-  return <JournalApp />;
+  return (
+    <iframe
+      src="/journal-app.html"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        width: '100%',
+        height: '100%',
+        border: 'none',
+        zIndex: 100,
+      }}
+      title="OrcaJournal"
+    />
+  )
 }
