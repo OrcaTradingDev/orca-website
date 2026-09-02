@@ -327,29 +327,19 @@ export default function AboutPage() {
         {/* FOUNDER */}
         <section className="ab-section">
           <div className="wrap">
-            <div className="ab-founder">
-              {/* Drop the founder photo at public/assets/bennie.jpg */}
-              <img
-                src="/assets/bennie.jpg"
-                alt="Bennie, founder of OrcaTrading"
-                className="ab-founder__photo"
-              />
-              <div className="ab-founder__text">
-                <div className="eyebrow">The founder</div>
-                <h2>Built by a trader, for traders.</h2>
-                <p>
-                  OrcaTrading was founded by <strong>Bennie</strong>. A trader who got tired of the gap
-                  between what trading education promises and what it actually delivers. The tools were
-                  built because they were needed, not because there was a market opportunity. The academy
-                  is free because Bennie knows what it costs to learn this without one.
-                </p>
-                <p>
-                  The Pod is not a course library behind a paywall. It is a room where Bennie is present
-                  every week, calling out setups, reviewing decisions, and pulling apart wins and losses
-                  in front of everyone who needs to see it. That is not scalable. That is the point.
-                </p>
-              </div>
-            </div>
+            <div className="eyebrow">The founder</div>
+            <h2>Built by a trader, for traders.</h2>
+            <p style={{ marginTop: 12 }}>
+              OrcaTrading was founded by <strong>Bennie</strong>. A trader who got tired of the gap
+              between what trading education promises and what it actually delivers. The tools were
+              built because they were needed, not because there was a market opportunity. The academy
+              is free because Bennie knows what it costs to learn this without one.
+            </p>
+            <p>
+              The Pod is not a course library behind a paywall. It is a room where Bennie is present
+              every week, calling out setups, reviewing decisions, and pulling apart wins and losses
+              in front of everyone who needs to see it. That is not scalable. That is the point.
+            </p>
           </div>
         </section>
 

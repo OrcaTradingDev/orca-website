@@ -118,6 +118,17 @@ export default function AccountSection() {
             </div>
             <Switch className="data-[state=checked]:bg-[#00D4FF]" />
           </div>
+          <div className="h-px bg-[#1E293B]" />
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-white text-sm">Share journal data with OrcaTrading</Label>
+              <p className="text-[#64748B] text-xs mt-0.5">
+                Allows the team to review your journal entries for coaching and platform improvement.
+                Your data is never shared with third parties.
+              </p>
+            </div>
+            <Switch className="data-[state=checked]:bg-[#00D4FF]" />
+          </div>
         </div>
         <Button className="mt-6 bg-[#00D4FF] hover:bg-[#00B8E6] text-black font-semibold px-6">
           Save Preferences

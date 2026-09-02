@@ -425,12 +425,12 @@ export default function Page() {
 
               <div className="hero-ctas">
                 <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Try the screener free — 7 days</a>
-                <a className="btn btn-discord" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
+                <a className="btn btn-discord" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
               </div>
 
               <div className="hero-sub">
                 <span className="hero-sub-note">No card needed to start.</span>
-                <a className="underlink" href="/academy">Or start with the free Academy →</a>
+                <a className="underlink" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Or start with the free Academy →</a>
               </div>
             </div>
 
@@ -609,11 +609,10 @@ export default function Page() {
               <div className="stack-24" style={{ justifyContent: 'center' }}>
                 <div className="trial-callout">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-                  <p><b>7 days free. No card.</b> Try every instrument, every timeframe, the ML forecast and the forward state model — completely free. If you decide it is not for you, you close the tab and nothing happens.</p>
+                  <p><b>7 days free.</b> Try every instrument, every timeframe, the ML forecast and the forward state model — completely free. If you decide it is not for you, you close the tab and nothing happens.</p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
                   <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Start your 7-day free trial</a>
-                  <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card needed to start.</span>
                 </div>
               </div>
             </div>
@@ -774,7 +773,7 @@ export default function Page() {
             </div>
 
             <div>
-              <a className="btn btn-primary" href="/academy">Start the Academy, free</a>
+              <a className="btn btn-primary" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Start the Academy, free</a>
             </div>
           </div>
         </section>
@@ -819,7 +818,7 @@ export default function Page() {
             </div>
 
             <div className="pod-cta">
-              <a className="btn btn-pod" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Start your free 7-day trial</a>
+              <a className="btn btn-pod" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join The Pod</a>
               <a className="btn btn-ghost" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Or start in the free Discord</a>
             </div>
           </div>
@@ -858,10 +857,6 @@ export default function Page() {
               <div className="plan">
                 <h3>Screener Premium</h3>
                 <div className="fig"><b>€29.99</b><span>per month</span></div>
-                <div className="trial-line">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-                  7-day free trial — no card needed
-                </div>
                 <ul>
                   <li>Every instrument and every timeframe</li>
                   <li>Advanced columns, ML forecast and forward state</li>
@@ -894,12 +889,12 @@ export default function Page() {
         {/* CLOSING */}
         <section className="sec closing" id="close">
           <h2>Start with the read. The rest can wait.</h2>
-          <p className="lede">Try the full screener free for 7 days — no card. Or join the Discord and start with the Academy right now.</p>
+          <p className="lede">Try the full screener free for 7 days. Or join the Discord and start with the Academy right now.</p>
           <div className="closing-ctas">
             <a className="btn btn-trial" href={SCREENER_BUY_URL} target="_blank" rel="noopener noreferrer">Try free for 7 days</a>
-            <a className="btn btn-discord" href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
+            <a className="btn btn-discord" href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Join the Discord</a>
           </div>
-          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>No card needed. Cancel any time. The Academy and Discord are always free.</span>
+          <span style={{ fontSize: 13, color: 'var(--text-3)' }}>Cancel any time. The Academy and Discord are always free.</span>
         </section>
 
         {/* FOOTER */}
@@ -916,7 +911,7 @@ export default function Page() {
                   <li><a href="/screener">Screener</a></li>
                   <li><a href="/journal">OrcaJournal</a></li>
 
-                  <li><a href="/academy">Academy</a></li>
+                  <li><a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Academy</a></li>
                   <li><a href={CLIENT_HUB_URL} target="_blank" rel="noopener noreferrer">The Pod</a></li>
                 </ul>
               </div>
@@ -924,7 +919,6 @@ export default function Page() {
                 <h4>COMPANY</h4>
                 <ul>
                   <li><a href="/about">About</a></li>
-                  <li><a href="/contact">Contact</a></li>
                   <li><a href={DISCORD_URL} target="_blank" rel="noopener noreferrer">Discord</a></li>
                 </ul>
               </div>
