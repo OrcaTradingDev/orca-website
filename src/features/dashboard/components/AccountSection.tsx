@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Mail, Shield, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,9 +15,54 @@ import {
 import { useAuthStore } from "@/store/auth-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+const PREFS_KEY = "orca_account_prefs";
+
+interface Prefs {
+  emailNotifications: boolean;
+  browserNotifications: boolean;
+  shareJournalData: boolean;
+  timezone: string;
+}
+
+const DEFAULT_PREFS: Prefs = {
+  emailNotifications: true,
+  browserNotifications: false,
+  shareJournalData: false,
+  timezone: "utc",
+};
+
+function loadPrefs(): Prefs {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    return raw ? { ...DEFAULT_PREFS, ...JSON.parse(raw) } : DEFAULT_PREFS;
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
 export default function AccountSection() {
   const user   = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+
+  const [prefs, setPrefs]   = useState<Prefs>(DEFAULT_PREFS);
+  const [saved, setSaved]   = useState(false);
+
+  useEffect(() => {
+    setPrefs(loadPrefs());
+  }, []);
+
+  const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) =>
+    setPrefs((p) => ({ ...p, [key]: value }));
+
+  const handleSave = () => {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // localStorage unavailable — silently ignore
+    }
+  };
 
   const initials =
     user?.name
@@ -90,7 +136,10 @@ export default function AccountSection() {
         <div className="space-y-5 max-w-sm">
           <div className="grid gap-2">
             <Label className="text-[#94A3B8] text-sm">Timezone</Label>
-            <Select defaultValue="utc">
+            <Select
+              value={prefs.timezone}
+              onValueChange={(v) => set("timezone", v)}
+            >
               <SelectTrigger className="bg-[#1A1F2E] border-[#2D3748] text-white focus:border-[#00D4FF]">
                 <SelectValue />
               </SelectTrigger>
@@ -109,29 +158,44 @@ export default function AccountSection() {
               <Label className="text-white text-sm">Email notifications</Label>
               <p className="text-[#64748B] text-xs mt-0.5">Alerts sent to your registered email</p>
             </div>
-            <Switch className="data-[state=checked]:bg-[#00D4FF]" defaultChecked />
+            <Switch
+              className="data-[state=checked]:bg-[#00D4FF]"
+              checked={prefs.emailNotifications}
+              onCheckedChange={(v) => set("emailNotifications", v)}
+            />
           </div>
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-white text-sm">Browser notifications</Label>
               <p className="text-[#64748B] text-xs mt-0.5">Push notifications in this browser</p>
             </div>
-            <Switch className="data-[state=checked]:bg-[#00D4FF]" />
+            <Switch
+              className="data-[state=checked]:bg-[#00D4FF]"
+              checked={prefs.browserNotifications}
+              onCheckedChange={(v) => set("browserNotifications", v)}
+            />
           </div>
           <div className="h-px bg-[#1E293B]" />
           <div className="flex items-center justify-between">
             <div>
               <Label className="text-white text-sm">Share journal data with OrcaTrading</Label>
               <p className="text-[#64748B] text-xs mt-0.5">
-                Allows the team to review your journal entries for coaching and platform improvement.
-                Your data is never shared with third parties.
+                Allows the team to review your entries for coaching. Your data is never shared with
+                third parties.
               </p>
             </div>
-            <Switch className="data-[state=checked]:bg-[#00D4FF]" />
+            <Switch
+              className="data-[state=checked]:bg-[#00D4FF]"
+              checked={prefs.shareJournalData}
+              onCheckedChange={(v) => set("shareJournalData", v)}
+            />
           </div>
         </div>
-        <Button className="mt-6 bg-[#00D4FF] hover:bg-[#00B8E6] text-black font-semibold px-6">
-          Save Preferences
+        <Button
+          className="mt-6 bg-[#00D4FF] hover:bg-[#00B8E6] text-black font-semibold px-6"
+          onClick={handleSave}
+        >
+          {saved ? "Saved" : "Save Preferences"}
         </Button>
       </div>
 
