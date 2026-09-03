@@ -11,6 +11,7 @@ interface JWTPayload {
   picture: string | null;
   screener_access: boolean;
   is_admin: boolean;
+  share_journal_data: boolean;
   iat: number;
   exp: number;
 }
@@ -24,6 +25,7 @@ interface AuthState {
     picture: string | null;
     screenerAccess: boolean;
     isAdmin: boolean;
+    shareJournalData: boolean;
   } | null;
   isHydrated: boolean;
   setAuth: (token: string) => void;
@@ -63,6 +65,7 @@ export const useAuthStore = create<AuthState>()(
               picture: decoded.picture,
               screenerAccess: decoded.screener_access ?? false,
               isAdmin: decoded.is_admin ?? false,
+              shareJournalData: decoded.share_journal_data ?? false,
             },
           });
         } catch (error) {
@@ -86,6 +89,7 @@ export const useAuthStore = create<AuthState>()(
               picture: decoded.picture,
               screenerAccess: decoded.screener_access ?? false,
               isAdmin: decoded.is_admin ?? false,
+              shareJournalData: decoded.share_journal_data ?? false,
             },
           });
         } catch (err) {

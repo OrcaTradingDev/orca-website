@@ -17,6 +17,7 @@ class User(Base):
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     picture: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     screener_access: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    share_journal_data: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     journal_coaching_access: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)

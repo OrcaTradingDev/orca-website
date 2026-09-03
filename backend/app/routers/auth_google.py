@@ -40,7 +40,7 @@ oauth.register(
 
 def _issue_app_jwt(
     *, sub: str, email: str, name: str, picture: Optional[str],
-    screener_access: bool, is_admin: bool
+    screener_access: bool, is_admin: bool, share_journal_data: bool = False,
 ) -> str:
     now = int(time.time())
     payload = {
@@ -51,6 +51,7 @@ def _issue_app_jwt(
         "picture": picture,
         "screener_access": screener_access or is_admin,  # admins always have screener access
         "is_admin": is_admin,
+        "share_journal_data": share_journal_data,
         "iat": now,
         "exp": now + 60 * 60 * 24 * 30,  # 30 days
     }
@@ -96,7 +97,7 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
     is_admin = email.lower() in ADMIN_EMAILS
 
     # Upsert user — create on first login, update name/picture on subsequent logins.
-    # screener_access is never overwritten here; it's toggled via the admin panel.
+    # screener_access and share_journal_data are never overwritten here.
     stmt = (
         insert(User)
         .values(google_sub=sub, email=email, name=name, picture=picture)
@@ -104,16 +105,18 @@ async def google_callback(request: Request, db: AsyncSession = Depends(get_db)):
             index_elements=["google_sub"],
             set_={"name": name, "picture": picture, "email": email},
         )
-        .returning(User.screener_access)
+        .returning(User.screener_access, User.share_journal_data)
     )
     result = await db.execute(stmt)
     await db.commit()
     row = result.fetchone()
     screener_access: bool = bool(row[0]) if row else False
+    share_journal_data: bool = bool(row[1]) if row else False
 
     app_token = _issue_app_jwt(
         sub=sub, email=email, name=name, picture=picture,
         screener_access=screener_access, is_admin=is_admin,
+        share_journal_data=share_journal_data,
     )
     return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback#token={app_token}")
 
@@ -123,11 +126,7 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ) -> dict:
-    """
-    Re-issue a JWT with up-to-date screener_access from the database.
-    Call this after a Stripe payment completes so the user gets instant
-    access without having to log out and back in.
-    """
+    """Re-issue a JWT with up-to-date fields from the database."""
     sub   = current_user["sub"]
     email = current_user["email"]
 
@@ -145,5 +144,50 @@ async def refresh_token(
         picture=db_user.picture,
         screener_access=db_user.screener_access,
         is_admin=is_admin,
+        share_journal_data=db_user.share_journal_data,
+    )
+    return {"token": new_token}
+
+
+from pydantic import BaseModel  # noqa: E402
+
+
+class PreferencesUpdate(BaseModel):
+    share_journal_data: bool
+
+
+@router.patch("/me/preferences")
+async def update_preferences(
+    body: PreferencesUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Persist the user's account preferences and return a refreshed JWT."""
+    sub   = current_user["sub"]
+    email = current_user["email"]
+
+    from sqlalchemy import update as sa_update  # noqa: PLC0415
+
+    await db.execute(
+        sa_update(User)
+        .where(User.google_sub == sub)
+        .values(share_journal_data=body.share_journal_data)
+    )
+    await db.commit()
+
+    result = await db.execute(select(User).where(User.google_sub == sub))
+    db_user = result.scalar_one_or_none()
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    is_admin  = email.lower() in ADMIN_EMAILS
+    new_token = _issue_app_jwt(
+        sub=sub,
+        email=email,
+        name=db_user.name or "",
+        picture=db_user.picture,
+        screener_access=db_user.screener_access,
+        is_admin=is_admin,
+        share_journal_data=db_user.share_journal_data,
     )
     return {"token": new_token}
