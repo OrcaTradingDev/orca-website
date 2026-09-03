@@ -2211,6 +2211,18 @@
       <div class="set-pane" data-p="features">
         <p class="dec-meta" style="margin:0 0 4px">Shape the journal to how you work. Switching a feature off only hides it, nothing is deleted, and switching it back on brings everything back exactly as it was. The funnel itself is the method and cannot be switched off.</p>
         <div id="ftrList"></div>
+        <div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--line)">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">Share journal data with OrcaTrading</div>
+              <div style="font-size:12.5px;color:var(--muted);line-height:1.55">Allow the team to review your entries for coaching and platform improvement. Your data is never shared with third parties.</div>
+              <div id="shareJournalStatus" style="font-size:12px;margin-top:6px;color:var(--muted)"></div>
+            </div>
+            <button id="btnShareJournalToggle" onclick="toggleShareJournal()" style="flex-shrink:0;appearance:none;width:44px;height:24px;border-radius:999px;border:none;cursor:pointer;position:relative;transition:background .2s;background:var(--line-strong)" title="Toggle data sharing">
+              <span style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s;display:block" id="shareJournalThumb"></span>
+            </button>
+          </div>
+        </div>
       </div>
       <div class="set-pane" data-p="tools">
       <div class="field">
@@ -3721,6 +3733,79 @@ document.getElementById('dashRange').addEventListener('change',e=>{dashRange=e.t
 document.getElementById('anaRange').addEventListener('change',e=>{anaRange=e.target.value;renderAnalytics();});
 function closeSettings(){document.getElementById('settingsOverlay').classList.remove('open');}
 document.getElementById('btnSettings').onclick=openSettings;
+
+// ── Data sharing consent ────────────────────────────────────────────────────
+function _getOrcaJwt(){
+  try{
+    const raw=localStorage.getItem('auth-storage');
+    if(!raw)return null;
+    const parsed=JSON.parse(raw);
+    return parsed?.state?.token||null;
+  }catch{return null;}
+}
+function _getShareJournalState(){
+  try{
+    const raw=localStorage.getItem('auth-storage');
+    if(!raw)return false;
+    const parsed=JSON.parse(raw);
+    return !!(parsed?.state?.user?.shareJournalData);
+  }catch{return false;}
+}
+function _renderShareToggle(on){
+  const btn=document.getElementById('btnShareJournalToggle');
+  const thumb=document.getElementById('shareJournalThumb');
+  if(!btn||!thumb)return;
+  btn.style.background=on?'var(--brand-2)':'var(--line-strong)';
+  thumb.style.transform=on?'translateX(20px)':'translateX(0)';
+}
+function _setShareStatus(msg,color){
+  const el=document.getElementById('shareJournalStatus');
+  if(el){el.textContent=msg;el.style.color=color||'var(--muted)';}
+}
+async function toggleShareJournal(){
+  const jwt=_getOrcaJwt();
+  if(!jwt){_setShareStatus('Sign in to change this setting.','var(--bad)');return;}
+  const current=_getShareJournalState();
+  const next=!current;
+  _renderShareToggle(next);
+  _setShareStatus('Saving…','var(--muted)');
+  try{
+    const apiBase=(localStorage.getItem('orca_api_base')||'').replace(/\/$/,'');
+    const res=await fetch(apiBase+'/auth/google/me/preferences',{
+      method:'PATCH',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+      body:JSON.stringify({share_journal_data:next}),
+    });
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const data=await res.json();
+    // Store the refreshed JWT back so the screener picks it up
+    if(data.token){
+      try{
+        const raw=localStorage.getItem('auth-storage');
+        const parsed=raw?JSON.parse(raw):{};
+        const decoded=JSON.parse(atob(data.token.split('.')[1]));
+        parsed.state=parsed.state||{};
+        parsed.state.token=data.token;
+        parsed.state.user=parsed.state.user||{};
+        parsed.state.user.shareJournalData=!!decoded.share_journal_data;
+        localStorage.setItem('auth-storage',JSON.stringify(parsed));
+      }catch{}
+    }
+    _setShareStatus(next?'Enabled — the team can now review your entries.':'Disabled — your entries stay private.', next?'var(--good)':'var(--muted)');
+  }catch(err){
+    // Roll back toggle on failure
+    _renderShareToggle(current);
+    _setShareStatus('Could not save — please try again.','var(--bad)');
+    console.error('share_journal_data PATCH failed',err);
+  }
+}
+// Seed toggle state whenever settings opens
+const _origOpenSettings=openSettings;
+openSettings=function(){
+  _origOpenSettings();
+  _renderShareToggle(_getShareJournalState());
+  _setShareStatus('');
+};
 document.getElementById('settingsOverlay').addEventListener('mousedown',e=>{if(e.target.id==='settingsOverlay')closeSettings();});
 document.getElementById('accentCustom').addEventListener('input',e=>{state.settings.accent=e.target.value;applyAccent();save();renderAccentSwatches();});
 document.getElementById('logoUpload').onclick=()=>document.getElementById('logoInput').click();

@@ -14,8 +14,6 @@ import {
 } from "@/components/ui/select";
 import { useAuthStore } from "@/store/auth-store";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { http } from "@/lib/http";
-import { jwtDecode } from "jwt-decode";
 
 const LOCAL_KEY = "orca_account_prefs";
 
@@ -41,43 +39,27 @@ function loadLocal(): LocalPrefs {
 }
 
 export default function AccountSection() {
-  const user        = useAuthStore((s) => s.user);
-  const logout      = useAuthStore((s) => s.logout);
-  const setAuth     = useAuthStore((s) => s.setAuth);
+  const user   = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
 
   const [local, setLocal]             = useState<LocalPrefs>(DEFAULT_LOCAL);
-  const [shareJournal, setShareJournal] = useState(false);
-  const [saving, setSaving]           = useState(false);
-  const [saved, setSaved]             = useState(false);
-  const [error, setError]             = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const [error, setError]   = useState<string | null>(null);
 
-  useEffect(() => {
-    setLocal(loadLocal());
-    // Seed from JWT — avoids showing a stale localStorage value
-    setShareJournal(user?.shareJournalData ?? false);
-  }, [user?.shareJournalData]);
+  useEffect(() => { setLocal(loadLocal()); }, []);
 
   const setL = <K extends keyof LocalPrefs>(key: K, value: LocalPrefs[K]) =>
     setLocal((p) => ({ ...p, [key]: value }));
 
-  const handleSave = async () => {
+  const handleSave = () => {
     setSaving(true);
     setError(null);
     try {
-      // Persist share_journal_data to the backend; receive a refreshed JWT
-      const { data } = await http.patch<{ token: string }>("/auth/google/me/preferences", {
-        share_journal_data: shareJournal,
-      });
-      // Store the refreshed token so shareJournalData stays in sync across tabs
-      setAuth(data.token);
-
-      // Local-only prefs (no backend column yet)
-      try { localStorage.setItem(LOCAL_KEY, JSON.stringify(local)); } catch { /* ignore */ }
-
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(local));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error(err);
+    } catch {
       setError("Failed to save — please try again.");
     } finally {
       setSaving(false);
@@ -190,21 +172,6 @@ export default function AccountSection() {
               className="data-[state=checked]:bg-[#00D4FF]"
               checked={local.browserNotifications}
               onCheckedChange={(v) => setL("browserNotifications", v)}
-            />
-          </div>
-          <div className="h-px bg-[#1E293B]" />
-          <div className="flex items-center justify-between">
-            <div>
-              <Label className="text-white text-sm">Share journal data with OrcaTrading</Label>
-              <p className="text-[#64748B] text-xs mt-0.5">
-                Allows the team to review your entries for coaching. Your data is never shared with
-                third parties.
-              </p>
-            </div>
-            <Switch
-              className="data-[state=checked]:bg-[#00D4FF]"
-              checked={shareJournal}
-              onCheckedChange={setShareJournal}
             />
           </div>
         </div>
