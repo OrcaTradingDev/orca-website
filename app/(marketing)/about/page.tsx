@@ -109,12 +109,15 @@ export default function AboutPage() {
         /* philosophy */
         .ab-pillars {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          grid-template-columns: repeat(2, 1fr);
           gap: 1px;
           background: var(--border);
           border: 1px solid var(--border);
           border-radius: var(--radius);
           overflow: hidden;
+        }
+        @media (max-width: 560px) {
+          .ab-pillars { grid-template-columns: 1fr; }
         }
         .ab-pillar {
           background: var(--surface);
