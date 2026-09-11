@@ -1,11 +1,17 @@
 import type { NextConfig } from "next";
 
+const DISCORD_URL = process.env.NEXT_PUBLIC_DISCORD_URI ?? 'https://discord.gg/eBqCQHwJdj'
+
 const nextConfig: NextConfig = {
-  /* config options here */
-  /*
-  Allowed remote image domains for user avatars
-  Google → lh3.googleusercontent.com
-  */
+  async redirects() {
+    return [
+      {
+        source: '/academy',
+        destination: DISCORD_URL,
+        permanent: false,
+      },
+    ]
+  },
   images : {
     remotePatterns: [
       {
